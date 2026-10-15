@@ -39,7 +39,7 @@ public static class AppShortcutHelper
         return false;
     }
 
-    public static void CreateOrUpdateShortcuts()
+    public static void CreateOrUpdateShortcuts(bool createIfMissing = true)
     {
         if (!OperatingSystem.IsWindows())
             return;
@@ -69,7 +69,7 @@ public static class AppShortcutHelper
                 // 1. Client shortcut (VibeSkua.lnk -> VibeSkua.exe)
                 if (File.Exists(clientExe))
                 {
-                    bool needCreateClient = true;
+                    bool needCreateClient = false;
                     if (File.Exists(clientLnk))
                     {
                         try
@@ -87,17 +87,17 @@ public static class AppShortcutHelper
                                 existingLink.IconPath = clientExe;
                                 existingLink.IconIndex = 0;
                                 existingLink.Save();
-                                needCreateClient = false;
-                            }
-                            else if (!string.IsNullOrEmpty(target) && target.Equals(clientExe, StringComparison.OrdinalIgnoreCase))
-                            {
-                                needCreateClient = false;
                             }
                         }
                         catch
                         {
-                            needCreateClient = true;
+                            if (createIfMissing)
+                                needCreateClient = true;
                         }
+                    }
+                    else if (createIfMissing)
+                    {
+                        needCreateClient = true;
                     }
 
                     if (needCreateClient)
@@ -121,22 +121,14 @@ public static class AppShortcutHelper
                 // 2. Manager shortcut (VibeSkua Manager.lnk -> VibeSkua.Manager.exe)
                 if (File.Exists(managerExe))
                 {
-                    bool needCreateMgr = true;
+                    bool needCreateMgr = false;
                     if (File.Exists(managerLnk))
                     {
-                        try
-                        {
-                            using var existingLink = new ShellLink(managerLnk);
-                            string? target = existingLink.Target;
-                            if (!string.IsNullOrEmpty(target) && target.Equals(managerExe, StringComparison.OrdinalIgnoreCase))
-                            {
-                                needCreateMgr = false;
-                            }
-                        }
-                        catch
-                        {
-                            needCreateMgr = true;
-                        }
+                        // Existing shortcut is fine
+                    }
+                    else if (createIfMissing)
+                    {
+                        needCreateMgr = true;
                     }
 
                     if (needCreateMgr)

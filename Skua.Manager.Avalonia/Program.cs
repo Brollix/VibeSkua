@@ -30,11 +30,11 @@ internal static class Program
         InitializeAssemblyResolvers();
 
         VelopackApp.Build()
-            .OnAfterInstallFastCallback(_ => AppShortcutHelper.CreateOrUpdateShortcuts())
-            .OnAfterUpdateFastCallback(_ => AppShortcutHelper.CreateOrUpdateShortcuts())
+            .OnAfterInstallFastCallback(_ => AppShortcutHelper.CreateOrUpdateShortcuts(createIfMissing: true))
+            .OnAfterUpdateFastCallback(_ => AppShortcutHelper.CreateOrUpdateShortcuts(createIfMissing: true))
             .OnBeforeUninstallFastCallback(_ => AppShortcutHelper.RemoveClientShortcuts())
-            .OnFirstRun(_ => AppShortcutHelper.CreateOrUpdateShortcuts())
-            .OnRestarted(_ => AppShortcutHelper.CreateOrUpdateShortcuts())
+            .OnFirstRun(_ => AppShortcutHelper.CreateOrUpdateShortcuts(createIfMissing: true))
+            .OnRestarted(_ => AppShortcutHelper.CreateOrUpdateShortcuts(createIfMissing: true))
             .Run();
 
         const string eventName = @"Global\VibeSkua.Manager.SingleInstance.WakeEvent";
@@ -158,7 +158,7 @@ internal static class Program
             Skua.Core.Models.ClientFileSources.EnsureInitialized();
             if (AppShortcutHelper.IsInstalled())
             {
-                AppShortcutHelper.CreateOrUpdateShortcuts();
+                AppShortcutHelper.CreateOrUpdateShortcuts(createIfMissing: false);
             }
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }

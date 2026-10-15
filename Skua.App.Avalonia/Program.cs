@@ -125,7 +125,7 @@ internal static class Program
             VelopackApp.Build().Run();
             if (Skua.Shared.Avalonia.Utils.AppShortcutHelper.IsInstalled())
             {
-                Skua.Shared.Avalonia.Utils.AppShortcutHelper.CreateOrUpdateShortcuts();
+                Skua.Shared.Avalonia.Utils.AppShortcutHelper.CreateOrUpdateShortcuts(createIfMissing: false);
             }
             Environment.CurrentDirectory = AppContext.BaseDirectory;
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
