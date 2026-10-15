@@ -1,0 +1,190 @@
+<UserControl x:Class="Skua.Shared.Avalonia.Views.ScriptSchedulerView"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:vms="clr-namespace:Skua.Shared.Avalonia.ViewModels;assembly=Skua.Shared.Avalonia"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             x:DataType="vms:ScriptSchedulerViewModel"
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <Grid Margin="12" RowDefinitions="Auto,*,Auto" RowSpacing="8">
+
+        <!-- Title & Subtitle Header Card -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource SkuaSurfaceBrush}"
+                BorderBrush="{DynamicResource SkuaBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="12,10">
+            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="SCRIPT SCHEDULER &amp; PLAYLISTS"
+                               FontSize="10"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource SkuaMutedTextBrush}" />
+                    <TextBlock FontSize="16"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource SkuaTextBrush}"
+                               Text="Script Execution Queue" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Border Background="#163C29"
+                            BorderBrush="#10B981"
+                            BorderThickness="1"
+                            CornerRadius="20"
+                            Padding="10,4"
+                            VerticalAlignment="Center"
+                            IsVisible="{Binding IsRunningQueue}">
+                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                            <Ellipse Width="6" Height="6" Fill="#10B981" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding QueueStartedTime}"
+                                       FontSize="11"
+                                       FontWeight="Bold"
+                                       Foreground="#10B981" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{DynamicResource SkuaSurfaceAltBrush}"
+                            BorderBrush="{DynamicResource SkuaBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="20"
+                            Padding="10,4"
+                            VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ScriptQueue.Count, StringFormat='Total Queued: {0}'}"
+                                   FontSize="11"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource SkuaTextBrush}" />
+                    </Border>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Queue Items List -->
+        <Border Grid.Row="1"
+                Background="{DynamicResource SkuaPageBrush}"
+                BorderBrush="{DynamicResource SkuaBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="4">
+            <ListBox ItemsSource="{Binding ScriptQueue}"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     HorizontalAlignment="Stretch">
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <Border Background="{DynamicResource SkuaSurfaceBrush}"
+                                BorderBrush="{DynamicResource SkuaBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="6"
+                                Margin="0,0,0,4"
+                                Padding="10,8">
+                            <Grid ColumnDefinitions="3*,*,*,Auto,Auto" Margin="2" VerticalAlignment="Center">
+                                <TextBox Grid.Column="0"
+                                         Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
+                                         VerticalAlignment="Center"
+                                         FontWeight="SemiBold"
+                                         FontFamily="JetBrains Mono,Consolas,Courier New,monospace"
+                                         FontSize="12"
+                                         TextWrapping="Wrap"
+                                         Background="Transparent"
+                                         BorderThickness="0"
+                                         Foreground="{DynamicResource SkuaTextBrush}"
+                                         CaretBrush="{DynamicResource SkuaTextBrush}"
+                                         ToolTip.Tip="Rename this script instance" />
+                                
+                                <Border Grid.Column="1"
+                                        Background="{DynamicResource SkuaSurfaceAltBrush}"
+                                        BorderBrush="{DynamicResource SkuaBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="12"
+                                        Padding="8,2"
+                                        Margin="6,0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Status}"
+                                               FontSize="11"
+                                               FontWeight="Bold"
+                                               Foreground="{DynamicResource SkuaTextBrush}"/>
+                                </Border>
+                                
+                                <TextBlock Grid.Column="2"
+                                           Text="{Binding Duration}"
+                                           VerticalAlignment="Center"
+                                           FontSize="11"
+                                           Margin="6,0"
+                                           Foreground="{DynamicResource SkuaMutedTextBrush}" />
+                                
+                                <Button Grid.Column="3" 
+                                        Classes="skua-button" 
+                                        Command="{Binding DataContext.EditScriptConfigCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" 
+                                        CommandParameter="{Binding}" 
+                                        Width="30"
+                                        Height="30"
+                                        Padding="0"
+                                        Margin="6,0,0,0"
+                                        ToolTip.Tip="Edit Script Options">
+                                    <materialIcons:MaterialIcon Kind="Cog" Width="15" Height="15" />
+                                </Button>
+                                
+                                <Button Grid.Column="4" 
+                                        Classes="skua-button" 
+                                        Command="{Binding DataContext.RemoveScriptCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" 
+                                        CommandParameter="{Binding}" 
+                                        Width="30"
+                                        Height="30"
+                                        Padding="0"
+                                        Margin="4,0,0,0"
+                                        ToolTip.Tip="Remove from queue">
+                                    <materialIcons:MaterialIcon Kind="Close" Width="15" Height="15" Foreground="#EF4444" />
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+
+        <!-- Bottom Action Bar -->
+        <StackPanel Grid.Row="2"
+                    Orientation="Horizontal"
+                    HorizontalAlignment="Right"
+                    Spacing="8">
+            <Button Command="{Binding LoadPlaylistCommand}"
+                    Classes="skua-button">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <materialIcons:MaterialIcon Kind="FolderOpen" Width="14" Height="14" />
+                    <TextBlock Text="Load Playlist" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            
+            <Button Command="{Binding SavePlaylistCommand}"
+                    Classes="skua-button">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <materialIcons:MaterialIcon Kind="ContentSave" Width="14" Height="14" />
+                    <TextBlock Text="Save Playlist" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            
+            <Button Command="{Binding OpenScriptRepoCommand}"
+                    Classes="skua-button">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <materialIcons:MaterialIcon Kind="FolderSearch" Width="14" Height="14" />
+                    <TextBlock Text="Search Scripts" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            
+            <Button Command="{Binding ToggleQueueCommand}"
+                    Classes="skua-button"
+                    Classes.skua-danger="{Binding IsRunningQueue}"
+                    Classes.skua-primary="{Binding !IsRunningQueue}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <materialIcons:MaterialIcon Kind="Play" Width="14" Height="14" IsVisible="{Binding !IsRunningQueue}" />
+                    <materialIcons:MaterialIcon Kind="Stop" Width="14" Height="14" IsVisible="{Binding IsRunningQueue}" />
+                    <TextBlock Text="{Binding ToggleQueueText}" VerticalAlignment="Center" FontWeight="Bold" />
+                </StackPanel>
+            </Button>
+        </StackPanel>
+    </Grid>
+</UserControl>

@@ -1,0 +1,196 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:vms="clr-namespace:Skua.App.Avalonia.ViewModels"
+             x:DataType="vms:ScriptLoaderViewModel"
+             x:Class="Skua.App.Avalonia.Views.ScriptLoaderView">
+  
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="10" RowSpacing="8">
+        
+        <!-- 1. Header Status Card -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource SkuaSurfaceBrush}"
+                BorderBrush="{DynamicResource SkuaBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                Padding="12,8">
+            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="LOADED SCRIPT"
+                               FontSize="9"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource SkuaMutedTextBrush}"
+                               LetterSpacing="0.5" />
+                    <TextBlock FontSize="13"
+                               FontWeight="Bold"
+                               FontFamily="JetBrains Mono,Consolas,Courier New,monospace"
+                               Foreground="{DynamicResource SkuaTextBrush}"
+                               Text="{Binding LoadedScript, FallbackValue='No script loaded'}"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+
+                <Border Grid.Column="1"
+                        Background="{DynamicResource SkuaSurfaceAltBrush}"
+                        BorderBrush="{DynamicResource SkuaBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="14"
+                        Padding="8,3"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="{Binding ScriptErrorToolTip}">
+                    <StackPanel Orientation="Horizontal" Spacing="5" VerticalAlignment="Center">
+                        <Ellipse Width="6" Height="6" Fill="#10B981" VerticalAlignment="Center" />
+                        <TextBlock FontSize="10"
+                                   FontWeight="Bold"
+                                   Foreground="{DynamicResource SkuaTextBrush}"
+                                   Text="{Binding ScriptStatus, FallbackValue='[No script]'}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+        
+        <!-- 2. Action Buttons Grid (Uniform 32px height, 6px spacing) -->
+        <Grid Grid.Row="1"
+              ColumnDefinitions="*,*"
+              RowDefinitions="Auto,Auto,Auto,Auto"
+              RowSpacing="6"
+              ColumnSpacing="6">
+            
+            <!-- Load Script -->
+            <Button Grid.Row="0" Grid.Column="0"
+                    Classes="skua-button"
+                    Height="32"
+                    Padding="8,0"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding LoadScriptCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="FolderOpen" Width="15" Height="15" />
+                    <TextBlock Text="Load Script" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            
+            <!-- Open VSCode -->
+            <Button Grid.Row="0" Grid.Column="1"
+                    Classes="skua-button"
+                    Height="32"
+                    Padding="8,0"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding OpenVSCodeCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="MicrosoftVisualStudioCode" Width="15" Height="15" />
+                    <TextBlock Text="Open VSCode" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            
+            <!-- Edit Script -->
+            <Button Grid.Row="1" Grid.Column="0"
+                    Classes="skua-button"
+                    Height="32"
+                    Padding="8,0"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding EditScriptCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="FileEdit" Width="15" Height="15" />
+                    <TextBlock Text="Edit Script" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            
+            <!-- Search Scripts -->
+            <Button Grid.Row="1" Grid.Column="1"
+                    Classes="skua-button"
+                    Height="32"
+                    Padding="8,0"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding OpenScriptRepoCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="FolderSearch" Width="15" Height="15" />
+                    <TextBlock Text="Search Scripts" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            
+            <!-- Edit Script Options (Span 2) -->
+            <Button Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                    Classes="skua-button"
+                    Height="32"
+                    Padding="8,0"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding EditScriptConfigCommand}"
+                    IsEnabled="{Binding ToggleScriptEnabled}">
+                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="Cog" Width="15" Height="15" />
+                    <TextBlock Text="Edit Script Options" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            
+            <!-- Start / Stop Script Button -->
+            <Button Grid.Row="3" Grid.Column="0"
+                    Classes="skua-button"
+                    Classes.skua-danger="{Binding ScriptManager.ScriptRunning}"
+                    Classes.skua-primary="{Binding !ScriptManager.ScriptRunning}"
+                    Height="32"
+                    Padding="8,0"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding ToggleScriptCommand}"
+                    IsEnabled="{Binding ToggleScriptEnabled}">
+                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="Play"
+                                                Width="15" Height="15"
+                                                VerticalAlignment="Center"
+                                                IsVisible="{Binding !ScriptManager.ScriptRunning}" />
+                    <materialIcons:MaterialIcon Kind="Stop"
+                                                Width="15" Height="15"
+                                                VerticalAlignment="Center"
+                                                IsVisible="{Binding ScriptManager.ScriptRunning}" />
+                    <TextBlock Text="{Binding ToggleScriptText}" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+            
+            <!-- Pause / Resume Script Button -->
+            <Button Grid.Row="3" Grid.Column="1"
+                    Classes="skua-button"
+                    Height="32"
+                    Padding="8,0"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Command="{Binding TogglePauseScriptCommand}"
+                    IsEnabled="{Binding ScriptManager.ScriptRunning}">
+                <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                    <materialIcons:MaterialIcon Kind="{Binding TogglePauseScriptIcon}" Width="15" Height="15" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding TogglePauseScriptText}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </StackPanel>
+            </Button>
+        </Grid>
+        
+        <!-- 3. Script Logs Framed Card -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource SkuaSurfaceBrush}"
+                BorderBrush="{DynamicResource SkuaBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="6"
+                ClipToBounds="True">
+            <ContentControl Content="{Binding ScriptLogs}" />
+        </Border>
+        
+        <!-- 4. Report Issues Button -->
+        <Button Grid.Row="3"
+                Classes="skua-button outline"
+                Height="30"
+                Padding="8,0"
+                FontSize="11"
+                HorizontalAlignment="Stretch"
+                HorizontalContentAlignment="Center"
+                Foreground="{DynamicResource SkuaMutedTextBrush}"
+                Command="{Binding OpenBrowserFormCommand}"
+                ToolTip.Tip="Open Discord feedback and issue channel">
+            <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                <materialIcons:MaterialIcon Kind="HelpCircleOutline" Width="14" Height="14" VerticalAlignment="Center" />
+                <TextBlock Text="Report Issues to @Tato2/@bogalj" VerticalAlignment="Center" />
+            </StackPanel>
+        </Button>
+    </Grid>
+</UserControl>

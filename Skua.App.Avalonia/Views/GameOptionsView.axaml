@@ -1,0 +1,156 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:vms="clr-namespace:Skua.App.Avalonia.ViewModels.Options"
+             xmlns:sharedOptions="clr-namespace:Skua.Shared.Avalonia.Controls.Options;assembly=Skua.Shared.Avalonia"
+             x:Class="Skua.App.Avalonia.Views.GameOptionsView"
+             x:DataType="vms:GameOptionsViewModel"
+             mc:Ignorable="d" d:DesignHeight="680" d:DesignWidth="640">
+
+  <Grid Margin="12" RowDefinitions="Auto,*,Auto,Auto" RowSpacing="10">
+    
+    <!-- Top Filter Bar -->
+    <Border Grid.Row="0"
+            Background="{DynamicResource SkuaSurfaceBrush}"
+            BorderBrush="{DynamicResource SkuaBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="8">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" VerticalAlignment="Center">
+        <TextBox x:Name="SearchBox"
+                 Grid.Column="0"
+                 Height="34"
+                 VerticalContentAlignment="Center"
+                 Text="{Binding SearchText, Mode=TwoWay}"
+                 Watermark="Search game options..." />
+
+        <!-- Category Selector -->
+        <ComboBox Grid.Column="1"
+                  Width="190"
+                  Height="34"
+                  ItemsSource="{Binding Categories}"
+                  SelectedItem="{Binding SelectedCategory, Mode=TwoWay}" />
+      </Grid>
+    </Border>
+
+    <!-- Grouped Options Scroll Area -->
+    <ScrollViewer Grid.Row="1"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+      <ItemsControl ItemsSource="{Binding FilteredGroups}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vms:OptionGroupViewModel">
+            <Border Background="{DynamicResource SkuaSurfaceBrush}"
+                    BorderBrush="{DynamicResource SkuaBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8"
+                    Margin="0,0,0,10"
+                    Padding="14,12">
+              <StackPanel Spacing="10">
+                
+                <!-- Category Section Header -->
+                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="10" VerticalAlignment="Center">
+                  <materialIcons:MaterialIcon Grid.Column="0"
+                                              Kind="{Binding Icon}"
+                                              Width="20"
+                                              Height="20"
+                                              Foreground="{DynamicResource SkuaTextBrush}"
+                                              VerticalAlignment="Center" />
+                  <StackPanel Grid.Column="1" Spacing="1">
+                    <TextBlock Text="{Binding Title}"
+                               FontWeight="Bold"
+                               FontSize="14"
+                               Foreground="{DynamicResource SkuaTextBrush}" />
+                    <TextBlock Text="{Binding Description}"
+                               FontSize="11"
+                               Foreground="{DynamicResource SkuaMutedTextBrush}"
+                               TextWrapping="Wrap" />
+                  </StackPanel>
+                </Grid>
+
+                <Border Height="1" Background="{DynamicResource SkuaBorderBrush}" Margin="0,2,0,4" />
+
+                <!-- Options Item 2-Column Grid -->
+                <ItemsControl ItemsSource="{Binding Items}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                      <UniformGrid Columns="2" />
+                    </ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                      <sharedOptions:OptionItemControl Margin="2" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+              </StackPanel>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+
+    <!-- Relogin Server Selector Card -->
+    <Border Grid.Row="2"
+            Background="{DynamicResource SkuaSurfaceBrush}"
+            BorderBrush="{DynamicResource SkuaBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="12,8">
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12" VerticalAlignment="Center">
+        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <materialIcons:MaterialIcon Kind="ServerNetwork" Width="16" Height="16" Foreground="{DynamicResource SkuaMutedTextBrush}" />
+          <TextBlock Text="Relogin Server:"
+                     FontWeight="SemiBold"
+                     FontSize="12"
+                     Foreground="{DynamicResource SkuaTextBrush}"
+                     VerticalAlignment="Center" />
+        </StackPanel>
+        <ComboBox Grid.Column="1"
+                  HorizontalAlignment="Stretch"
+                  Height="34"
+                  ItemsSource="{Binding ServersList}"
+                  SelectedItem="{Binding SelectedServer, Mode=TwoWay}" />
+      </Grid>
+    </Border>
+
+    <!-- Bottom Action Bar -->
+    <Grid Grid.Row="3" ColumnDefinitions="Auto,Auto,*,Auto" ColumnSpacing="8">
+      <Button Grid.Column="0"
+              Classes="skua-button"
+              Height="34"
+              Command="{Binding ResetDefaultOptionsCommand}"
+              ToolTip.Tip="Reset to application default values">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <materialIcons:MaterialIcon Kind="Restore" Width="14" Height="14" />
+          <TextBlock Text="Defaults" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+
+      <Button Grid.Column="1"
+              Classes="skua-button"
+              Height="34"
+              Command="{Binding ResetOptionsCommand}"
+              ToolTip.Tip="Reset to saved user values">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <materialIcons:MaterialIcon Kind="Undo" Width="14" Height="14" />
+          <TextBlock Text="Reset" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+
+      <Button Grid.Column="3"
+              Classes="skua-button skua-primary"
+              Height="34"
+              Command="{Binding SaveOptionsCommand}">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <materialIcons:MaterialIcon Kind="ContentSave" Width="14" Height="14" />
+          <TextBlock Text="Save Options" VerticalAlignment="Center" />
+        </StackPanel>
+      </Button>
+    </Grid>
+
+  </Grid>
+</UserControl>

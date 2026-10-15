@@ -1,0 +1,56 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+        xmlns:shell="clr-namespace:Skua.Shared.Avalonia.Controls.Shell;assembly=Skua.Shared.Avalonia"
+        x:Class="ButlerV5.RosterWindow"
+        Classes="skua"
+        Title="Butler V5"
+        Width="620" Height="520"
+        MinWidth="500" MinHeight="360"
+        SystemDecorations="BorderOnly"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="32"
+        WindowStartupLocation="Manual">
+
+    <Border BorderBrush="{DynamicResource SkuaBorderBrush}"
+            BorderThickness="1"
+            Background="{DynamicResource SkuaSurfaceBrush}">
+        <Grid RowDefinitions="Auto,*">
+            <shell:WindowTitleBar Grid.Row="0" TitleText="Butler V5" />
+
+            <DockPanel Grid.Row="1" Margin="14">
+                <!-- Header -->
+                <Grid DockPanel.Dock="Top" Margin="2,0,2,12" ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock x:Name="MeText" FontSize="16" FontWeight="SemiBold" Foreground="{DynamicResource SkuaTextBrush}" Text="(not logged in)" />
+                        <TextBlock x:Name="StateText" FontSize="12" Margin="0,2,0,0" Foreground="{DynamicResource SkuaMutedTextBrush}" Text="Not following anyone" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button x:Name="StopButton" Classes="skua-button" Content="Stop following" Background="#E05252" Foreground="White" IsVisible="False" Click="StopButton_Click" />
+                        <Button x:Name="ReleaseAllButton" Classes="skua-button" Content="Release all" Background="#E8862D" Foreground="White" IsVisible="False" ToolTip.Tip="Clear this account's followers list; released butlers park in their house." Click="ReleaseAllButton_Click" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- Footer -->
+                <Grid DockPanel.Dock="Bottom" Margin="2,10,2,0" ColumnDefinitions="*,Auto,Auto">
+                    <TextBlock x:Name="FooterText" Grid.Column="0" FontSize="11" VerticalAlignment="Center" Foreground="{DynamicResource SkuaMutedTextBrush}" Text="0 plugin accounts online" />
+                    <Button x:Name="SummonAllButton" Grid.Column="1" Classes="skua-button" Margin="0,0,6,0" Content="Summon all" ToolTip.Tip="Order every online ButlerV5 account to follow this one." Click="SummonAllButton_Click" />
+                    <Button x:Name="SettingsButton" Grid.Column="2" Classes="skua-button" Content="Settings" ToolTip.Tip="Open the ButlerV5 plugin options." Click="SettingsButton_Click" />
+                </Grid>
+
+                <!-- Roster List Container -->
+                <Border BorderThickness="1"
+                        BorderBrush="{DynamicResource SkuaBorderBrush}"
+                        Background="{DynamicResource SkuaSurfaceAltBrush}"
+                        CornerRadius="8"
+                        Padding="6,4">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel x:Name="RowsPanel" Margin="0,0,8,0" />
+                    </ScrollViewer>
+                </Border>
+            </DockPanel>
+        </Grid>
+    </Border>
+</Window>

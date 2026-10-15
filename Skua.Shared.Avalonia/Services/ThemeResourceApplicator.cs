@@ -1,0 +1,427 @@
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Media;
+using Avalonia.Styling;
+using Avalonia.Threading;
+using System;
+using System.Reflection;
+using System.Runtime.InteropServices;
+
+namespace Skua.Shared.Avalonia.Services;
+
+public static class ThemeResourceApplicator
+{
+    private static bool _materialChecked;
+    private static bool _hasMaterialStyles;
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1 = 19;
+    private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
+    private const int DWMWA_CAPTION_COLOR = 35;
+    private const int DWMWA_TEXT_COLOR = 36;
+
+    private const uint SWP_NOSIZE = 0x0001;
+    private const uint SWP_NOMOVE = 0x0002;
+    private const uint SWP_NOZORDER = 0x0004;
+    private const uint SWP_NOACTIVATE = 0x0010;
+    private const uint SWP_FRAMECHANGED = 0x0020;
+
+    private static readonly Dictionary<IntPtr, (bool isDark, Color caption, Color text)> _appliedTitleBars = new();
+
+    public static void ApplyTitleBarTheme(Application app, bool isDark)
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => ApplyTitleBarTheme(app, isDark));
+            return;
+        }
+
+        if (app.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+        {
+            foreach (Window window in desktop.Windows)
+            {
+                ApplyTitleBarTheme(window, isDark);
+            }
+        }
+    }
+
+    public static void ApplyTitleBarTheme(Window window, bool? isDarkTheme = null)
+    {
+        bool isDark = isDarkTheme ?? (window.ActualThemeVariant == ThemeVariant.Dark || Application.Current?.RequestedThemeVariant != ThemeVariant.Light);
+        ThemeVariant targetVariant = isDark ? ThemeVariant.Dark : ThemeVariant.Light;
+        if (window.RequestedThemeVariant != targetVariant)
+            window.RequestedThemeVariant = targetVariant;
+
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        IntPtr hwnd = window.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
+        if (hwnd == IntPtr.Zero)
+        {
+            EventHandler? onOpened = null;
+            onOpened = (s, e) =>
+            {
+                window.Opened -= onOpened;
+                ApplyTitleBarTheme(window, isDark);
+            };
+            window.Opened += onOpened;
+            return;
+        }
+
+        Color captionColor = isDark ? Color.FromRgb(0x18, 0x18, 0x18) : Color.FromRgb(0xF5, 0xF5, 0xF5);
+        Color textColor = isDark ? Color.FromRgb(0xF5, 0xF5, 0xF5) : Color.FromRgb(0x21, 0x21, 0x21);
+
+        try
+        {
+            if (Application.Current?.Resources.ThemeDictionaries.TryGetValue(isDark ? ThemeVariant.Dark : ThemeVariant.Light, out var provider) == true
+                && provider is IResourceDictionary dict)
+            {
+                if (dict.TryGetValue("SkuaSurfaceAltBrush", out var sBrush) && sBrush is ISolidColorBrush scb)
+                    captionColor = scb.Color;
+                if (dict.TryGetValue("SkuaTextBrush", out var tBrush) && tBrush is ISolidColorBrush tcb)
+                    textColor = tcb.Color;
+            }
+        }
+        catch { }
+
+        ApplyNativeTitleBar(hwnd, isDark, captionColor, textColor);
+    }
+
+    public static void ApplyNativeTitleBar(IntPtr hwnd, bool isDark, Color captionColor, Color textColor)
+    {
+        if (hwnd == IntPtr.Zero || !OperatingSystem.IsWindows())
+            return;
+
+        if (_appliedTitleBars.TryGetValue(hwnd, out var current) &&
+            current.isDark == isDark &&
+            current.caption == captionColor &&
+            current.text == textColor)
+        {
+            return;
+        }
+
+        try
+        {
+            int darkMode = isDark ? 1 : 0;
+
+            // 1. DWMWA_USE_IMMERSIVE_DARK_MODE (Windows 10 20H1+ and Windows 11: attr 20; Windows 10 1809-1909: attr 19)
+            int hr = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref darkMode, sizeof(int));
+            if (hr != 0)
+            {
+                DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_BEFORE_20H1, ref darkMode, sizeof(int));
+            }
+
+            // 2. Windows 11 (build >= 22000): customize caption and title text colors
+            if (Environment.OSVersion.Version.Build >= 22000)
+            {
+                int captionColorRef = (captionColor.B << 16) | (captionColor.G << 8) | captionColor.R;
+                int textColorRef = (textColor.B << 16) | (textColor.G << 8) | textColor.R;
+
+                DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, ref captionColorRef, sizeof(int));
+                DwmSetWindowAttribute(hwnd, DWMWA_TEXT_COLOR, ref textColorRef, sizeof(int));
+            }
+
+            // 3. Force non-client area frame to repaint immediately without deactivating or stealing focus
+            SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED);
+            _appliedTitleBars[hwnd] = (isDark, captionColor, textColor);
+        }
+        catch
+        {
+            // Gracefully ignore on unsupported Windows editions
+        }
+    }
+
+    public static void ApplyAccentBrushes(
+        Application app,
+        Color primary,
+        Color primaryForeground,
+        Color? secondary = null,
+        Color? secondaryForeground = null,
+        bool? isDarkTheme = null)
+    {
+        Color sec = secondary ?? primary;
+        Color secFore = secondaryForeground ?? primaryForeground;
+
+        SetOrUpdateColor(app.Resources, "SkuaAccentColor", primary);
+        SetOrUpdateColor(app.Resources, "SkuaAccentForegroundColor", primaryForeground);
+        SetOrUpdateBrush(app.Resources, "SkuaAccentBrush", primary);
+        SetOrUpdateBrush(app.Resources, "SkuaAccentForegroundBrush", primaryForeground);
+        SetOrUpdateBrush(app.Resources, "SkuaAccentHoverBrush", Lighten(primary, 0.1));
+        SetOrUpdateBrush(app.Resources, "SkuaAccentPressedBrush", Darken(primary, 0.12));
+
+        Color selectionLight = Color.FromArgb(0x33, primary.R, primary.G, primary.B);
+        Color selectionDark = Color.FromArgb(0x66, primary.R, primary.G, primary.B);
+        bool useDarkSelection = isDarkTheme ?? false;
+        SetOrUpdateBrush(app.Resources, "SkuaSelectionBrush", useDarkSelection ? selectionDark : selectionLight);
+
+        if (app.Resources.ThemeDictionaries.TryGetValue(ThemeVariant.Light, out IThemeVariantProvider? selLightProvider) && selLightProvider is IResourceDictionary selLightDict)
+            SetOrUpdateBrush(selLightDict, "SkuaSelectionBrush", selectionLight);
+        if (app.Resources.ThemeDictionaries.TryGetValue(ThemeVariant.Dark, out IThemeVariantProvider? selDarkProvider) && selDarkProvider is IResourceDictionary selDarkDict)
+            SetOrUpdateBrush(selDarkDict, "SkuaSelectionBrush", selectionDark);
+
+        ApplyMaterialPaletteResources(app, primary, primaryForeground, sec, secFore);
+        TrySetMaterialAccent(app, primary, sec);
+
+        if (isDarkTheme is bool dark)
+        {
+            TrySetMaterialBaseTheme(app, dark);
+        }
+    }
+
+    public static void ApplyAccentBrushes(
+        Application app,
+        string? accentHex = null,
+        string? accentForegroundHex = null,
+        string? secondaryHex = null,
+        string? secondaryForegroundHex = null,
+        string fallbackAccentHex = "#10B981",
+        bool? isDarkTheme = null)
+    {
+        Color primary = ParseColorSafe(accentHex, GetResourceColor(app, "SkuaAccentColor", fallbackAccentHex));
+        Color primaryForeground = ParseColorSafe(accentForegroundHex, GetResourceColor(app, "SkuaAccentForegroundColor", "#FF000000"));
+        Color secondary = ParseColorSafe(secondaryHex, primary);
+        Color secondaryForeground = ParseColorSafe(secondaryForegroundHex, primaryForeground);
+
+        ApplyAccentBrushes(app, primary, primaryForeground, secondary, secondaryForeground, isDarkTheme);
+    }
+
+    private static void SetOrUpdateBrush(IResourceDictionary dict, string key, Color color)
+    {
+        if (dict.TryGetValue(key, out object? existing) && existing is SolidColorBrush brush)
+        {
+            if (brush.Color != color)
+                brush.Color = color;
+        }
+        else
+        {
+            dict[key] = new SolidColorBrush(color);
+        }
+    }
+
+    private static void SetOrUpdateColor(IResourceDictionary dict, string key, Color color)
+    {
+        if (dict.TryGetValue(key, out object? existing) && existing is Color c && c == color)
+            return;
+
+        dict[key] = color;
+    }
+
+    private static void EnsureMaterialChecked(Application app)
+    {
+        if (_materialChecked)
+            return;
+
+        foreach (object style in app.Styles)
+        {
+            string? fullName = style.GetType().FullName;
+            if (!string.IsNullOrWhiteSpace(fullName) && fullName.StartsWith("Material.Styles.Themes.", StringComparison.Ordinal))
+            {
+                _hasMaterialStyles = true;
+                break;
+            }
+        }
+        _materialChecked = true;
+    }
+
+    private static void TrySetMaterialBaseTheme(Application app, bool isDark)
+    {
+        EnsureMaterialChecked(app);
+        if (!_hasMaterialStyles)
+            return;
+
+        foreach (object style in app.Styles)
+        {
+            Type type = style.GetType();
+            string? fullName = type.FullName;
+            if (string.IsNullOrWhiteSpace(fullName) || !fullName.StartsWith("Material.Styles.Themes.", StringComparison.Ordinal))
+                continue;
+
+            try
+            {
+                PropertyInfo? property = type.GetProperty("BaseTheme", BindingFlags.Public | BindingFlags.Instance);
+                if (property?.CanWrite == true)
+                    property.SetValue(style, Enum.Parse(property.PropertyType, isDark ? "Dark" : "Light", ignoreCase: true));
+            }
+            catch
+            {
+                // Best effort: keep app theme application resilient across Material versions.
+            }
+        }
+    }
+
+    private static void TrySetMaterialAccent(Application app, Color primary, Color secondary)
+    {
+        EnsureMaterialChecked(app);
+        if (!_hasMaterialStyles)
+            return;
+
+        foreach (object style in app.Styles)
+        {
+            Type type = style.GetType();
+            string? fullName = type.FullName;
+            if (string.IsNullOrWhiteSpace(fullName) || !fullName.StartsWith("Material.Styles.Themes.", StringComparison.Ordinal))
+                continue;
+
+            TrySetThemeColor(style, type, "PrimaryColor", primary);
+            TrySetThemeColor(style, type, "SecondaryColor", secondary);
+            TrySetThemeColor(style, type, "PrimaryMid", primary);
+            TrySetThemeColor(style, type, "SecondaryMid", secondary);
+            TryInvokeThemeMethod(style, type, "SetPrimaryColor", primary);
+            TryInvokeThemeMethod(style, type, "SetSecondaryColor", secondary);
+        }
+    }
+
+    private static void ApplyMaterialPaletteResources(Application app, Color primary, Color primaryForeground, Color secondary, Color secondaryForeground)
+    {
+        Color primaryLight = Lighten(primary, 0.1);
+        Color primaryDark = Darken(primary, 0.12);
+        Color secondaryLight = Lighten(secondary, 0.1);
+        Color secondaryDark = Darken(secondary, 0.12);
+
+        SetColorResource(app, "MaterialPrimaryLightColor", primaryLight);
+        SetColorResource(app, "MaterialPrimaryMidColor", primary);
+        SetColorResource(app, "MaterialPrimaryDarkColor", primaryDark);
+        SetColorResource(app, "MaterialSecondaryLightColor", secondaryLight);
+        SetColorResource(app, "MaterialSecondaryMidColor", secondary);
+        SetColorResource(app, "MaterialSecondaryDarkColor", secondaryDark);
+
+        SetColorResource(app, "MaterialPrimaryLightForegroundColor", primaryForeground);
+        SetColorResource(app, "MaterialPrimaryMidForegroundColor", primaryForeground);
+        SetColorResource(app, "MaterialPrimaryForegroundColor", primaryForeground);
+        SetColorResource(app, "MaterialSecondaryLightForegroundColor", secondaryForeground);
+        SetColorResource(app, "MaterialSecondaryMidForegroundColor", secondaryForeground);
+        SetColorResource(app, "MaterialSecondaryDarkForegroundColor", secondaryForeground);
+
+        SetColorResource(app, "MaterialPrimaryColor", primary);
+        SetColorResource(app, "MaterialSecondaryColor", secondary);
+        SetColorResource(app, "MaterialSelectionColor", Color.FromArgb(0x55, primary.R, primary.G, primary.B));
+        SetColorResource(app, "MaterialFlatButtonClickColor", Color.FromArgb(0x66, primary.R, primary.G, primary.B));
+        SetColorResource(app, "MaterialFlatButtonRippleColor", Color.FromArgb(0x33, primary.R, primary.G, primary.B));
+    }
+
+    private static void SetColorResource(Application app, string colorKey, Color color)
+    {
+        SetOrUpdateColor(app.Resources, colorKey, color);
+
+        if (colorKey.EndsWith("Color", StringComparison.Ordinal))
+        {
+            string brushKey = colorKey[..^"Color".Length] + "Brush";
+            SetOrUpdateBrush(app.Resources, brushKey, color);
+        }
+    }
+
+    private static void TrySetThemeColor(object theme, Type themeType, string propertyName, Color color)
+    {
+        try
+        {
+            PropertyInfo? property = themeType.GetProperty(propertyName, BindingFlags.Public | BindingFlags.Instance);
+            if (property?.CanWrite != true)
+                return;
+
+            object? value = CoerceValue(property.PropertyType, color);
+            if (value is not null)
+                property.SetValue(theme, value);
+        }
+        catch
+        {
+            // Best effort across Material versions.
+        }
+    }
+
+    private static void TryInvokeThemeMethod(object theme, Type themeType, string methodName, Color color)
+    {
+        try
+        {
+            MethodInfo[] methods = themeType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static);
+            foreach (MethodInfo method in methods)
+            {
+                if (!string.Equals(method.Name, methodName, StringComparison.Ordinal))
+                    continue;
+
+                ParameterInfo[] parameters = method.GetParameters();
+                if (!method.IsStatic && parameters.Length == 1)
+                {
+                    object? arg = CoerceValue(parameters[0].ParameterType, color);
+                    if (arg is null)
+                        continue;
+                    method.Invoke(theme, [arg]);
+                    return;
+                }
+
+                if (method.IsStatic && parameters.Length == 2 && parameters[0].ParameterType.IsInstanceOfType(theme))
+                {
+                    object? arg = CoerceValue(parameters[1].ParameterType, color);
+                    if (arg is null)
+                        continue;
+                    method.Invoke(null, [theme, arg]);
+                    return;
+                }
+            }
+        }
+        catch
+        {
+            // Best effort across Material versions.
+        }
+    }
+
+    private static object? CoerceValue(Type targetType, Color color)
+    {
+        if (targetType == typeof(Color))
+            return color;
+
+        ConstructorInfo? colorCtor = targetType.GetConstructor([typeof(Color)]);
+        if (colorCtor is not null)
+            return colorCtor.Invoke([color]);
+
+        if (targetType == typeof(string))
+            return color.ToString();
+
+        return null;
+    }
+
+    private static Color Lighten(Color color, double amount)
+    {
+        byte L(byte c) => (byte)Math.Clamp(c + (255 - c) * amount, 0, 255);
+        return Color.FromArgb(color.A, L(color.R), L(color.G), L(color.B));
+    }
+
+    private static Color Darken(Color color, double amount)
+    {
+        byte D(byte c) => (byte)Math.Clamp(c * (1 - amount), 0, 255);
+        return Color.FromArgb(color.A, D(color.R), D(color.G), D(color.B));
+    }
+
+    private static Color ParseColorSafe(string? hex, Color fallback)
+    {
+        if (string.IsNullOrWhiteSpace(hex))
+            return fallback;
+
+        return Color.TryParse(hex, out Color parsed) ? parsed : fallback;
+    }
+
+    private static Color GetResourceColor(Application app, string resourceKey, string fallbackHex)
+    {
+        if (app.Resources.TryGetValue(resourceKey, out object? value))
+        {
+            if (value is Color c)
+                return c;
+            if (value is SolidColorBrush b)
+                return b.Color;
+            if (value is string s && Color.TryParse(s, out Color parsed))
+                return parsed;
+        }
+
+        return Color.TryParse(fallbackHex, out Color fallback)
+            ? fallback
+            : Color.FromArgb(255, 16, 185, 129);
+    }
+}

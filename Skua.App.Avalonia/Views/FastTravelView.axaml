@@ -1,0 +1,142 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:vms="clr-namespace:Skua.App.Avalonia.ViewModels.FastTravel"
+             x:Class="Skua.App.Avalonia.Views.FastTravelView"
+             x:DataType="vms:FastTravelViewModel">
+  <Grid Margin="12" RowDefinitions="Auto,*,Auto" RowSpacing="10">
+    <!-- Top Action Card -->
+    <Border Grid.Row="0"
+            Background="{DynamicResource SkuaSurfaceBrush}"
+            BorderBrush="{DynamicResource SkuaBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="10">
+      <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto" ColumnSpacing="6" VerticalAlignment="Center">
+        <TextBox Grid.Column="0"
+                 Watermark="Search destinations..."
+                 Text="{Binding SearchText, Mode=TwoWay}" />
+
+        <Button Grid.Column="1"
+                Classes="skua-button"
+                Content="Save"
+                Command="{Binding SaveFastTravelsCommand}" />
+
+        <Button Grid.Column="2"
+                Classes="skua-button outline"
+                Content="Clear"
+                Command="{Binding ClearFastTravelsCommand}" />
+
+        <CheckBox Grid.Column="3"
+                  VerticalAlignment="Center"
+                  Content="Private Room"
+                  IsChecked="{Binding MapService.UsePrivateRoom, Mode=TwoWay}"
+                  ToolTip.Tip="Join private rooms with specified number." />
+
+        <TextBox Grid.Column="4"
+                 Width="110"
+                 Watermark="Room Nr."
+                 Text="{Binding MapService.PrivateRoomNumber, Mode=TwoWay}" />
+      </Grid>
+    </Border>
+
+    <!-- Fast Travel Items Wrap List Card -->
+    <Border Grid.Row="1"
+            Background="{DynamicResource SkuaPageBrush}"
+            BorderBrush="{DynamicResource SkuaBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="6">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding FilteredFastTravelItems}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate>
+              <WrapPanel Orientation="Horizontal" />
+            </ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Width="280"
+                      Margin="4"
+                      CornerRadius="8"
+                      BorderThickness="1"
+                      BorderBrush="{DynamicResource SkuaBorderBrush}"
+                      Background="{DynamicResource SkuaSurfaceBrush}">
+                <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
+                  <Button Grid.Column="0"
+                          Classes="skua-button"
+                          BorderThickness="0"
+                          Background="Transparent"
+                          CornerRadius="8,0,0,8"
+                          HorizontalAlignment="Stretch"
+                          HorizontalContentAlignment="Left"
+                          Padding="12,0"
+                          Height="36"
+                          Content="{Binding DescriptionName}"
+                          Command="{Binding TravelCommand}"
+                          CommandParameter="{Binding}" />
+
+                  <Button Grid.Column="1"
+                          Classes="icon"
+                          Padding="8,0"
+                          Height="36"
+                          Command="{Binding EditCommand}"
+                          ToolTip.Tip="Edit Fast Travel">
+                    <materialIcons:MaterialIcon Kind="Pencil" Width="14" Height="14" />
+                  </Button>
+
+                  <Button Grid.Column="2"
+                          Classes="icon danger-icon"
+                          Padding="8,0"
+                          Height="36"
+                          Command="{Binding RemoveCommand}"
+                          ToolTip.Tip="Remove Fast Travel">
+                    <materialIcons:MaterialIcon Kind="Close" Width="14" Height="14" />
+                  </Button>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+
+    <!-- Add Fast Travel Expander -->
+    <Expander Grid.Row="2"
+              Header="Add Fast Travel"
+              IsExpanded="False">
+      <Border Background="{DynamicResource SkuaSurfaceBrush}"
+              BorderBrush="{DynamicResource SkuaBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="8"
+              Padding="12"
+              Margin="4">
+        <StackPanel Spacing="8">
+          <TextBox Watermark="Description (e.g. Ultra Alteon)"
+                   Text="{Binding Editor.Travel.DescriptionName, Mode=TwoWay}" />
+          <TextBox Watermark="Map (e.g. timeinn)"
+                   Text="{Binding Editor.Travel.MapName, Mode=TwoWay}" />
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <TextBox Grid.Column="0"
+                     Watermark="Cell (e.g. Enter)"
+                     Text="{Binding Editor.Travel.Cell, Mode=TwoWay}" />
+            <TextBox Grid.Column="1"
+                     Watermark="Pad (e.g. Spawn)"
+                     Text="{Binding Editor.Travel.Pad, Mode=TwoWay}" />
+          </Grid>
+          <Grid ColumnDefinitions="*,*" ColumnSpacing="8">
+            <Button Grid.Column="0"
+                    Classes="skua-button"
+                    Content="Get Current"
+                    Command="{Binding Editor.GetCurrentCommand}" />
+            <Button Grid.Column="1"
+                    Classes="skua-button skua-primary"
+                    Content="Add Fast Travel"
+                    Command="{Binding AddFastTravelCommand}" />
+          </Grid>
+        </StackPanel>
+      </Border>
+    </Expander>
+  </Grid>
+</UserControl>

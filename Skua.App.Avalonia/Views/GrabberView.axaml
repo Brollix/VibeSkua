@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:Skua.App.Avalonia.Views"
+             xmlns:grabber="clr-namespace:Skua.App.Avalonia.ViewModels.Grabber"
+             x:Class="Skua.App.Avalonia.Views.GrabberView">
+    
+    <UserControl.DataTemplates>
+        <DataTemplate DataType="grabber:GrabberListViewModel">
+            <views:GrabberListView/>
+        </DataTemplate>
+    </UserControl.DataTemplates>
+
+    <Grid RowDefinitions="Auto, *" Margin="12" RowSpacing="10">
+        <!-- Top Pill Tabs Navigation Header Card -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource SkuaSurfaceBrush}"
+                BorderBrush="{DynamicResource SkuaBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="8"
+                Padding="8">
+            <ListBox ItemsSource="{Binding GrabberTabs}"
+                     SelectedItem="{Binding SelectedTab}"
+                     ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                     ScrollViewer.VerticalScrollBarVisibility="Disabled"
+                     Background="Transparent"
+                     BorderThickness="0">
+                <ListBox.Styles>
+                    <Style Selector="ListBoxItem">
+                        <Setter Property="Padding" Value="14,6" />
+                        <Setter Property="Margin" Value="0,0,6,0" />
+                        <Setter Property="CornerRadius" Value="6" />
+                        <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
+                        <Setter Property="BorderThickness" Value="1" />
+                        <Setter Property="Foreground" Value="{DynamicResource SkuaMutedTextBrush}" />
+                        <Setter Property="FontWeight" Value="SemiBold" />
+                        <Setter Property="FontSize" Value="12" />
+                        <Setter Property="Transitions">
+                            <Transitions>
+                                <BrushTransition Property="Background" Duration="0:0:0.12" Easing="CubicEaseOut" />
+                                <BrushTransition Property="BorderBrush" Duration="0:0:0.12" Easing="CubicEaseOut" />
+                            </Transitions>
+                        </Setter>
+                    </Style>
+                    <Style Selector="ListBoxItem:pointerover">
+                        <Setter Property="Background" Value="{DynamicResource SkuaNavHoverBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
+                        <Setter Property="Foreground" Value="{DynamicResource SkuaTextBrush}" />
+                    </Style>
+                    <Style Selector="ListBoxItem:selected">
+                        <Setter Property="Background" Value="{DynamicResource SkuaSelectionBrush}" />
+                        <Setter Property="BorderBrush" Value="{DynamicResource SkuaAccentBrush}" />
+                        <Setter Property="Foreground" Value="{DynamicResource SkuaTextBrush}" />
+                        <Setter Property="FontWeight" Value="Bold" />
+                    </Style>
+                </ListBox.Styles>
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="4" />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding Title}" VerticalAlignment="Center" />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </Border>
+        
+        <ContentControl Grid.Row="1" Content="{Binding SelectedTab}" />
+    </Grid>
+</UserControl>

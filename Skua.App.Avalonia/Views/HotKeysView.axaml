@@ -1,0 +1,210 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:vms="clr-namespace:Skua.App.Avalonia.ViewModels.HotKeys"
+             x:Class="Skua.App.Avalonia.Views.HotKeysView"
+             x:DataType="vms:HotKeysViewModel"
+             Background="{DynamicResource SkuaPageBrush}"
+             mc:Ignorable="d" d:DesignHeight="600" d:DesignWidth="700">
+
+  <Grid RowDefinitions="Auto,Auto,*" Margin="12" RowSpacing="10">
+    
+    <!-- 1. Top Header & Add Hotkey Card -->
+    <Border Grid.Row="0"
+            Background="{DynamicResource SkuaSurfaceBrush}"
+            BorderBrush="{DynamicResource SkuaBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="14,12">
+      <StackPanel Spacing="10">
+        <!-- Title & Subtitle Header -->
+        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+          <Border Width="28" Height="28"
+                  Background="{DynamicResource SkuaSurfaceAltBrush}"
+                  BorderBrush="{DynamicResource SkuaBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="14">
+            <materialIcons:MaterialIcon Kind="KeyboardOutline"
+                                        Width="16" Height="16"
+                                        Foreground="{DynamicResource SkuaAccentBrush}"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center" />
+          </Border>
+          <StackPanel VerticalAlignment="Center" Spacing="1">
+            <TextBlock Text="Global Hotkeys &amp; Shortcuts"
+                       FontWeight="Bold"
+                       FontSize="13"
+                       Foreground="{DynamicResource SkuaTextBrush}" />
+            <TextBlock Text="Assign quick-access keystrokes to trigger bot features, tools, and scripts"
+                       FontSize="11"
+                       Foreground="{DynamicResource SkuaMutedTextBrush}" />
+          </StackPanel>
+        </StackPanel>
+
+        <!-- Divider Line -->
+        <Border Height="1" Background="{DynamicResource SkuaBorderBrush}" />
+
+        <!-- Add Custom Action Row (Dropdown you can also write in) -->
+        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" VerticalAlignment="Center">
+          <Grid Grid.Column="0">
+            <AutoCompleteBox x:Name="ActionAutoComplete"
+                             Height="34"
+                             CornerRadius="6"
+                             VerticalAlignment="Center"
+                             Padding="10,0,32,0"
+                             ItemsSource="{Binding AvailableCustomActions}"
+                             SelectedItem="{Binding SelectedCustomAction, Mode=TwoWay}"
+                             Text="{Binding SearchText, Mode=TwoWay}"
+                             MinimumPrefixLength="0"
+                             MaxDropDownHeight="320"
+                             Watermark="Select or search available hotkey actions..."
+                             ValueMemberBinding="{Binding Title}">
+              <AutoCompleteBox.ItemTemplate>
+                <DataTemplate>
+                  <Border Padding="6,4" Margin="0,1" CornerRadius="4">
+                    <StackPanel Spacing="2">
+                      <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="12" Foreground="{DynamicResource SkuaTextBrush}" />
+                      <TextBlock Text="{Binding Description}" FontSize="10" Foreground="{DynamicResource SkuaMutedTextBrush}" TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </AutoCompleteBox.ItemTemplate>
+            </AutoCompleteBox>
+
+            <Button Width="28" Height="28"
+                    Classes="titlebar"
+                    HorizontalAlignment="Right"
+                    Margin="0,0,4,0"
+                    Click="ToggleDropdown_Click"
+                    ToolTip.Tip="Browse all available hotkey actions">
+              <materialIcons:MaterialIcon Kind="ChevronDown" Width="14" Height="14" Foreground="{DynamicResource SkuaMutedTextBrush}" />
+            </Button>
+          </Grid>
+
+          <Button Grid.Column="1"
+                  Classes="skua-button skua-primary"
+                  Height="34"
+                  Padding="14,0"
+                  Command="{Binding AddCustomCommand}"
+                  ToolTip.Tip="Add selected action to active hotkeys list">
+            <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+              <materialIcons:MaterialIcon Kind="Plus" Width="14" Height="14" />
+              <TextBlock Text="Add Hotkey" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
+            </StackPanel>
+          </Button>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <!-- 2. Search & Filter Active Hotkeys Bar -->
+    <Border Grid.Row="1"
+            Background="{DynamicResource SkuaSurfaceAltBrush}"
+            BorderBrush="{DynamicResource SkuaBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="8">
+      <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" VerticalAlignment="Center">
+        <Grid Grid.Column="0">
+          <TextBox Height="32"
+                   CornerRadius="6"
+                   VerticalContentAlignment="Center"
+                   Padding="32,0,28,0"
+                   Text="{Binding FilterHotKeysText, Mode=TwoWay}"
+                   Watermark="Filter assigned hotkeys by name, description, or shortcut..." />
+
+          <materialIcons:MaterialIcon Kind="Magnify"
+                                      Width="15" Height="15"
+                                      Foreground="{DynamicResource SkuaMutedTextBrush}"
+                                      HorizontalAlignment="Left"
+                                      Margin="10,0,0,0"
+                                      IsHitTestVisible="False" />
+
+          <Button Classes="titlebar"
+                  Width="24" Height="24"
+                  HorizontalAlignment="Right"
+                  Margin="0,0,4,0"
+                  Command="{Binding ClearFilterCommand}"
+                  IsVisible="{Binding FilterHotKeysText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                  ToolTip.Tip="Clear Filter">
+            <materialIcons:MaterialIcon Kind="Close" Width="12" Height="12" Foreground="{DynamicResource SkuaMutedTextBrush}" />
+          </Button>
+        </Grid>
+      </Grid>
+    </Border>
+
+    <!-- 3. HotKeys List Container -->
+    <Border Grid.Row="2"
+            Background="{DynamicResource SkuaSurfaceBrush}"
+            BorderBrush="{DynamicResource SkuaBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Padding="8">
+      <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                    VerticalScrollBarVisibility="Auto">
+        <ItemsControl ItemsSource="{Binding FilteredHotKeys}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Background="{DynamicResource SkuaSurfaceAltBrush}"
+                      BorderBrush="{DynamicResource SkuaBorderBrush}"
+                      BorderThickness="1"
+                      CornerRadius="6"
+                      Margin="0,0,0,6"
+                      Padding="12,10">
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10" VerticalAlignment="Center">
+                  <!-- Action Title & Description -->
+                  <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Title}"
+                               FontSize="12"
+                               FontWeight="Bold"
+                               Foreground="{DynamicResource SkuaTextBrush}" />
+                    <TextBlock Text="{Binding Description}"
+                               FontSize="11"
+                               Foreground="{DynamicResource SkuaMutedTextBrush}"
+                               TextWrapping="Wrap"
+                               IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  </StackPanel>
+
+                  <!-- Keycap Shortcut Badge -->
+                  <Button Grid.Column="1"
+                          Classes="skua-button"
+                          HorizontalContentAlignment="Center"
+                          VerticalContentAlignment="Center"
+                          Height="32"
+                          MinWidth="120"
+                          Padding="10,0"
+                          FontFamily="JetBrains Mono,Consolas,Courier New,monospace"
+                          FontSize="12"
+                          FontWeight="Bold"
+                          Content="{Binding KeyGesture}"
+                          Command="{Binding EditHotKeyCommand}"
+                          ToolTip.Tip="Click to capture and assign a new shortcut key">
+                    <Button.Styles>
+                      <Style Selector="Button:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+                        <Setter Property="BorderBrush" Value="{DynamicResource SkuaAccentBrush}" />
+                        <Setter Property="Background" Value="{DynamicResource SkuaNavHoverBrush}" />
+                      </Style>
+                    </Button.Styles>
+                  </Button>
+
+                  <!-- Remove Hotkey Action Button -->
+                  <Button Grid.Column="2"
+                          Width="32"
+                          Height="32"
+                          Padding="0"
+                          Classes="skua-button skua-danger"
+                          Command="{Binding RemoveHotKeyCommand}"
+                          ToolTip.Tip="Remove this hotkey">
+                    <materialIcons:MaterialIcon Kind="TrashCanOutline" Width="14" Height="14" />
+                  </Button>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </ScrollViewer>
+    </Border>
+
+  </Grid>
+</UserControl>

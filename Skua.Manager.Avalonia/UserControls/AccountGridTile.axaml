@@ -1,0 +1,82 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
+             xmlns:materialAssists="clr-namespace:Material.Styles.Assists;assembly=Material.Styles"
+             xmlns:managerUc="clr-namespace:Skua.Manager.Avalonia.UserControls"
+             xmlns:uc="clr-namespace:Skua.Manager.Avalonia.UserControls"
+             x:Class="Skua.Manager.Avalonia.UserControls.AccountGridTile"
+             mc:Ignorable="d"
+             d:DesignWidth="220"
+             d:DesignHeight="80">
+    <Border Classes="account-row account-row-grid"
+            Classes.selected="{Binding UseCheck}"
+            Padding="12,6"
+            Margin="2"
+            PointerReleased="Border_PointerReleased">
+        <Border.ContextMenu>
+            <uc:AccountItemContextMenu />
+        </Border.ContextMenu>
+        <Grid RowDefinitions="Auto,Auto" ColumnDefinitions="Auto,*,Auto">
+            <CheckBox Grid.Row="0"
+                      Grid.Column="0"
+                      materialAssists:SelectionControlAssist.Size="18"
+                      IsChecked="{Binding UseCheck}"
+                      VerticalAlignment="Center"
+                      Padding="0"
+                      Margin="0,0,6,0" />
+            <TextBlock Grid.Row="0"
+                       Grid.Column="1"
+                       Text="{Binding DisplayOrUsername}"
+                       FontSize="14"
+                       Margin="0,0,8,0"
+                       VerticalAlignment="Center"
+                       FontWeight="Medium"
+                       TextTrimming="CharacterEllipsis" />
+            <StackPanel Grid.Row="0"
+                        Grid.Column="2"
+                        Orientation="Horizontal"
+                        Spacing="2"
+                        VerticalAlignment="Center">
+                <Button Command="{Binding EditCommand}"
+                        Classes="icon"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="Edit Account">
+                    <materialIcons:MaterialIcon Kind="PencilOutline"
+                                                Width="13"
+                                                Height="13"
+                                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                </Button>
+                <Button Command="{Binding RemoveCommand}"
+                        Classes="icon"
+                        VerticalAlignment="Center"
+                        ToolTip.Tip="Remove Account">
+                    <materialIcons:MaterialIcon Kind="DeleteOutline"
+                                                Width="13"
+                                                Height="13"
+                                                Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}" />
+                </Button>
+            </StackPanel>
+            <ItemsControl Grid.Row="1"
+                          Grid.Column="1"
+                          Margin="0,3,0,0"
+                          ItemsSource="{Binding Tags}"
+                          IsVisible="{Binding DataContext.ShowTags, RelativeSource={RelativeSource AncestorType=managerUc:AccountManagerUserControl}}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Classes="tag-chip">
+                            <TextBlock Text="{Binding}"
+                                       Classes="tag-chip-text" />
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </Grid>
+    </Border>
+</UserControl>

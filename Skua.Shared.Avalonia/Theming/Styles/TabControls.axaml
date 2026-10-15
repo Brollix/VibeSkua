@@ -1,0 +1,87 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Design.PreviewWith>
+        <Border Padding="20">
+            <!-- Add Controls for Previewer Here -->
+        </Border>
+    </Design.PreviewWith>
+
+    <!-- Global TabControl and TabItem defaults -->
+    <Style Selector="TabControl">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+
+    <Style Selector="TabItem">
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="MinHeight" Value="32" />
+        <Setter Property="Foreground" Value="{DynamicResource SkuaMutedTextBrush}" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="Padding" Value="12,6" />
+        <Setter Property="Cursor" Value="Hand" />
+    </Style>
+
+    <Style Selector="TabItem /template/ Border#PART_LayoutRoot, TabItem /template/ Border#PART_RootBorder">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderBrush" Value="Transparent" />
+        <Setter Property="CornerRadius" Value="6,6,0,0" />
+    </Style>
+
+    <Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot, TabItem:pointerover /template/ Border#PART_RootBorder">
+        <Setter Property="Background" Value="{DynamicResource SkuaNavHoverBrush}" />
+    </Style>
+
+    <Style Selector="TabItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource SkuaTextBrush}" />
+    </Style>
+
+    <Style Selector="TabItem:selected /template/ Border#PART_LayoutRoot, TabItem:selected /template/ Border#PART_RootBorder">
+        <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
+    </Style>
+
+    <Style Selector="TabItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource SkuaAccentBrush}" />
+        <Setter Property="TextElement.FontWeight" Value="SemiBold" />
+    </Style>
+
+    <Style Selector="TabItem /template/ Border#PART_SelectedPipe">
+        <Setter Property="Background" Value="{DynamicResource SkuaAccentBrush}" />
+    </Style>
+
+    <!-- Account/Groups switcher inside Account Manager (Material TabControl). -->
+    <!-- Hide Material's strip-wide separator while preserving selected underline behavior. -->
+    <Style Selector="TabControl.account-groups-switcher /template/ Panel#PART_TabsPanel > Rectangle#PART_Separator">
+        <Setter Property="IsVisible" Value="False" />
+    </Style>
+
+    <Style Selector="TabControl.account-groups-switcher /template/ UniformGrid#PART_TabContainer">
+        <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <Style Selector="TabControl.account-groups-switcher TabItem">
+        <Setter Property="MinWidth" Value="0" />
+        <Setter Property="MinHeight" Value="36" />
+        <Setter Property="MaxWidth" Value="10000" />
+    </Style>
+
+    <Style Selector="TabControl.account-groups-switcher TabItem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Margin" Value="12,6" />
+    </Style>
+
+    <Style Selector="TabControl.account-groups-switcher TabItem:selected /template/ Border#PART_LayoutRoot, TabControl.account-groups-switcher TabItem:selected /template/ Border#PART_RootBorder">
+        <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
+    </Style>
+
+    <Style Selector="TabControl.account-groups-switcher TabItem:pointerover /template/ Border#PART_LayoutRoot, TabControl.account-groups-switcher TabItem:pointerover /template/ Border#PART_RootBorder">
+        <Setter Property="Background" Value="{DynamicResource SkuaHoverBrush}" />
+    </Style>
+
+    <Style Selector="TabControl.account-groups-switcher TabItem:selected:pointerover /template/ Border#PART_LayoutRoot, TabControl.account-groups-switcher TabItem:selected:pointerover /template/ Border#PART_RootBorder">
+        <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
+    </Style>
+</Styles>
+
+
+
