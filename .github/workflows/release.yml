@@ -81,14 +81,21 @@ jobs:
           }
 
           Write-Host "Publishing assets to tag $tag..."
+          $notesArg = @("--generate-notes")
+          if (Test-Path "RELEASE_NOTES.md") {
+              $notesArg = @("--notes-file", "RELEASE_NOTES.md")
+          }
           gh release view $tag 2>$null
           if ($LASTEXITCODE -eq 0) {
               Write-Host "Existing release found for $tag. Uploading assets..."
               gh release upload $tag $files --clobber
               if ($LASTEXITCODE -ne 0) { throw "Failed to upload release assets." }
+              if (Test-Path "RELEASE_NOTES.md") {
+                  gh release edit $tag --notes-file "RELEASE_NOTES.md"
+              }
           } else {
               Write-Host "Creating new release for $tag..."
-              gh release create $tag $files --title "VibeSkua $tag" --generate-notes
+              gh release create $tag $files --title "VibeSkua $tag" @notesArg
               if ($LASTEXITCODE -ne 0) { throw "Failed to create release." }
           }
           Write-Host "Release $tag published successfully!"

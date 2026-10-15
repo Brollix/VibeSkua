@@ -12,7 +12,7 @@ namespace Skua.Shared.Avalonia.Controls.Shell;
 public partial class WindowTitleBar : UserControl
 {
     public static readonly StyledProperty<string> TitleTextProperty =
-        AvaloniaProperty.Register<WindowTitleBar, string>(nameof(TitleText), "VibeSkua V2.0.0");
+        AvaloniaProperty.Register<WindowTitleBar, string>(nameof(TitleText), "VibeSkua");
 
     private static readonly IImage DefaultIconSource = LoadDefaultIconSource();
 
