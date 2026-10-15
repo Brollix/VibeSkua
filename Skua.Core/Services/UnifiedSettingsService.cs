@@ -74,20 +74,40 @@ public class UnifiedSettingsService
         {
             try
             {
-                PropertyInfo? clientProp = FindPropertyByJsonName(_root.Client.GetType(), key);
-                if (clientProp?.GetValue(_root.Client) is object clientVal)
-                    if (typeof(T).IsAssignableFrom(clientVal.GetType()))
-                        return (T)clientVal;
-
-                PropertyInfo? managerProp = FindPropertyByJsonName(_root.Manager.GetType(), key);
-                if (managerProp?.GetValue(_root.Manager) is object managerVal)
-                    if (typeof(T).IsAssignableFrom(managerVal.GetType()))
-                        return (T)managerVal;
-
                 PropertyInfo? sharedProp = FindPropertyByJsonName(_root.Shared.GetType(), key);
-                if (sharedProp?.GetValue(_root.Shared) is object sharedVal)
+                if (sharedProp?.GetValue(_root.Shared) is object sharedVal && !IsDefaultOrEmpty(sharedVal))
+                {
                     if (typeof(T).IsAssignableFrom(sharedVal.GetType()))
                         return (T)sharedVal;
+                }
+
+                if (_currentRole == AppRole.Manager)
+                {
+                    PropertyInfo? managerProp = FindPropertyByJsonName(_root.Manager.GetType(), key);
+                    if (managerProp?.GetValue(_root.Manager) is object managerVal && !IsDefaultOrEmpty(managerVal))
+                        if (typeof(T).IsAssignableFrom(managerVal.GetType()))
+                            return (T)managerVal;
+
+                    PropertyInfo? clientProp = FindPropertyByJsonName(_root.Client.GetType(), key);
+                    if (clientProp?.GetValue(_root.Client) is object clientVal && !IsDefaultOrEmpty(clientVal))
+                        if (typeof(T).IsAssignableFrom(clientVal.GetType()))
+                            return (T)clientVal;
+                }
+                else
+                {
+                    PropertyInfo? clientProp = FindPropertyByJsonName(_root.Client.GetType(), key);
+                    if (clientProp?.GetValue(_root.Client) is object clientVal && !IsDefaultOrEmpty(clientVal))
+                        if (typeof(T).IsAssignableFrom(clientVal.GetType()))
+                            return (T)clientVal;
+
+                    PropertyInfo? managerProp = FindPropertyByJsonName(_root.Manager.GetType(), key);
+                    if (managerProp?.GetValue(_root.Manager) is object managerVal && !IsDefaultOrEmpty(managerVal))
+                        if (typeof(T).IsAssignableFrom(managerVal.GetType()))
+                            return (T)managerVal;
+                }
+
+                if (sharedProp?.GetValue(_root.Shared) is object sVal && typeof(T).IsAssignableFrom(sVal.GetType()))
+                    return (T)sVal;
             }
             catch (Exception)
             {
@@ -95,6 +115,15 @@ public class UnifiedSettingsService
 
             return default;
         }
+    }
+
+    private static bool IsDefaultOrEmpty(object val)
+    {
+        if (val is string s)
+            return string.IsNullOrEmpty(s);
+        if (val is StringCollection sc)
+            return sc.Count == 0;
+        return false;
     }
 
     public T Get<T>(string key, T defaultValue)
@@ -114,29 +143,17 @@ public class UnifiedSettingsService
                 {
                     sharedProp.SetValue(_root.Shared, value);
                 }
-                else if (_currentRole == AppRole.Client)
+
+                PropertyInfo? clientProp = FindPropertyByJsonName(_root.Client.GetType(), key);
+                if (clientProp != null)
                 {
-                    PropertyInfo? clientProp = FindPropertyByJsonName(_root.Client.GetType(), key);
-                    if (clientProp != null)
-                        clientProp.SetValue(_root.Client, value);
-                    else
-                    {
-                        // Allow client-side code to update shared manager-backed values
-                        // (e.g., unified theme settings) when keys live under manager.
-                        PropertyInfo? managerProp = FindPropertyByJsonName(_root.Manager.GetType(), key);
-                        managerProp?.SetValue(_root.Manager, value);
-                    }
+                    clientProp.SetValue(_root.Client, value);
                 }
-                else if (_currentRole == AppRole.Manager)
+
+                PropertyInfo? managerProp = FindPropertyByJsonName(_root.Manager.GetType(), key);
+                if (managerProp != null)
                 {
-                    PropertyInfo? managerProp = FindPropertyByJsonName(_root.Manager.GetType(), key);
-                    if (managerProp != null)
-                        managerProp.SetValue(_root.Manager, value);
-                    else
-                    {
-                        PropertyInfo? clientProp = FindPropertyByJsonName(_root.Client.GetType(), key);
-                        clientProp?.SetValue(_root.Client, value);
-                    }
+                    managerProp.SetValue(_root.Manager, value);
                 }
 
                 SaveSettings();

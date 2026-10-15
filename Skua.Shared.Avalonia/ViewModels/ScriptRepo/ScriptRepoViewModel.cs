@@ -221,31 +221,34 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
     }
 
     [RelayCommand]
-    private void AddCustomFolder()
+    private async Task AddCustomFolder()
     {
         IFileDialogService? fileDialog = Ioc.Default.GetService<IFileDialogService>();
         if (fileDialog == null)
             return;
 
-        string? folder = fileDialog.OpenFolder(ClientFileSources.SkuaScriptsDIR);
+        string? folder = await fileDialog.OpenFolderAsync(ClientFileSources.SkuaScriptsDIR);
         if (!string.IsNullOrEmpty(folder))
         {
             ISettingsService? settings = Ioc.Default.GetService<ISettingsService>();
             settings?.Set("UserCustomScriptsFolder", folder);
-            _ = RefreshScriptsList();
+            _customScripts.SetCustomFolder(folder);
+            FilterBy = "Local";
+            await RefreshScriptsList();
         }
     }
 
     [RelayCommand]
-    private void ClearCustomFolder()
+    private async Task ClearCustomFolder()
     {
         ISettingsService? settings = Ioc.Default.GetService<ISettingsService>();
         settings?.Set("UserCustomScriptsFolder", string.Empty);
-        _ = RefreshScriptsList();
+        _customScripts.SetCustomFolder(string.Empty);
+        await RefreshScriptsList();
     }
 
     [RelayCommand]
-    private void LoadLocalScript()
+    private async Task LoadLocalScript()
     {
         IFileDialogService? fileDialog = Ioc.Default.GetService<IFileDialogService>();
         if (fileDialog == null)
@@ -257,12 +260,14 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
             ISettingsService? settings = Ioc.Default.GetService<ISettingsService>();
             if (settings != null)
             {
-                StringCollection? list = settings.Get<StringCollection>("UserCustomScriptsList") ?? new StringCollection();
+                StringCollection? list = settings.Get<StringCollection>("UserCustomScriptsList") ?? settings.GetShared()?.UserCustomScriptsList ?? new StringCollection();
                 if (!list.Contains(path))
                 {
                     list.Add(path);
                     settings.Set("UserCustomScriptsList", list);
-                    _ = RefreshScriptsList();
+                    _customScripts.AddCustomFile(path);
+                    FilterBy = "Local";
+                    await RefreshScriptsList();
                 }
             }
 
@@ -360,29 +365,31 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
         ISettingsService? settingsService = Ioc.Default.GetService<ISettingsService>();
         settingsService?.ReloadSettings();
 
-        if (_getScriptsService?.Scripts != null)
+        List<ScriptInfoViewModel> scriptViewModels = await Task.Run(() =>
         {
-            List<ScriptInfoViewModel> scriptViewModels = await Task.Run(() =>
+            // 1. Single-pass fast dictionary of existing local files
+            Dictionary<string, long> existingLocalFiles = new(StringComparer.OrdinalIgnoreCase);
+            try
             {
-                // 1. Single-pass fast dictionary of existing local files
-                Dictionary<string, long> existingLocalFiles = new(StringComparer.OrdinalIgnoreCase);
-                try
+                if (Directory.Exists(ClientFileSources.SkuaScriptsDIR))
                 {
-                    if (Directory.Exists(ClientFileSources.SkuaScriptsDIR))
+                    DirectoryInfo dirInfo = new(ClientFileSources.SkuaScriptsDIR);
+                    foreach (FileInfo file in dirInfo.EnumerateFiles("*.cs", SearchOption.AllDirectories))
                     {
-                        DirectoryInfo dirInfo = new(ClientFileSources.SkuaScriptsDIR);
-                        foreach (FileInfo file in dirInfo.EnumerateFiles("*.cs", SearchOption.AllDirectories))
-                        {
-                            existingLocalFiles[Path.GetFullPath(file.FullName)] = file.Length;
-                        }
+                        existingLocalFiles[Path.GetFullPath(file.FullName)] = file.Length;
                     }
                 }
-                catch { }
+            }
+            catch { }
 
-                List<ScriptInfoViewModel> viewModels = new(_getScriptsService.Scripts.Count);
-                string filter = FilterBy;
-                bool isAllFilter = filter == "All";
+            List<ScriptInfoViewModel> viewModels = new();
+            string filter = FilterBy;
+            bool isAllFilter = string.Equals(filter, "All", StringComparison.OrdinalIgnoreCase);
+            bool isLocalFilter = string.Equals(filter, "Local", StringComparison.OrdinalIgnoreCase);
 
+            // 1. Repository scripts (only if NOT filtering exclusively by "Local")
+            if (!isLocalFilter && _getScriptsService?.Scripts != null)
+            {
                 foreach (ScriptInfo script in _getScriptsService.Scripts)
                 {
                     if (!isAllFilter)
@@ -419,90 +426,107 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
 
                     viewModels.Add(new ScriptInfoViewModel(script, null, false, downloaded, localSize));
                 }
+            }
 
-                // 2. Custom Folders and Custom Scripts
+            // 2. Custom Folders and Custom Scripts (shown when FilterBy is "All" or "Local")
+            if (isAllFilter || isLocalFilter)
+            {
                 try
                 {
-                    if (settingsService != null)
+                    string? localFolder = settingsService?.Get<string>("UserCustomScriptsFolder");
+                    if (string.IsNullOrWhiteSpace(localFolder))
+                        localFolder = settingsService?.GetShared()?.UserCustomScriptsFolder;
+                    if (string.IsNullOrWhiteSpace(localFolder))
+                        localFolder = settingsService?.GetClient()?.UserCustomScriptsFolder;
+                    if (string.IsNullOrWhiteSpace(localFolder))
+                        localFolder = settingsService?.GetManager()?.UserCustomScriptsFolder;
+                    if (string.IsNullOrWhiteSpace(localFolder) && _customScripts != null)
                     {
-                        string? localFolder = settingsService.Get<string>("UserCustomScriptsFolder");
-                        if (!string.IsNullOrEmpty(localFolder) && Directory.Exists(localFolder))
-                        {
-                            DirectoryInfo customDir = new(localFolder);
-                            foreach (FileInfo file in customDir.EnumerateFiles("*.cs", SearchOption.AllDirectories))
-                            {
-                                if (!isAllFilter && filter != "Local") continue;
+                        var roots = _customScripts.GetSearchRoots();
+                        if (roots != null && roots.Count > 0)
+                            localFolder = roots[0];
+                    }
 
-                                ScriptInfo info = new()
-                                {
-                                    Name = Path.GetFileNameWithoutExtension(file.Name),
-                                    FileName = file.Name,
-                                    FilePath = file.FullName,
-                                    Description = "Local Custom Script",
-                                    Tags = new[] { "Local" },
-                                    CreationDate = file.CreationTime,
-                                    Size = (int)file.Length,
-                                    Sha256 = null,
-                                    CachedDownloaded = true,
-                                    CachedLocalSize = (int)file.Length
-                                };
-                                viewModels.Add(new ScriptInfoViewModel(info, file.FullName, isCustom: true, isDownloaded: true, localSize: (int)file.Length));
-                            }
+                    if (!string.IsNullOrEmpty(localFolder) && Directory.Exists(localFolder))
+                    {
+                        DirectoryInfo customDir = new(localFolder);
+                        foreach (FileInfo file in customDir.EnumerateFiles("*.cs", SearchOption.AllDirectories))
+                        {
+                            ScriptInfo info = new()
+                            {
+                                Name = Path.GetFileNameWithoutExtension(file.Name),
+                                FileName = file.Name,
+                                FilePath = file.FullName,
+                                Description = "Local Custom Script",
+                                Tags = new[] { "Local" },
+                                CreationDate = file.CreationTime,
+                                Size = (int)file.Length,
+                                Sha256 = null,
+                                CachedDownloaded = true,
+                                CachedLocalSize = (int)file.Length
+                            };
+                            viewModels.Add(new ScriptInfoViewModel(info, file.FullName, isCustom: true, isDownloaded: true, localSize: (int)file.Length));
                         }
+                    }
 
-                        StringCollection? scriptList = settingsService.Get<StringCollection>("UserCustomScriptsList");
-                        if (scriptList != null && scriptList.Count > 0)
+                    StringCollection? scriptList = settingsService?.Get<StringCollection>("UserCustomScriptsList");
+                    if (scriptList == null || scriptList.Count == 0)
+                        scriptList = settingsService?.GetShared()?.UserCustomScriptsList;
+                    if (scriptList == null || scriptList.Count == 0)
+                        scriptList = settingsService?.GetClient()?.UserCustomScriptsList;
+                    if (scriptList == null || scriptList.Count == 0)
+                        scriptList = settingsService?.GetManager()?.UserCustomScriptsList;
+
+                    if (scriptList != null && scriptList.Count > 0)
+                    {
+                        HashSet<string> seenPaths = new(viewModels.Select(v => v.LocalFile), StringComparer.OrdinalIgnoreCase);
+                        foreach (string? filePath in scriptList)
                         {
-                            HashSet<string> seenPaths = new(viewModels.Select(v => v.LocalFile), StringComparer.OrdinalIgnoreCase);
-                            foreach (string? filePath in scriptList)
-                            {
-                                if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) continue;
-                                if (!isAllFilter && filter != "Local") continue;
-                                if (seenPaths.Contains(filePath)) continue;
+                            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) continue;
+                            if (seenPaths.Contains(filePath)) continue;
 
-                                FileInfo file = new(filePath);
-                                ScriptInfo info = new()
-                                {
-                                    Name = Path.GetFileNameWithoutExtension(file.Name),
-                                    FileName = file.Name,
-                                    FilePath = file.FullName,
-                                    Description = "Local Single Script",
-                                    Tags = new[] { "Local", "Single" },
-                                    CreationDate = file.CreationTime,
-                                    Size = (int)file.Length,
-                                    Sha256 = null,
-                                    CachedDownloaded = true,
-                                    CachedLocalSize = (int)file.Length
-                                };
-                                seenPaths.Add(filePath);
-                                viewModels.Add(new ScriptInfoViewModel(info, filePath, isCustom: true, isDownloaded: true, localSize: (int)file.Length));
-                            }
+                            FileInfo file = new(filePath);
+                            ScriptInfo info = new()
+                            {
+                                Name = Path.GetFileNameWithoutExtension(file.Name),
+                                FileName = file.Name,
+                                FilePath = file.FullName,
+                                Description = "Local Single Script",
+                                Tags = new[] { "Local", "Single" },
+                                CreationDate = file.CreationTime,
+                                Size = (int)file.Length,
+                                Sha256 = null,
+                                CachedDownloaded = true,
+                                CachedLocalSize = (int)file.Length
+                            };
+                            seenPaths.Add(filePath);
+                            viewModels.Add(new ScriptInfoViewModel(info, filePath, isCustom: true, isDownloaded: true, localSize: (int)file.Length));
                         }
                     }
                 }
                 catch { }
+            }
 
-                // 3. Fast in-place sorting
-                if (SortBy == "Date Created")
-                {
-                    if (SortDescending)
-                        viewModels.Sort((a, b) => (b.Info.CreationDate ?? DateTime.MinValue).CompareTo(a.Info.CreationDate ?? DateTime.MinValue));
-                    else
-                        viewModels.Sort((a, b) => (a.Info.CreationDate ?? DateTime.MinValue).CompareTo(b.Info.CreationDate ?? DateTime.MinValue));
-                }
+            // 3. Fast in-place sorting
+            if (SortBy == "Date Created")
+            {
+                if (SortDescending)
+                    viewModels.Sort((a, b) => (b.Info.CreationDate ?? DateTime.MinValue).CompareTo(a.Info.CreationDate ?? DateTime.MinValue));
                 else
-                {
-                    if (SortDescending)
-                        viewModels.Sort((a, b) => string.Compare(b.FileName, a.FileName, StringComparison.OrdinalIgnoreCase));
-                    else
-                        viewModels.Sort((a, b) => string.Compare(a.FileName, b.FileName, StringComparison.OrdinalIgnoreCase));
-                }
+                    viewModels.Sort((a, b) => (a.Info.CreationDate ?? DateTime.MinValue).CompareTo(b.Info.CreationDate ?? DateTime.MinValue));
+            }
+            else
+            {
+                if (SortDescending)
+                    viewModels.Sort((a, b) => string.Compare(b.FileName, a.FileName, StringComparison.OrdinalIgnoreCase));
+                else
+                    viewModels.Sort((a, b) => string.Compare(a.FileName, b.FileName, StringComparison.OrdinalIgnoreCase));
+            }
 
-                return viewModels;
-            });
+            return viewModels;
+        });
 
-            _scripts.ReplaceRange(scriptViewModels);
-        }
+        _scripts.ReplaceRange(scriptViewModels);
 
         ApplySearchFilter();
         OnPropertyChanged(nameof(Scripts));

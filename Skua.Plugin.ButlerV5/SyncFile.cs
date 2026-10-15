@@ -1,25 +1,28 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text;
-using Skua.Core.Models;
 
 namespace ButlerV5;
 
 /// <summary>
 /// State written by every account running the plugin. One file per account:
-/// %APPDATA%\VibeSkua\character_locations\{username}_butlerv5
+/// %APPDATA%\Skua\character_locations\{username}_butlerv5
 /// </summary>
 public class SyncData
 {
     public string Username = "";
     public int Pid;
     public string Server = "";
+    /// <summary>Actually equipped class, not the configured follow class type.</summary>
+    public string ClassName = "";
     public string Map = "";
     public string Room = "1";
     public string Cell = "Enter";
     public string Pad = "Spawn";
     public bool LoggedIn;
     public bool Attacking;
+    /// <summary>True when this account's AQW "Enable Goto" preference is off.</summary>
+    public bool OffGoto;
     public List<string> Followers = new();
 
     /// <summary>Who this account is currently following ("" = nobody).</summary>
@@ -43,12 +46,14 @@ public class SyncData
         sb.Append("username=").Append(Username).Append('\n');
         sb.Append("pid=").Append(Pid).Append('\n');
         sb.Append("server=").Append(Server).Append('\n');
+        sb.Append("class=").Append(ClassName).Append('\n');
         sb.Append("map=").Append(Map).Append('\n');
         sb.Append("room=").Append(Room).Append('\n');
         sb.Append("cell=").Append(Cell).Append('\n');
         sb.Append("pad=").Append(Pad).Append('\n');
         sb.Append("loggedin=").Append(LoggedIn ? '1' : '0').Append('\n');
         sb.Append("attacking=").Append(Attacking ? '1' : '0').Append('\n');
+        sb.Append("offgoto=").Append(OffGoto ? '1' : '0').Append('\n');
         sb.Append("followers=").Append(string.Join(",", Followers)).Append('\n');
         sb.Append("following=").Append(Following).Append('\n');
         sb.Append("script=").Append(ScriptOn ? '1' : '0').Append('\n');
@@ -81,12 +86,14 @@ public class SyncData
                 case "username": data.Username = value; sawUsername = !string.IsNullOrEmpty(value); break;
                 case "pid": _ = int.TryParse(value, out data.Pid); break;
                 case "server": data.Server = value; break;
+                case "class": data.ClassName = value; break;
                 case "map": data.Map = value.ToLowerInvariant(); break;
                 case "room": data.Room = value; break;
                 case "cell": data.Cell = value; break;
                 case "pad": data.Pad = value; break;
                 case "loggedin": data.LoggedIn = value == "1"; break;
                 case "attacking": data.Attacking = value == "1"; break;
+                case "offgoto": data.OffGoto = value == "1"; break;
                 case "followers":
                     data.Followers = value
                         .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
@@ -109,18 +116,12 @@ public static class SyncFile
     public const string Suffix = "_butlerv5";
 
     public static string Directory { get; } = Path.Combine(
-        ClientFileSources.SkuaDIR,
-        "character_locations");
-
-    public static string LegacyDirectory { get; } = Path.Combine(
-        ClientFileSources.LegacySkuaDIR,
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Skua",
         "character_locations");
 
     public static string PathFor(string username) =>
         Path.Combine(Directory, $"{username.ToLowerInvariant()}{Suffix}");
-
-    public static string LegacyPathFor(string username) =>
-        Path.Combine(LegacyDirectory, $"{username.ToLowerInvariant()}{Suffix}");
 
     /// <summary>
     /// Prefers an atomic temp-file + rename (readers never see a half-written file),
@@ -130,30 +131,12 @@ public static class SyncFile
     /// </summary>
     public static bool Write(SyncData data)
     {
-        string content = data.Serialize();
-        bool success = WriteToPath(PathFor(data.Username), content);
-
-        if (!LegacyDirectory.Equals(Directory, StringComparison.OrdinalIgnoreCase))
-        {
-            try
-            {
-                WriteToPath(LegacyPathFor(data.Username), content);
-            }
-            catch { }
-        }
-
-        return success;
-    }
-
-    private static bool WriteToPath(string path, string content)
-    {
         try
         {
-            string? dir = Path.GetDirectoryName(path);
-            if (!string.IsNullOrEmpty(dir))
-                System.IO.Directory.CreateDirectory(dir);
-
+            System.IO.Directory.CreateDirectory(Directory);
+            string path = PathFor(data.Username);
             string temp = path + ".tmp";
+            string content = data.Serialize();
 
             for (int attempt = 0; attempt < 3; attempt++)
             {
@@ -163,6 +146,8 @@ public static class SyncFile
                     File.Move(temp, path, overwrite: true);
                     return true;
                 }
+                // Replacing a file another Skua instance holds open throws
+                // UnauthorizedAccessException, not just IOException.
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 {
                     Thread.Sleep(30);
@@ -208,72 +193,27 @@ public static class SyncFile
         return null;
     }
 
-    public static SyncData? ReadUser(string username)
-    {
-        string primaryPath = PathFor(username);
-        string legacyPath = LegacyPathFor(username);
-
-        bool hasPrimary = File.Exists(primaryPath);
-        bool hasLegacy = !legacyPath.Equals(primaryPath, StringComparison.OrdinalIgnoreCase) && File.Exists(legacyPath);
-
-        if (hasPrimary && hasLegacy)
-        {
-            try
-            {
-                DateTime primaryTime = File.GetLastWriteTimeUtc(primaryPath);
-                DateTime legacyTime = File.GetLastWriteTimeUtc(legacyPath);
-                if (legacyTime > primaryTime)
-                {
-                    SyncData? legacyData = Read(legacyPath);
-                    if (legacyData != null)
-                        return legacyData;
-                }
-            }
-            catch { }
-        }
-
-        SyncData? data = Read(primaryPath);
-        if (data != null)
-            return data;
-
-        if (hasLegacy)
-            return Read(legacyPath);
-
-        return null;
-    }
+    public static SyncData? ReadUser(string username) => Read(PathFor(username));
 
     public static List<SyncData> ReadAll()
     {
-        Dictionary<string, (SyncData data, DateTime time)> result = new(StringComparer.OrdinalIgnoreCase);
-
-        void CollectFrom(string dir)
+        List<SyncData> result = new();
+        try
         {
-            try
+            if (!System.IO.Directory.Exists(Directory))
+                return result;
+
+            foreach (string path in System.IO.Directory.EnumerateFiles(Directory, $"*{Suffix}"))
             {
-                if (!System.IO.Directory.Exists(dir))
-                    return;
-
-                foreach (string path in System.IO.Directory.EnumerateFiles(dir, $"*{Suffix}"))
-                {
-                    SyncData? data = Read(path);
-                    if (data != null && !string.IsNullOrEmpty(data.Username))
-                    {
-                        DateTime writeTime = DateTime.MinValue;
-                        try { writeTime = File.GetLastWriteTimeUtc(path); } catch { }
-
-                        if (!result.TryGetValue(data.Username, out var existing) || writeTime > existing.time)
-                            result[data.Username] = (data, writeTime);
-                    }
-                }
+                SyncData? data = Read(path);
+                if (data != null)
+                    result.Add(data);
             }
-            catch { }
         }
-
-        CollectFrom(Directory);
-        if (!LegacyDirectory.Equals(Directory, StringComparison.OrdinalIgnoreCase))
-            CollectFrom(LegacyDirectory);
-
-        return result.Values.Select(v => v.data).ToList();
+        catch
+        {
+        }
+        return result;
     }
 
     /// <summary>

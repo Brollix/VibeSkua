@@ -50,7 +50,7 @@ public enum FollowSource
 /// Follows a master account. Core behavior is Butler v3's: rate-limited Goto plus a
 /// packet listener for "Locked zone" / "is full" / "ignoring goto" warnings. Where v3
 /// walked a hardcoded locked-maps list, v5 reads the master's sync file and joins the
-/// exact map-room directly.
+/// exact map-room directly when goto is disabled or cannot reach the master.
 /// </summary>
 public class Follower
 {
@@ -70,6 +70,9 @@ public class Follower
     private DateTime _lastJoinTime = DateTime.MinValue;
     private string? _lastJoinTarget;
     private int _gotoAttempts;
+    private int _directJoinAttempts;
+    private string? _directJoinTarget;
+    private bool? _lastReportedOffGoto;
     private bool _packetStreamLogged;
     private string? _skillClass;
     private ClassUseMode _skillMode = ClassUseMode.Base;
@@ -99,6 +102,8 @@ public class Follower
     private bool _butlerOptsApplied;         // we turned the butler QoL options on for this follow
     private (bool InfiniteRange, bool SkipCutscenes)? _butlerOptsPrior;  // their values before we did
     private bool _autoStopLogged;  // logged the "stopped Skua Auto" notice once per on->off transition
+    private string? _ownHouseUsername;  // cache belongs to this logged-in account only
+    private string? _ownHouseRoom;      // house-<CharID>, not ScriptPlayer.ID (session uid)
 
     /// <summary>True while mid-park (walking home) - the master shouldn't re-summon yet.</summary>
     public bool IsParking => _isParking;
@@ -114,12 +119,6 @@ public class Follower
     public FollowSource Source { get; private set; } = FollowSource.None;
     public bool IsRunning => _loop is { IsCompleted: false };
 
-    /// <summary>
-    /// A master that turned out to be ignoring goto: orders from them are not obeyed
-    /// again until the user starts a follow manually (which clears this).
-    /// </summary>
-    public string? GotoBlockedMaster { get; private set; }
-
     public Follower(IScriptInterface bot, FollowerSettings settings, Action<string> log)
     {
         _bot = bot;
@@ -133,7 +132,9 @@ public class Follower
 
         Master = master;
         Source = source;
-        GotoBlockedMaster = null;
+        _lastReportedOffGoto = null;
+        _directJoinTarget = null;
+        _directJoinAttempts = 0;
         _suspended = false;
         _parked = false;
         _lastWithMaster = null;
@@ -182,10 +183,10 @@ public class Follower
         StopAttacking(deaggroJump: true);
         RevertAntiLag();
         RevertButlerOptions();
-        // Only park if we aren't already parked. Releasing a butler that's already
-        // parked (e.g. stuck on a different server) shouldn't kick off a second,
-        // slow house-join - it's already home.
-        if (park && !_parked)
+        // A parked butler may still be in someone else's house after an unreachable
+        // direct join. On release, only skip the house transfer if it is truly home.
+        if (park && (!_parked ||
+            (_settings.Park() == ParkSpot.House && !IsInOwnHouse(GetMyMapRoom()))))
             Park("Released by master.");
         else if (park)
             DebugLog.Log("Follower", "released while already parked - staying put");
@@ -260,12 +261,6 @@ public class Follower
                 if (_parked)
                     ForceParkingAggroOff();
 
-                if (_gotoOff)
-                {
-                    _log($"{master} is ignoring goto requests (incognito mode?). Stopping follow.");
-                    break;
-                }
-
                 SyncData? m = SyncFile.ReadUser(master);
 
                 if ((DateTime.UtcNow - _lastSnapshot).TotalSeconds >= 10)
@@ -309,6 +304,21 @@ public class Follower
                     continue;
                 }
                 _badReads = 0;
+
+                // A server rejection may arrive before the broadcaster updates its
+                // file. Keep using direct joins until the master explicitly publishes
+                // that goto has been enabled again.
+                if (_lastReportedOffGoto == true && !m.OffGoto)
+                {
+                    _gotoOff = false;
+                    _gotoAttempts = 0;
+                    _directJoinAttempts = 0;
+                    _directJoinTarget = null;
+                    _blockedMap = null;
+                    _blockedRoom = null;
+                    DebugLog.Log("Follower", $"{master} enabled goto again");
+                }
+                _lastReportedOffGoto = m.OffGoto;
 
                 if (!SameServer(m))
                 {
@@ -385,7 +395,7 @@ public class Follower
                     _log(full
                         ? $"Room full - joining {m.MapWithRoom} directly (attempt {_roomFullAttempts})."
                         : $"Locked zone - joining {m.MapWithRoom} from {master}'s file.");
-                    JoinMasterRoom(m);
+                    JoinMasterRoom(m, token);
                     Wait(token, LoopDelayMs);
                     continue;
                 }
@@ -415,8 +425,7 @@ public class Follower
                         QuestBypass.ApplyForMap(_bot, myMapName);
                 }
 
-                bool sameRoom = string.Equals(myRoom, m.MapWithRoom, StringComparison.OrdinalIgnoreCase)
-                             || (_bot.Map?.PlayerExists(master) == true && string.Equals(_bot.Map?.Name, m.Map, StringComparison.OrdinalIgnoreCase));
+                bool sameRoom = string.Equals(myRoom, m.MapWithRoom, StringComparison.OrdinalIgnoreCase);
                 if (sameRoom != _lastWithMaster)
                 {
                     _lastWithMaster = sameRoom;
@@ -425,6 +434,8 @@ public class Follower
 
                 if (sameRoom)
                 {
+                    _directJoinAttempts = 0;
+                    _directJoinTarget = null;
                     _rescueRounds = 0;
                     _lastRescueMap = null;
                     _roomFullAttempts = 0;
@@ -461,60 +472,94 @@ public class Follower
                         QuestBypass.ApplyForMap(_bot, m.Map);
                     }
 
-                    // Goto first, always - it reaches different maps, same-name room
-                    // changes AND player houses (which cannot be joined by map name).
-                    // Warning packets never reach a plugin (no running script pumps
-                    // them), so goto failure is detected by counting: several gotos
-                    // without landing in the master's room means goto is blocked
-                    // (locked zone, full room, ...) - then join map-room from the file.
-                    int rescueThreshold = Math.Clamp(_settings.RescueThreshold(), 1, 10);
-                    if (_gotoAttempts >= rescueThreshold)
+                    if (m.OffGoto || _gotoOff)
                     {
+                        // With goto disabled, use the master's exact map-room from the
+                        // sync file. Count actual join attempts, not throttled ticks,
+                        // so an inaccessible room does not get hammered forever.
                         _gotoAttempts = 0;
-
-                        if (string.Equals(m.Map, _lastRescueMap, StringComparison.OrdinalIgnoreCase))
-                            _rescueRounds++;
-                        else
+                        if (!string.Equals(_directJoinTarget, m.MapWithRoom, StringComparison.OrdinalIgnoreCase))
                         {
-                            _lastRescueMap = m.Map;
-                            _rescueRounds = 1;
+                            _directJoinTarget = m.MapWithRoom;
+                            _directJoinAttempts = 0;
+                            DebugLog.Log("Follower", $"{master} has goto off - directly joining {m.MapWithRoom}");
                         }
 
-                        if (_rescueRounds >= 3)
+                        if (_directJoinAttempts >= 3)
                         {
-                            // Stop hammering, but tell apart a FULL ROOM from a LOCKED MAP.
-                            // /goto always blocks when the master's room is full; whether we
-                            // can still reach the MAP tells the two apart. A full PUBLIC room
-                            // (<1000) overflows the file-join onto the map in a different free
-                            // room - so we're ON the master's map but the wrong room. That's a
-                            // full room, and a ROOM change may free us, so block only this
-                            // room. (A full PRIVATE room >=1000 is rejected outright and is
-                            // handled by the _roomFull path above.) If we couldn't even get
-                            // onto the map - an entry gate bounced us to battleon - the map is
-                            // locked (a quest fake is missing); block the whole map until the
-                            // master leaves it.
                             bool onMasterMap = string.Equals(_bot.Map?.Name ?? "", m.Map, StringComparison.OrdinalIgnoreCase);
-                            _rescueRounds = 0;
                             if (onMasterMap)
                             {
                                 _blockedRoom = m.MapWithRoom;
-                                ParkOnce($"{m.MapWithRoom} is full after 3 rescue attempts - parked until {master} changes rooms.");
+                                ParkOnce(m.Map.Equals("house", StringComparison.OrdinalIgnoreCase)
+                                    ? $"Can't reach {master} in {m.MapWithRoom} through their own house - they may be visiting someone else's house. Parked until they change rooms."
+                                    : $"Can't enter {m.MapWithRoom} after 3 direct joins - parked until {master} changes rooms.");
                             }
                             else
                             {
                                 _blockedMap = m.Map;
-                                ParkOnce($"Can't enter {m.Map} after 3 rescue attempts - a quest gate may be missing. Parked until {master} changes maps.");
+                                ParkOnce($"Can't enter {m.Map} after 3 direct joins - parked until {master} changes maps.");
                             }
                             Wait(token, 2000);
                             continue;
                         }
 
-                        DebugLog.Log("Follower", $"goto not landing after {rescueThreshold} attempts - file-join rescue (round {_rescueRounds})");
-                        JoinMasterRoom(m);
+                        if (JoinMasterRoom(m, token))
+                            _directJoinAttempts++;
                     }
-                    else if (TryGoto(master))
+                    else
                     {
-                        _gotoAttempts++;
+                        // Goto reaches player houses and remains the fastest path when
+                        // allowed. After failed attempts, rescue with a direct join.
+                        int rescueThreshold = Math.Clamp(_settings.RescueThreshold(), 1, 10);
+                        if (_gotoAttempts >= rescueThreshold)
+                        {
+                            _gotoAttempts = 0;
+
+                            if (string.Equals(m.Map, _lastRescueMap, StringComparison.OrdinalIgnoreCase))
+                                _rescueRounds++;
+                            else
+                            {
+                                _lastRescueMap = m.Map;
+                                _rescueRounds = 1;
+                            }
+
+                            if (_rescueRounds >= 3)
+                            {
+                                // Stop hammering, but tell apart a FULL ROOM from a LOCKED MAP.
+                                // /goto always blocks when the master's room is full; whether we
+                                // can still reach the MAP tells the two apart. A full PUBLIC room
+                                // (<1000) overflows the file-join onto the map in a different free
+                                // room - so we're ON the master's map but the wrong room. That's a
+                                // full room, and a ROOM change may free us, so block only this
+                                // room. (A full PRIVATE room >=1000 is rejected outright and is
+                                // handled by the _roomFull path above.) If we couldn't even get
+                                // onto the map - an entry gate bounced us to battleon - the map is
+                                // locked (a quest fake is missing); block the whole map until the
+                                // master leaves it.
+                                bool onMasterMap = string.Equals(_bot.Map?.Name ?? "", m.Map, StringComparison.OrdinalIgnoreCase);
+                                _rescueRounds = 0;
+                                if (onMasterMap)
+                                {
+                                    _blockedRoom = m.MapWithRoom;
+                                    ParkOnce($"{m.MapWithRoom} is full after 3 rescue attempts - parked until {master} changes rooms.");
+                                }
+                                else
+                                {
+                                    _blockedMap = m.Map;
+                                    ParkOnce($"Can't enter {m.Map} after 3 rescue attempts - a quest gate may be missing. Parked until {master} changes maps.");
+                                }
+                                Wait(token, 2000);
+                                continue;
+                            }
+
+                            DebugLog.Log("Follower", $"goto not landing after {rescueThreshold} attempts - file-join rescue (round {_rescueRounds})");
+                            JoinMasterRoom(m, token);
+                        }
+                        else if (TryGoto(master))
+                        {
+                            _gotoAttempts++;
+                        }
                     }
                 }
                 else if (_settings.LeechMode())
@@ -549,7 +594,7 @@ public class Follower
                     // keeps issuing it even when we believe we're already in place.
                     // Throttled by the same Goto delay as travel; leech mode is a separate
                     // branch above, so it is unaffected.
-                    if (_settings.AlwaysGoto())
+                    if (_settings.AlwaysGoto() && !m.OffGoto && !_gotoOff)
                         TryGoto(master);
 
                     // In the master's room: only the CELL matters. Pads are ignored on
@@ -588,23 +633,6 @@ public class Follower
         catch (Exception ex)
         {
             _log($"Follow loop error: {ex.Message}");
-        }
-        finally
-        {
-            // The loop can end without Stop() being called (gotoOff breaks out).
-            // Without this cleanup the UI keeps showing a dead follow, and an
-            // ORDERED follow gets restarted by the order watcher every 2s forever.
-            if (_gotoOff && Master != null)
-            {
-                GotoBlockedMaster = Master;
-                _bot.Events.ExtensionPacketReceived -= PacketListener;
-                try { _bot.Flash.FlashCall -= OnFlashCall; } catch { }
-                StopSkills();
-                StopAttacking();
-                _log($"{Master} won't be auto-followed until you press Follow manually (their goto is off).");
-                Master = null;
-                Source = FollowSource.None;
-            }
         }
     }
 
@@ -1243,14 +1271,15 @@ public class Follower
         }
     }
 
-    private void JoinMasterRoom(SyncData m)
+    /// <returns>True if a join was attempted; false when the 5-second throttle held it.</returns>
+    private bool JoinMasterRoom(SyncData m, CancellationToken token)
     {
         // One join attempt per target per 5s. Re-joining every loop tick keeps
         // reloading the room, which looks like stuttering and can prevent the
         // transfer from ever completing.
         if (string.Equals(m.MapWithRoom, _lastJoinTarget, StringComparison.OrdinalIgnoreCase) &&
             (DateTime.UtcNow - _lastJoinTime).TotalMilliseconds < 5000)
-            return;
+            return false;
 
         _lastJoinTarget = m.MapWithRoom;
         _lastJoinTime = DateTime.UtcNow;
@@ -1259,25 +1288,53 @@ public class Follower
         {
             DebugLog.Log("Follower", $"join {m.MapWithRoom} cell={m.Cell} pad={m.Pad} (from map={_bot.Map?.Name})");
             StopAttacking();
-
-            if (string.Equals(m.Map, "house", StringComparison.OrdinalIgnoreCase))
+            if (m.Map.Equals("house", StringComparison.OrdinalIgnoreCase))
             {
+                // The server ignores a normal room transfer to house-<number>.
+                // Enter the master's own house by username, then verify the exact
+                // instance from their sync file before the combat path may resume.
+                string roomBefore = GetMyMapRoom();
                 _bot.Send.Packet($"%xt%zm%house%1%{m.Username}%");
-                _bot.Wait.ForMapLoad("house");
+
+                // ForMapLoad("house") can return immediately when we started in
+                // another house. Wait for the room title instead, allowing the
+                // house transfer (or its post-combat cooldown) time to settle.
+                for (int i = 0; i < 24 && !token.IsCancellationRequested; i++)
+                {
+                    Wait(token, 250);
+                    string currentRoom = GetMyMapRoom();
+                    if (currentRoom.Equals(m.MapWithRoom, StringComparison.OrdinalIgnoreCase))
+                    {
+                        DebugLog.Log("Follower", $"house join reached {currentRoom}");
+                        return true;
+                    }
+
+                    if (currentRoom.StartsWith("house-", StringComparison.OrdinalIgnoreCase) &&
+                        !currentRoom.Equals(roomBefore, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // We entered the master's own house but not their recorded
+                        // instance. They may be visiting another player's house.
+                        _blockedRoom = m.MapWithRoom;
+                        ParkOnce($"House join reached {currentRoom}, but {m.Username} is in {m.MapWithRoom}. Parked until they change rooms.");
+                        return true;
+                    }
+                }
             }
             else
             {
-                // ignoreCheck: Skua skips joins to a map with the same name, which
-                // breaks room-number changes like yulgar-1 -> yulgar-9123.
-                _bot.Map!.Join(m.MapWithRoom, m.Cell, m.Pad, ignoreCheck: true);
                 if (string.Equals(_bot.Map?.Name, m.Map, StringComparison.OrdinalIgnoreCase))
                 {
-                    _bot.Wait.ForTrue(() => _bot.Map.RoomID.ToString() == m.Room, 3);
+                    // ScriptMap.Join's internal loop only runs when the map name
+                    // changes, even with ignoreCheck=true. Send the transfer for a
+                    // different room instance on the same map directly.
+                    _bot.Map!.JoinPacket(m.MapWithRoom, m.Cell, m.Pad);
                 }
                 else
                 {
-                    _bot.Wait.ForMapLoad(m.Map);
+                    _bot.Map!.Join(m.MapWithRoom, m.Cell, m.Pad, ignoreCheck: true);
                 }
+
+                _bot.Wait.ForMapLoad(m.Map);
             }
             DebugLog.Log("Follower", $"join done, now on map={_bot.Map?.Name} loaded={_bot.Map?.Loaded}");
         }
@@ -1286,6 +1343,7 @@ public class Follower
             _log($"Join {m.MapWithRoom} failed: {ex.Message}");
             DebugLog.Log("Follower", $"join {m.MapWithRoom} FAILED: {ex}");
         }
+        return true;
     }
 
     private void ParkOnce(string reason)
@@ -1314,15 +1372,15 @@ public class Follower
                 return;
             }
 
-            // Already where we'd park? Don't re-transfer. Prevents repeated house-joins
-            // when the master hops servers while we're already parked at home.
+            // Skip a redundant transfer only when this is the local account's house;
+            // the master and third parties also have "house-<id>" rooms.
             string already = GetMyMapRoom();
-            if (spot == ParkSpot.House && (already.StartsWith("house-", StringComparison.OrdinalIgnoreCase) || string.Equals(_bot.Map?.Name, "house", StringComparison.OrdinalIgnoreCase)))
+            if (spot == ParkSpot.House && IsInOwnHouse(already))
             {
                 DebugLog.Log("Follower", "already home - park is a no-op");
                 return;
             }
-            if (spot == ParkSpot.Whitemap && (already.StartsWith("whitemap-", StringComparison.OrdinalIgnoreCase) || string.Equals(_bot.Map?.Name, "whitemap", StringComparison.OrdinalIgnoreCase)))
+            if (spot == ParkSpot.Whitemap && already.StartsWith("whitemap-", StringComparison.OrdinalIgnoreCase))
             {
                 DebugLog.Log("Follower", "already at whitemap - park is a no-op");
                 return;
@@ -1344,13 +1402,11 @@ public class Follower
                     _bot.House?.Items?.Any(h => h.Equipped) == true)
                 {
                     DebugLog.Log("Follower", "parking in own house");
-                    string roomBefore = GetMyMapRoom();
-
                     // The server enforces a "too soon after combat" cooldown on house
                     // joins that outlives the in-combat flag by several seconds, and
                     // the transfer itself can take a while. Retry across the cooldown;
-                    // we're home once we're in a "house" map that isn't the room we
-                    // started in (release can happen inside the master's house).
+                    // verify the exact local account house, not merely a changed
+                    // house room (release can happen inside another player's house).
                     // The post-combat cooldown almost always eats an immediate attempt;
                     // waiting 3s first usually makes attempt 1 the one that lands.
                     ParkingWait(3000);
@@ -1363,8 +1419,7 @@ public class Follower
                         {
                             ParkingWait(250);
                             string current = GetMyMapRoom();
-                            if ((current.StartsWith("house-", StringComparison.OrdinalIgnoreCase) || string.Equals(_bot.Map?.Name, "house", StringComparison.OrdinalIgnoreCase)) &&
-                                !current.Equals(roomBefore, StringComparison.OrdinalIgnoreCase))
+                            if (IsInOwnHouse(current))
                             {
                                 DebugLog.Log("Follower", $"parked in own house ({current}, attempt {attempt})");
                                 return;
@@ -1398,8 +1453,7 @@ public class Follower
                         {
                             ParkingWait(250);
                             string current = GetMyMapRoom();
-                            if ((current.StartsWith("house-", StringComparison.OrdinalIgnoreCase) || string.Equals(_bot.Map?.Name, "house", StringComparison.OrdinalIgnoreCase)) &&
-                                !current.Equals(roomBefore, StringComparison.OrdinalIgnoreCase))
+                            if (IsInOwnHouse(current))
                             {
                                 DebugLog.Log("Follower", $"parked in own house ({current}, after Enter/Spawn deaggro)");
                                 return;
@@ -1407,14 +1461,14 @@ public class Follower
                         }
                     }
 
-                    // Still in a house (probably were in one when the packet was sent,
-                    // possibly our own)? A house is a safe park - don't yank to whitemap.
-                    if (GetMyMapRoom().StartsWith("house-", StringComparison.OrdinalIgnoreCase) || string.Equals(_bot.Map?.Name, "house", StringComparison.OrdinalIgnoreCase))
+                    // The last house transfer may have landed just after its wait.
+                    // Only the local account's house fulfills the House park setting.
+                    if (IsInOwnHouse(GetMyMapRoom()))
                     {
-                        DebugLog.Log("Follower", "already in a house - staying parked here");
+                        DebugLog.Log("Follower", "parked in own house after final wait");
                         return;
                     }
-                    DebugLog.Log("Follower", "house join didn't land after 7s, falling back to whitemap");
+                    DebugLog.Log("Follower", "own house join didn't land - falling back to whitemap");
                 }
             }
             catch (Exception ex)
@@ -1492,10 +1546,6 @@ public class Follower
             if (string.IsNullOrEmpty(name) || name == "-1")
                 return "";
 
-            int roomId = _bot.Map.RoomID;
-            if (roomId > 0)
-                return $"{name}-{roomId}";
-
             string fullName = _bot.Map.FullName ?? "";
             int dash = fullName.LastIndexOf('-');
             if (dash > 0 && dash < fullName.Length - 1)
@@ -1509,6 +1559,44 @@ public class Follower
         catch
         {
             return "";
+        }
+    }
+
+    /// <summary>
+    /// AQW uses the owner's persistent CharID as the house room number. Skua's
+    /// Player.ID reads myAvatar.uid, a session ID that is NOT the house owner ID.
+    /// Cache a successful lookup for this username so parking retries do not keep
+    /// crossing the Flash bridge. A generic "house-" prefix also matches others.
+    /// </summary>
+    private bool IsInOwnHouse(string room)
+    {
+        try
+        {
+            string? username = _bot.Player?.Username;
+            if (string.IsNullOrWhiteSpace(username))
+                return false;
+
+            if (!string.Equals(username, _ownHouseUsername, StringComparison.OrdinalIgnoreCase))
+            {
+                _ownHouseUsername = username;
+                _ownHouseRoom = null;
+            }
+
+            if (_ownHouseRoom == null)
+            {
+                int charId = _bot.Flash.GetGameObject<int>("world.myAvatar.objData.CharID");
+                if (charId <= 0)
+                    return false;
+                _ownHouseRoom = $"house-{charId}";
+                DebugLog.Log("Follower", $"own house room resolved from CharID: {_ownHouseRoom}");
+            }
+
+            return string.Equals(room, _ownHouseRoom, StringComparison.OrdinalIgnoreCase);
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Log("Follower", $"own house CharID lookup failed: {ex.Message}");
+            return false;
         }
     }
 

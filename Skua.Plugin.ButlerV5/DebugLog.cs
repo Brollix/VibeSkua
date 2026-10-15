@@ -1,9 +1,5 @@
 using System.ComponentModel;
 using System.IO;
-using Avalonia;
-using Avalonia.Controls;
-using Avalonia.Media;
-using Skua.Core.Models;
 
 namespace ButlerV5;
 
@@ -14,14 +10,6 @@ public class LogLine : INotifyPropertyChanged
 {
     public long Seq { get; init; }
     public LogLevel Level { get; init; }
-
-    public IBrush LevelBrush => Level switch
-    {
-        LogLevel.Success => Brush.Parse("#3FBF6F"),
-        LogLevel.Warning => Brush.Parse("#FFA23E"),
-        LogLevel.Error => Brush.Parse("#E05252"),
-        _ => (Application.Current?.FindResource("SkuaTextBrush") as IBrush) ?? Brush.Parse("#C4C4CC")
-    };
 
     private string _text = "";
     public string Text
@@ -39,14 +27,15 @@ public class LogLine : INotifyPropertyChanged
 /// <summary>
 /// Verbose diagnostics. Every entry goes into a capped, deduplicated in-memory ring
 /// buffer (for the in-plugin log viewer, copy and export), and - when auto-save is on -
-/// is also appended to %APPDATA%\VibeSkua\butlerv5_logs\debug_pid{pid}.log.
+/// is also appended to %APPDATA%\Skua\butlerv5_logs\debug_pid{pid}.log.
 /// </summary>
 public static class DebugLog
 {
     private static readonly object _fileLock = new();
     private static readonly object _memLock = new();
     private static readonly string _dir = Path.Combine(
-        ClientFileSources.SkuaDIR,
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Skua",
         "butlerv5_logs");
     private static readonly string _path = Path.Combine(_dir, $"debug_pid{Environment.ProcessId}.log");
 
@@ -64,7 +53,7 @@ public static class DebugLog
     public static Func<bool> EnabledProvider = () => true;
 
     /// <summary>Auto-save option: when true, entries are also appended to the log file.</summary>
-    public static Func<bool> AutoSaveProvider = () => false;
+    public static Func<bool> AutoSaveProvider = () => true;
 
     public static void Log(string component, string message, LogLevel level = LogLevel.Info)
     {
@@ -152,6 +141,6 @@ public static class DebugLog
         d == null
             ? "(no file)"
             : $"user={d.Username} pid={d.Pid} loggedin={(d.LoggedIn ? 1 : 0)} map={d.MapWithRoom} " +
-              $"cell={d.Cell} pad={d.Pad} attacking={(d.Attacking ? 1 : 0)} server={d.Server} " +
+              $"cell={d.Cell} pad={d.Pad} attacking={(d.Attacking ? 1 : 0)} offgoto={(d.OffGoto ? 1 : 0)} server={d.Server} " +
               $"followers=[{string.Join(",", d.Followers)}]";
 }

@@ -26,6 +26,9 @@ public class Broadcaster
     private string _lastWritten = "";
     private string _lastKnownRoom = "1";
     private volatile string _lastServer = "";
+    private bool _lastOffGoto;
+    private string _lastClassName = "";
+    private DateTime _lastClassCheck = DateTime.MinValue;
 
     /// <summary>This account's current server name (cached from the last broadcast).</summary>
     public string CurrentServer => _lastServer;
@@ -182,21 +185,44 @@ public class Broadcaster
             string server = GameServer.CurrentName(_bot); // server NAME, not IP (sock7 is shared)
             _lastServer = server;
 
+            // AQW stores the "Enable Goto" social preference here. A nullable read
+            // distinguishes a transient Flash read failure from an actual false value.
+            bool? gotoEnabled = _bot.Flash.GetGameObject<bool?>("uoPref.bGoto");
+            if (gotoEnabled.HasValue)
+                _lastOffGoto = !gotoEnabled.Value;
+
             lock (_writeLock)
             {
+                if (!player.Username.Equals(_lastUsername, StringComparison.OrdinalIgnoreCase))
+                {
+                    _lastClassName = "";
+                    _lastClassCheck = DateTime.MinValue;
+                }
                 _lastUsername = player.Username;
+
+                // CurrentClass scans inventory; sample at roster cadence rather than
+                // on every 250ms location poll. A transient read failure keeps the
+                // last known class until the next sample.
+                if ((DateTime.UtcNow - _lastClassCheck).TotalSeconds >= 2)
+                {
+                    _lastClassCheck = DateTime.UtcNow;
+                    try { _lastClassName = player.CurrentClass?.Name ?? _lastClassName; }
+                    catch { }
+                }
 
                 SyncData data = new()
                 {
                     Username = player.Username,
                     Pid = Environment.ProcessId,
                     Server = server,
+                    ClassName = _lastClassName,
                     Map = mapName,
                     Room = ResolveRoom(),
                     Cell = player.Cell ?? "Enter",
                     Pad = player.Pad ?? "Spawn",
                     LoggedIn = true,
                     Attacking = attacking,
+                    OffGoto = _lastOffGoto,
                     Followers = _followers.ToList(),
                     Following = SafeGet(_followingProvider) ?? "",
                     ScriptOn = SafeGet(_scriptNameProvider) != null,
@@ -235,6 +261,8 @@ public class Broadcaster
                 };
 
                 WriteIfChanged(data);
+                _lastClassName = "";
+                _lastClassCheck = DateTime.MinValue;
             }
         }
         catch
@@ -280,14 +308,6 @@ public class Broadcaster
     {
         try
         {
-            int roomId = _bot.Map?.RoomID ?? 0;
-            if (roomId > 0)
-            {
-                string rStr = roomId.ToString();
-                _lastKnownRoom = rStr;
-                return rStr;
-            }
-
             string fullName = _bot.Map?.FullName ?? "";
             int dash = fullName.LastIndexOf('-');
             if (dash > 0 && dash < fullName.Length - 1)

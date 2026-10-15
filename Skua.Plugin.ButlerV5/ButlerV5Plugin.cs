@@ -1,7 +1,7 @@
+using System.Collections;
 using System.IO;
-using Avalonia.Controls;
+using System.Reflection;
 using Avalonia.Threading;
-using CommunityToolkit.Mvvm.DependencyInjection;
 using Skua.Core.Interfaces;
 using Skua.Core.Options;
 
@@ -9,13 +9,13 @@ namespace ButlerV5;
 
 public class ButlerV5Plugin : ISkuaPlugin
 {
-    private const string MenuButtonText = "Butler V5";
+    private const string MenuButtonText = "ButlerV5 Avalonia";
 
-    public string Name => "Butler V5";
+    public string Name => "ButlerV5 Avalonia";
     public string Author => "l0newolf12";
     public string Description =>
-        "Every account with this plugin broadcasts its location to a shared file. " +
-        "Open the Butler V5 window to see who's online, follow someone, or order your alts to follow you.";
+        "Avalonia edition of ButlerV5. Every account with this plugin broadcasts its location " +
+        "to a shared file so you can follow someone or order your alts to follow you.";
 
     public List<IOption>? Options { get; } = new()
     {
@@ -32,7 +32,7 @@ public class ButlerV5Plugin : ISkuaPlugin
             "Record diagnostics into the in-plugin log viewer (Settings window). Turn off\n" +
             "to stop all logging entirely. Default: On.", true),
         new Option<bool>("autoSaveLog", "Auto-save logs to file",
-            "Also write every log line to a file in %APPDATA%\\VibeSkua\\butlerv5_logs as it\n" +
+            "Also write every log line to a file in %APPDATA%\\Skua\\butlerv5_logs as it\n" +
             "happens (one file per account). Off = logs live only in the viewer until you\n" +
             "click Save. This is a global option - applies to all accounts. Default: Off.", false),
         new Option<int>("gotoDelay", "Goto delay (milliseconds)",
@@ -116,9 +116,9 @@ public class ButlerV5Plugin : ISkuaPlugin
             false),
         new Option<bool>("instantWarnings", "Instant warning detection",
             "Reads the raw game packet stream to catch 'Locked zone' / 'room is full' /\n" +
-            "'ignoring goto' warnings the moment they arrive - near-instant locked-map\n" +
-            "rescue, same detection Butler v3 used. The failed-goto counter still runs\n" +
-            "underneath as a fallback. Turn off if following misbehaves. Default: On.",
+            "'ignoring goto' warnings the moment they arrive - near-instant rescue\n" +
+            "or a direct join. Failed-goto counting still works if no warning arrives.\n" +
+            "Turn off if following misbehaves. Default: On.",
             true),
         new Option<bool>("antiLagFollowing", "AntiLag while following",
             "Same as 'AntiLag while summoned', but only while MANUALLY following someone\n" +
@@ -137,6 +137,11 @@ public class ButlerV5Plugin : ISkuaPlugin
     private IPluginHelper? _helper;
     private IPluginContainer? _container;
     private IScriptManager? _scriptManager;
+    private IDispatcherService? _dispatcher;
+    private IDialogService? _dialogs;
+    private CancellationTokenSource? _menuRegistrationCts;
+    private IList? _hostPluginMenu;
+    private object? _hostMenuItem;
     private Broadcaster? _broadcaster;
     private Follower? _follower;
     private RosterWindow? _window;
@@ -151,7 +156,6 @@ public class ButlerV5Plugin : ISkuaPlugin
     private EventHandler? _processExitHandler;
 
     private SyncWatcher? _syncWatcher;
-    private SyncWatcher? _legacySyncWatcher;
     private readonly AutoResetEvent _orderSignal = new(false);
     private const int OrderFallbackMs = 3000; // safety-net poll; file changes wake it instantly
 
@@ -188,6 +192,8 @@ public class ButlerV5Plugin : ISkuaPlugin
         IPluginManager? manager = provider.GetService(typeof(IPluginManager)) as IPluginManager;
         _container = manager?.GetContainer(this);
         _scriptManager = provider.GetService(typeof(IScriptManager)) as IScriptManager;
+        _dispatcher = provider.GetService(typeof(IDispatcherService)) as IDispatcherService;
+        _dialogs = provider.GetService(typeof(IDialogService)) as IDialogService;
 
         DebugLog.EnabledProvider = () => GetOption("debugLogs", true);
         DebugLog.AutoSaveProvider = () => GetOption("autoSaveLog", false);
@@ -239,17 +245,6 @@ public class ButlerV5Plugin : ISkuaPlugin
             DebugLog.Log("Plugin", $"SyncWatcher failed ({ex.Message}) - falling back to polling only");
         }
 
-        if (!SyncFile.LegacyDirectory.Equals(SyncFile.Directory, StringComparison.OrdinalIgnoreCase))
-        {
-            try
-            {
-                Directory.CreateDirectory(SyncFile.LegacyDirectory);
-                _legacySyncWatcher = new SyncWatcher(SyncFile.LegacyDirectory, $"*{SyncFile.Suffix}");
-                _legacySyncWatcher.Changed += OnSyncFilesChanged;
-            }
-            catch { }
-        }
-
         _broadcaster.Start();
         StartOrderWatcher();
 
@@ -258,7 +253,7 @@ public class ButlerV5Plugin : ISkuaPlugin
         _processExitHandler = (_, _) => _broadcaster?.WriteOffline();
         AppDomain.CurrentDomain.ProcessExit += _processExitHandler;
 
-        helper.AddMenuButton(MenuButtonText, OpenWindow);
+        RegisterMenuButton(provider, helper);
         Log("ButlerV5 plugin loaded.");
     }
 
@@ -266,20 +261,30 @@ public class ButlerV5Plugin : ISkuaPlugin
     {
         try
         {
-            _helper?.RemoveMenuButton(MenuButtonText);
+            _menuRegistrationCts?.Cancel();
+            _menuRegistrationCts?.Dispose();
+            _menuRegistrationCts = null;
+            if (_helper != null)
+            {
+                RunOnUi(() =>
+                {
+                    try
+                    {
+                        if (_hostPluginMenu != null && _hostMenuItem != null && _hostPluginMenu.Contains(_hostMenuItem))
+                            _hostPluginMenu.Remove(_hostMenuItem);
+                    }
+                    catch { }
+                    _helper?.RemoveMenuButton(MenuButtonText);
+                    _hostPluginMenu = null;
+                    _hostMenuItem = null;
+                });
+            }
 
             if (_syncWatcher != null)
             {
                 _syncWatcher.Changed -= OnSyncFilesChanged;
                 _syncWatcher.Dispose();
                 _syncWatcher = null;
-            }
-
-            if (_legacySyncWatcher != null)
-            {
-                _legacySyncWatcher.Changed -= OnSyncFilesChanged;
-                _legacySyncWatcher.Dispose();
-                _legacySyncWatcher = null;
             }
 
             _orderWatcherCts?.Cancel();
@@ -295,7 +300,7 @@ public class ButlerV5Plugin : ISkuaPlugin
             if (_processExitHandler != null)
                 AppDomain.CurrentDomain.ProcessExit -= _processExitHandler;
 
-            Dispatcher.UIThread.Post(() =>
+            RunOnUi(() =>
             {
                 _window?.Close();
                 _window = null;
@@ -313,18 +318,17 @@ public class ButlerV5Plugin : ISkuaPlugin
     {
         try
         {
-            Dispatcher.UIThread.Post(() =>
+            RunOnUi(() =>
             {
-                var dialogService = Ioc.Default.GetService<IDialogService>();
-                var result = dialogService?.ShowMessageBox(
+                bool? keepSuspended = _dialogs?.ShowMessageBox(
                     $"A script started while this account was following {master}.\n\n" +
                     "Following is now SUSPENDED and will resume automatically when the script stops.\n\n" +
-                    "OK - keep it suspended (resume after the script)\n" +
-                    "Cancel - stop following entirely",
-                    "Butler V5",
-                    "OK", "Cancel");
+                    "Yes - keep it suspended (resume after the script)\n" +
+                    "No - stop following entirely",
+                    "ButlerV5 Avalonia",
+                    yesAndNo: true);
 
-                if (result?.Text == "Cancel")
+                if (keepSuspended == false)
                     StopFollow();
             });
         }
@@ -517,7 +521,7 @@ public class ButlerV5Plugin : ISkuaPlugin
         DebugLog.Log("UI", "Settings clicked");
         try
         {
-            Dispatcher.UIThread.Post(() =>
+            RunOnUi(() =>
             {
                 if (_settingsWindow == null)
                 {
@@ -527,8 +531,6 @@ public class ButlerV5Plugin : ISkuaPlugin
                 }
                 else
                 {
-                    if (_settingsWindow.WindowState == WindowState.Minimized)
-                        _settingsWindow.WindowState = WindowState.Normal;
                     _settingsWindow.Activate();
                 }
             });
@@ -543,7 +545,7 @@ public class ButlerV5Plugin : ISkuaPlugin
     {
         try
         {
-            Dispatcher.UIThread.Post(() =>
+            RunOnUi(() =>
             {
                 if (_window == null)
                 {
@@ -553,8 +555,6 @@ public class ButlerV5Plugin : ISkuaPlugin
                 }
                 else
                 {
-                    if (_window.WindowState == WindowState.Minimized)
-                        _window.WindowState = WindowState.Normal;
                     _window.RefreshRoster();
                     _window.Activate();
                 }
@@ -563,6 +563,98 @@ public class ButlerV5Plugin : ISkuaPlugin
         catch (Exception ex)
         {
             Log($"Could not open window: {ex.Message}");
+        }
+    }
+
+    /// <summary>Shows an informational message through Avalonia Skua's public dialog service.</summary>
+    public void ShowMessage(string message) =>
+        _dialogs?.ShowMessageBox(message, "ButlerV5 Avalonia");
+
+    /// <summary>Confirms the global master-switch change.</summary>
+    public bool ConfirmDisablePlugin() =>
+        _dialogs?.ShowMessageBox(
+            "Turning this off stops ButlerV5 from working on ALL accounts - no following, " +
+            "summoning, or broadcasting until you turn it back on.\n\nDisable ButlerV5?",
+            "ButlerV5 Avalonia",
+            yesAndNo: true) == true;
+
+    private void RunOnUi(Action action)
+    {
+        if (_dispatcher != null)
+            _dispatcher.Invoke(action);
+        else
+            Dispatcher.UIThread.Post(action);
+    }
+
+    /// <summary>
+    /// Registers through Skua's public helper, then works around the Avalonia test
+    /// build dropping startup menu messages by attaching the helper-created item to
+    /// MainMenuViewModel.Plugins directly. Reflection keeps private host types out of
+    /// the plugin's compile-time dependencies.
+    /// </summary>
+    private void RegisterMenuButton(IServiceProvider provider, IPluginHelper helper)
+    {
+        _menuRegistrationCts = new CancellationTokenSource();
+        CancellationToken token = _menuRegistrationCts.Token;
+
+        RunOnUi(() =>
+        {
+            if (token.IsCancellationRequested)
+                return;
+            helper.AddMenuButton(MenuButtonText, OpenWindow);
+            TryAttachMenuItemDirect(provider, helper);
+        });
+
+        // Retry once after startup layout. This covers slower machines where the main
+        // menu view model has not been resolved when the first UI-queue callback runs.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(1500, token);
+                if (!token.IsCancellationRequested)
+                    RunOnUi(() => TryAttachMenuItemDirect(provider, helper));
+            }
+            catch (OperationCanceledException)
+            {
+            }
+        }, token);
+    }
+
+    private void TryAttachMenuItemDirect(IServiceProvider provider, IPluginHelper helper)
+    {
+        try
+        {
+            Type? mainMenuType = Type.GetType(
+                "Skua.App.Avalonia.ViewModels.MainMenu.MainMenuViewModel, Skua",
+                throwOnError: false);
+            object? mainMenu = mainMenuType == null ? null : provider.GetService(mainMenuType);
+            object? plugins = mainMenuType?.GetProperty("Plugins", BindingFlags.Public | BindingFlags.Instance)
+                ?.GetValue(mainMenu);
+
+            FieldInfo? buttonsField = helper.GetType().GetField("_buttons", BindingFlags.NonPublic | BindingFlags.Instance);
+            IDictionary? buttons = buttonsField?.GetValue(helper) as IDictionary;
+            object? menuItem = buttons?[MenuButtonText];
+
+            if (plugins is not IList menu || menuItem == null)
+            {
+                DebugLog.Log("UI", "Avalonia menu fallback is waiting for the host menu");
+                return;
+            }
+
+            bool present = menu.Cast<object>().Any(item => ReferenceEquals(item, menuItem));
+            if (!present)
+            {
+                menu.Add(menuItem);
+                DebugLog.Log("UI", "attached ButlerV5 Avalonia directly to the host Plugins menu", LogLevel.Success);
+            }
+
+            _hostPluginMenu = menu;
+            _hostMenuItem = menuItem;
+        }
+        catch (Exception ex)
+        {
+            DebugLog.Log("UI", $"Avalonia menu fallback failed: {ex.Message}", LogLevel.Error);
         }
     }
 
@@ -660,13 +752,6 @@ public class ButlerV5Plugin : ISkuaPlugin
                             CurrentFollowers.Any(f => f.Equals(master.Username, StringComparison.OrdinalIgnoreCase)))
                         {
                             DebugLog.Log("OrderWatcher", $"ignoring order from {master.Username}: they are in my own followers list");
-                            master = null;
-                        }
-
-                        // A master who ignores goto stays blocked until a manual follow.
-                        if (master != null &&
-                            master.Username.Equals(_follower.GotoBlockedMaster, StringComparison.OrdinalIgnoreCase))
-                        {
                             master = null;
                         }
 

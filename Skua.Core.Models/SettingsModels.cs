@@ -363,6 +363,12 @@ public class ManagerSettings
     [JsonPropertyName("syncTheme")]
     public bool SyncTheme { get; set; } = true;
 
+    [JsonPropertyName("UserCustomScriptsFolder")]
+    public string UserCustomScriptsFolder { get; set; } = string.Empty;
+
+    [JsonPropertyName("UserCustomScriptsList")]
+    public StringCollection UserCustomScriptsList { get; set; } = new();
+
     [JsonPropertyName("ManagedAccounts")]
     [JsonConverter(typeof(AccountDataDictionaryJsonConverter))]
     public Dictionary<string, AccountData> ManagedAccounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);

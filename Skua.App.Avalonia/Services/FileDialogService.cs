@@ -7,6 +7,8 @@ namespace Skua.App.Avalonia.Services;
 #if IS_WINDOWS
 using Skua.Core.Models;
 using System.IO;
+using System.Linq;
+using global::Avalonia.Platform.Storage;
 using WinForms = System.Windows.Forms;
 public class FileDialogService : IFileDialogService
 {
@@ -35,15 +37,37 @@ public class FileDialogService : IFileDialogService
         {
             Description = "Select the folder.",
             UseDescriptionForTitle = true,
-            InitialDirectory = initialDirectory
+            InitialDirectory = initialDirectory,
+            AutoUpgradeEnabled = true
         };
 
         return dialog.ShowDialog() == WinForms.DialogResult.OK ? dialog.SelectedPath : null;
     }
 
-    public Task<string?> OpenFolderAsync() => Task.FromResult(OpenFolder());
+    public Task<string?> OpenFolderAsync() => OpenFolderAsync(ClientFileSources.SkuaDIR);
 
-    public Task<string?> OpenFolderAsync(string initialDirectory) => Task.FromResult(OpenFolder(initialDirectory));
+    public async Task<string?> OpenFolderAsync(string initialDirectory)
+    {
+        if (global::Avalonia.Application.Current?.ApplicationLifetime is global::Avalonia.Controls.ApplicationLifetimes.IClassicDesktopStyleApplicationLifetime desktop &&
+            desktop.MainWindow?.StorageProvider is global::Avalonia.Platform.Storage.IStorageProvider provider)
+        {
+            var options = new global::Avalonia.Platform.Storage.FolderPickerOpenOptions
+            {
+                AllowMultiple = false,
+                SuggestedStartLocation = !string.IsNullOrWhiteSpace(initialDirectory)
+                    ? await provider.TryGetFolderFromPathAsync(initialDirectory)
+                    : null
+            };
+            var folders = await provider.OpenFolderPickerAsync(options);
+            string? localPath = folders.FirstOrDefault()?.TryGetLocalPath();
+            if (!string.IsNullOrEmpty(localPath))
+                return localPath;
+            if (folders.Count == 0)
+                return null;
+        }
+
+        return OpenFolder(initialDirectory);
+    }
 
     public IEnumerable<string>? OpenText()
     {

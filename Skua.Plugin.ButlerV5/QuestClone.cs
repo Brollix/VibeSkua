@@ -24,9 +24,6 @@ public static class QuestClone
     public static string PathFor(string username) =>
         Path.Combine(SyncFile.Directory, $"{username.ToLowerInvariant()}{Suffix}");
 
-    public static string LegacyPathFor(string username) =>
-        Path.Combine(SyncFile.LegacyDirectory, $"{username.ToLowerInvariant()}{Suffix}");
-
     /// <summary>Reads this client's quest value slots, logging how long it took.</summary>
     public static int[]? ReadOwnSlots(IScriptInterface bot)
     {
@@ -122,15 +119,6 @@ public static class QuestClone
 
             Directory.CreateDirectory(SyncFile.Directory);
             File.WriteAllText(path, content);
-            if (!SyncFile.LegacyDirectory.Equals(SyncFile.Directory, StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    Directory.CreateDirectory(SyncFile.LegacyDirectory);
-                    File.WriteAllText(LegacyPathFor(username), content);
-                }
-                catch { }
-            }
             DebugLog.Log("QuestClone", $"published quest state ({content.Count(c => c == '\n')} slots) to {Path.GetFileName(path)}");
             return true;
         }
@@ -147,14 +135,7 @@ public static class QuestClone
         try
         {
             string path = PathFor(masterUsername);
-            DateTime t1 = File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;
-
-            string legPath = LegacyPathFor(masterUsername);
-            DateTime t2 = (!legPath.Equals(path, StringComparison.OrdinalIgnoreCase) && File.Exists(legPath))
-                ? File.GetLastWriteTimeUtc(legPath)
-                : DateTime.MinValue;
-
-            return t2 > t1 ? t2 : t1;
+            return File.Exists(path) ? File.GetLastWriteTimeUtc(path) : DateTime.MinValue;
         }
         catch
         {
@@ -173,13 +154,6 @@ public static class QuestClone
         try
         {
             string path = PathFor(masterUsername);
-            string legPath = LegacyPathFor(masterUsername);
-            if (!File.Exists(path) || (File.Exists(legPath) && File.GetLastWriteTimeUtc(legPath) > File.GetLastWriteTimeUtc(path)))
-            {
-                if (File.Exists(legPath))
-                    path = legPath;
-            }
-
             if (!File.Exists(path))
             {
                 DebugLog.Log("QuestClone", $"no quest file from {masterUsername} - is cloning enabled on their client?");

@@ -1,5 +1,4 @@
 using System.IO;
-using Skua.Core.Models;
 
 namespace ButlerV5;
 
@@ -17,27 +16,18 @@ public enum ParkSpot { House, Whitemap, Stay }
 public static class AccountConfig
 {
     private static readonly string Dir = Path.Combine(
-        ClientFileSources.SkuaDIR,
-        "butlerv5_options");
-
-    private static readonly string LegacyDir = Path.Combine(
-        ClientFileSources.LegacySkuaDIR,
+        Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+        "Skua",
         "butlerv5_options");
 
     private static string PathFor(string username) =>
         Path.Combine(Dir, $"{username.ToLowerInvariant()}.txt");
-
-    private static string LegacyPathFor(string username) =>
-        Path.Combine(LegacyDir, $"{username.ToLowerInvariant()}.txt");
 
     public static ButlerClassType GetClassType(string username)
     {
         try
         {
             string path = PathFor(username);
-            if (!File.Exists(path) && !LegacyDir.Equals(Dir, StringComparison.OrdinalIgnoreCase))
-                path = LegacyPathFor(username);
-
             if (!File.Exists(path))
                 return ButlerClassType.None;
 
@@ -60,16 +50,6 @@ public static class AccountConfig
         {
             Directory.CreateDirectory(Dir);
             File.WriteAllText(PathFor(username), $"classtype={type}\n");
-
-            if (!LegacyDir.Equals(Dir, StringComparison.OrdinalIgnoreCase))
-            {
-                try
-                {
-                    Directory.CreateDirectory(LegacyDir);
-                    File.WriteAllText(LegacyPathFor(username), $"classtype={type}\n");
-                }
-                catch { }
-            }
         }
         catch
         {
@@ -78,7 +58,7 @@ public static class AccountConfig
 
     /// <summary>
     /// The class name CoreBots has configured for this account, read from
-    /// %APPDATA%\VibeSkua\options\CBO_Storage({username}).txt ("FarmClassSelect: X").
+    /// %APPDATA%\Skua\options\CBO_Storage({username}).txt ("FarmClassSelect: X").
     /// </summary>
     public static string? GetCboClassName(string username, ButlerClassType type) => type switch
     {
@@ -103,24 +83,16 @@ public static class AccountConfig
     {
         try
         {
-            string optionsDir = ClientFileSources.SkuaOptionsDIR;
+            string optionsDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "Skua",
+                "options");
             string expected = $"CBO_Storage({username}).txt";
 
             string? file = Directory.Exists(optionsDir)
                 ? Directory.EnumerateFiles(optionsDir, "CBO_Storage(*).txt")
                     .FirstOrDefault(f => Path.GetFileName(f).Equals(expected, StringComparison.OrdinalIgnoreCase))
                 : null;
-
-            if (file == null && Directory.Exists(ClientFileSources.LegacySkuaDIR))
-            {
-                string legacyOptionsDir = Path.Combine(ClientFileSources.LegacySkuaDIR, "options");
-                if (Directory.Exists(legacyOptionsDir))
-                {
-                    file = Directory.EnumerateFiles(legacyOptionsDir, "CBO_Storage(*).txt")
-                        .FirstOrDefault(f => Path.GetFileName(f).Equals(expected, StringComparison.OrdinalIgnoreCase));
-                }
-            }
-
             if (file == null)
                 return null;
 
