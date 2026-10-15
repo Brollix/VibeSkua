@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.Messaging;
 using Skua.Core.Messaging;
+using Skua.Shared.Avalonia.Utils;
 using System;
 using System.IO;
 using System.Linq;
@@ -11,8 +12,6 @@ using System.Runtime.InteropServices;
 using System.Runtime.Loader;
 using System.Threading;
 using Velopack;
-using Velopack.Locators;
-using Velopack.Windows;
 
 namespace Skua.Manager.Avalonia;
 
@@ -20,10 +19,23 @@ internal static class Program
 {
     private static EventWaitHandle? _singleInstanceWaitHandle;
 
+    static Program()
+    {
+        InitializeAssemblyResolvers();
+    }
+
     [STAThread]
     public static void Main(string[] args)
     {
         InitializeAssemblyResolvers();
+
+        VelopackApp.Build()
+            .OnAfterInstallFastCallback(_ => AppShortcutHelper.CreateOrUpdateShortcuts())
+            .OnAfterUpdateFastCallback(_ => AppShortcutHelper.CreateOrUpdateShortcuts())
+            .OnBeforeUninstallFastCallback(_ => AppShortcutHelper.RemoveClientShortcuts())
+            .OnFirstRun(_ => AppShortcutHelper.CreateOrUpdateShortcuts())
+            .OnRestarted(_ => AppShortcutHelper.CreateOrUpdateShortcuts())
+            .Run();
 
         const string eventName = @"Global\VibeSkua.Manager.SingleInstance.WakeEvent";
         bool createdNew;
@@ -144,37 +156,15 @@ internal static class Program
         try
         {
             Skua.Core.Models.ClientFileSources.EnsureInitialized();
-            VelopackApp.Build()
-                .OnFirstRun(_ => CreateClientShortcuts())
-                .OnRestarted(_ => CreateClientShortcuts())
-                .Run();
+            if (AppShortcutHelper.IsInstalled())
+            {
+                AppShortcutHelper.CreateOrUpdateShortcuts();
+            }
             BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
         }
         catch (Exception ex)
         {
             File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "crash_manager.txt"), ex.ToString());
-        }
-    }
-
-    private static void CreateClientShortcuts()
-    {
-        if (!OperatingSystem.IsWindows())
-            return;
-
-        try
-        {
-#pragma warning disable CS0618
-            Shortcuts shortcuts = new(VelopackLocator.Current);
-            shortcuts.CreateShortcut(
-                "VibeSkua.exe",
-                ShortcutLocation.Desktop | ShortcutLocation.StartMenuRoot,
-                updateOnly: false,
-                programArguments: string.Empty,
-                icon: null);
-#pragma warning restore CS0618
-        }
-        catch
-        {
         }
     }
 

@@ -50,7 +50,7 @@ foreach ($Target in $Targets) {
     }
 
     # 2. Copy Root Files from ManagerBin
-    $RootManagerFiles = @("VibeSkua.Manager.exe", "VibeSkua.Manager.dll", "VibeSkua.Manager.runtimeconfig.json")
+    $RootManagerFiles = @("VibeSkua.Manager.exe", "VibeSkua.Manager.dll", "VibeSkua.Manager.runtimeconfig.json", "Velopack.dll")
     foreach ($file in $RootManagerFiles) {
         $src = Join-Path $ManagerBin $file
         if (Test-Path $src) {
@@ -135,7 +135,7 @@ foreach ($Target in $Targets) {
     $AllowedRootFiles = @(
         "VibeSkua.exe", "VibeSkua.dll", "VibeSkua.runtimeconfig.json", "VibeSkua.deps.json",
         "VibeSkua.Manager.exe", "VibeSkua.Manager.dll", "VibeSkua.Manager.runtimeconfig.json", "VibeSkua.Manager.deps.json",
-        "skua.swf", "AdvancedSkills.json", "QuestData.json", "ScriptDates.json"
+        "Velopack.dll", "skua.swf", "AdvancedSkills.json", "QuestData.json", "ScriptDates.json"
     )
 
     Get-ChildItem -Path $Target -File | Where-Object {

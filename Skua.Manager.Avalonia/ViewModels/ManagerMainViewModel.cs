@@ -19,11 +19,11 @@ public partial class ManagerMainViewModel : ObservableRecipient
         _selectedTab = Tabs[0];
         _dialogService = dialogService;
         _settingsService = settingsService;
-        _title = $"VibeSkua V{ClientFileSources.DisplayVersion}";
+        _title = $"VibeSkua Manager V{ClientFileSources.DisplayVersion}";
     }
 
     [ObservableProperty]
-    private string _title = "VibeSkua V2.0.0";
+    private string _title = "VibeSkua Manager";
 
     [RelayCommand]
     private void ShowManager()
