@@ -1042,7 +1042,7 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
             if (includeReferences.Count > 0)
                 includeCompiler.AddAssemblies(includeReferences.ToArray());
 
-            dynamic? assembly = includeCompiler.CompileClass(processedInclude, includeHash, loadContext, includeFileName);
+            includeCompiler.CompileClassToType(processedInclude, includeHash, loadContext, includeFileName);
 
             if (includeCompiler.Error)
             {
@@ -1051,7 +1051,7 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
                     includeCompiler.GeneratedClassCodeWithLineNumbers);
             }
 
-            if (assembly != null && File.Exists(compiledPath))
+            if (File.Exists(compiledPath))
             {
                 for (int i = 0; i < 10; i++)
                 {

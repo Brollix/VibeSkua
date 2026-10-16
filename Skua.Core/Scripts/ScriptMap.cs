@@ -59,32 +59,22 @@ public partial class ScriptMap : IScriptMap
             if (!Loaded)
                 return string.Empty;
 
-            string name = Name;
-            int roomId = RoomID;
-            if (!string.IsNullOrEmpty(name) && roomId > 0)
-                return $"{name}-{roomId}";
-
             try
             {
                 string? raw = Flash.GetGameObject("ui.mcInterface.areaList.title.t1.text")?.Replace("\"", string.Empty).Trim();
-                if (!string.IsNullOrEmpty(raw))
+                if (!string.IsNullOrEmpty(raw) && raw != "null")
                 {
-                    int dash = raw.LastIndexOf('-');
-                    if (dash > 0)
-                    {
-                        string afterDash = raw[(dash + 1)..].Trim();
-                        string beforeDash = raw[..dash].Trim();
-                        if (beforeDash.StartsWith("Area:", StringComparison.OrdinalIgnoreCase))
-                            beforeDash = beforeDash["Area:".Length..].Trim();
+                    string area = raw.Split(' ', StringSplitOptions.RemoveEmptyEntries).Last().Trim();
+                    if (area.StartsWith("Area:", StringComparison.OrdinalIgnoreCase))
+                        area = area["Area:".Length..].Trim();
 
-                        if (!string.IsNullOrEmpty(beforeDash) && !string.IsNullOrEmpty(afterDash) && afterDash.All(char.IsDigit))
-                            return $"{beforeDash.ToLowerInvariant()}-{afterDash}";
-                    }
+                    if (!string.IsNullOrEmpty(area) && !area.Equals("null", StringComparison.OrdinalIgnoreCase))
+                        return area;
                 }
             }
             catch { }
 
-            return !string.IsNullOrEmpty(name) ? name : string.Empty;
+            return !string.IsNullOrEmpty(Name) ? Name : string.Empty;
         }
     }
 

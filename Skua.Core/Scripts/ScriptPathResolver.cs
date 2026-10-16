@@ -39,7 +39,54 @@ public sealed class ScriptPathResolver : IScriptPathResolver
         }
         else if (normalizedSpecifier.StartsWith($"Scripts{Path.DirectorySeparatorChar}", StringComparison.OrdinalIgnoreCase))
         {
-            candidates.Add(Path.Combine(_repositoryRoot, normalizedSpecifier[("Scripts".Length + 1)..]));
+            string subPath = normalizedSpecifier[("Scripts".Length + 1)..];
+            candidates.Add(Path.Combine(_repositoryRoot, subPath));
+
+            int firstSlash = subPath.IndexOf(Path.DirectorySeparatorChar);
+            if (firstSlash > 0)
+            {
+                string folderSegment = subPath[..firstSlash];
+                string relativeInFolder = subPath[(firstSlash + 1)..];
+
+                // Check repository root with common GitHub ZIP branch suffixes
+                candidates.Add(Path.Combine(_repositoryRoot, $"{folderSegment}-main", relativeInFolder));
+                candidates.Add(Path.Combine(_repositoryRoot, $"{folderSegment}-master", relativeInFolder));
+
+                // Check relative to owner file directory and parent directory (e.g. scripts inside subfolders)
+                if (!string.IsNullOrWhiteSpace(ownerFile))
+                {
+                    string? ownerDir = Path.GetDirectoryName(Canonicalize(ownerFile));
+                    if (!string.IsNullOrEmpty(ownerDir))
+                    {
+                        candidates.Add(Path.Combine(ownerDir, relativeInFolder));
+                        string? parentDir = Path.GetDirectoryName(ownerDir);
+                        if (!string.IsNullOrEmpty(parentDir) && !parentDir.Equals(_repositoryRoot, StringComparison.OrdinalIgnoreCase))
+                        {
+                            candidates.Add(Path.Combine(parentDir, relativeInFolder));
+                        }
+                    }
+                }
+
+                foreach (string customRoot in _customScripts.GetSearchRoots())
+                {
+                    if (Directory.Exists(customRoot))
+                    {
+                        candidates.Add(Path.Combine(customRoot, subPath));
+                        candidates.Add(Path.Combine(customRoot, $"{folderSegment}-main", relativeInFolder));
+                        candidates.Add(Path.Combine(customRoot, $"{folderSegment}-master", relativeInFolder));
+                    }
+                }
+            }
+            else
+            {
+                foreach (string customRoot in _customScripts.GetSearchRoots())
+                {
+                    if (Directory.Exists(customRoot))
+                        candidates.Add(Path.Combine(customRoot, subPath));
+                }
+            }
+
+            AddOwnerRelativeCandidate(candidates, ownerFile, subPath);
         }
         else if (_customScripts.IsCustomPath(ownerFile ?? string.Empty))
         {
