@@ -81,17 +81,31 @@ jobs:
           }
 
           Write-Host "Publishing assets to tag $tag..."
-          $notesArg = @("--generate-notes")
+          $notesFile = "RELEASE_NOTES.md"
           if (Test-Path "RELEASE_NOTES.md") {
-              $notesArg = @("--notes-file", "RELEASE_NOTES.md")
+              $content = Get-Content "RELEASE_NOTES.md" -Raw
+              if ($content -match "(?s)(##\s+VibeSkua\s+v?$ver\b.*?)(?=\r?\n##\s+VibeSkua\s+v\d|\Z)") {
+                  $extracted = $Matches[1].Trim()
+                  if ($content -match "(?s)(###\s+Installation\s+&.*)") {
+                      if (-not ($extracted -match "###\s+Installation")) {
+                          $extracted += "`n`n---`n`n" + $Matches[1].Trim()
+                      }
+                  }
+                  $extracted | Set-Content "CURRENT_RELEASE_NOTES.md" -Encoding UTF8
+                  $notesFile = "CURRENT_RELEASE_NOTES.md"
+              }
+          }
+          $notesArg = @("--generate-notes")
+          if (Test-Path $notesFile) {
+              $notesArg = @("--notes-file", $notesFile)
           }
           gh release view $tag 2>$null
           if ($LASTEXITCODE -eq 0) {
               Write-Host "Existing release found for $tag. Uploading assets..."
               gh release upload $tag $files --clobber
               if ($LASTEXITCODE -ne 0) { throw "Failed to upload release assets." }
-              if (Test-Path "RELEASE_NOTES.md") {
-                  gh release edit $tag --notes-file "RELEASE_NOTES.md"
+              if (Test-Path $notesFile) {
+                  gh release edit $tag --notes-file $notesFile
               }
           } else {
               Write-Host "Creating new release for $tag..."
