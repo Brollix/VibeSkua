@@ -88,12 +88,17 @@
     </Style>
 
     <Style Selector="Border.tag-chip">
-        <Setter Property="Background" Value="{DynamicResource SkuaNavChipBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
+        <Setter Property="Background" Value="{DynamicResource SkuaAccentBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SkuaAccentBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="8,2" />
+        <Setter Property="CornerRadius" Value="10" />
+        <Setter Property="Padding" Value="7,1" />
         <Setter Property="Margin" Value="0,0,4,2" />
+    </Style>
+
+    <Style Selector="Border.tag-chip:pointerover">
+        <Setter Property="Background" Value="{DynamicResource SkuaAccentHoverBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SkuaAccentHoverBrush}" />
     </Style>
 
     <Style Selector="Border.titlebar-app-badge">
