@@ -33,9 +33,11 @@
     </Style>
     
     <Style Selector="TextBlock.tag-chip-text">
-        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontSize" Value="10.5" />
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="Foreground" Value="{DynamicResource SkuaAccentForegroundBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource SkuaTagTextBrush}" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     </Style>
     
     <Style Selector="TextBlock.top-tabs-label">

@@ -115,8 +115,16 @@
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
                         <Border Classes="tag-chip">
-                            <TextBlock Text="{Binding}"
-                                       Classes="tag-chip-text" />
+                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                                <materialIcons:MaterialIcon Kind="TagOutline"
+                                                            Width="9"
+                                                            Height="9"
+                                                            VerticalAlignment="Center"
+                                                            Opacity="0.75"
+                                                            Foreground="{DynamicResource SkuaTagTextBrush}" />
+                                <TextBlock Text="{Binding}"
+                                           Classes="tag-chip-text" />
+                            </StackPanel>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>

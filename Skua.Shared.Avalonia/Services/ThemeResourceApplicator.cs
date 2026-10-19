@@ -163,10 +163,36 @@ public static class ThemeResourceApplicator
         bool useDarkSelection = isDarkTheme ?? false;
         SetOrUpdateBrush(app.Resources, "SkuaSelectionBrush", useDarkSelection ? selectionDark : selectionLight);
 
+        Color tagBg = Color.FromArgb(0x22, primary.R, primary.G, primary.B);
+        Color tagBgHover = Color.FromArgb(0x3B, primary.R, primary.G, primary.B);
+        Color tagBorder = Color.FromArgb(0x4D, primary.R, primary.G, primary.B);
+        Color tagBorderHover = Color.FromArgb(0x80, primary.R, primary.G, primary.B);
+        Color tagText = (isDarkTheme ?? true) ? Lighten(primary, 0.18) : Darken(primary, 0.18);
+
+        SetOrUpdateBrush(app.Resources, "SkuaTagBackgroundBrush", tagBg);
+        SetOrUpdateBrush(app.Resources, "SkuaTagBackgroundHoverBrush", tagBgHover);
+        SetOrUpdateBrush(app.Resources, "SkuaTagBorderBrush", tagBorder);
+        SetOrUpdateBrush(app.Resources, "SkuaTagBorderHoverBrush", tagBorderHover);
+        SetOrUpdateBrush(app.Resources, "SkuaTagTextBrush", tagText);
+
         if (app.Resources.ThemeDictionaries.TryGetValue(ThemeVariant.Light, out IThemeVariantProvider? selLightProvider) && selLightProvider is IResourceDictionary selLightDict)
+        {
             SetOrUpdateBrush(selLightDict, "SkuaSelectionBrush", selectionLight);
+            SetOrUpdateBrush(selLightDict, "SkuaTagBackgroundBrush", Color.FromArgb(0x1F, primary.R, primary.G, primary.B));
+            SetOrUpdateBrush(selLightDict, "SkuaTagBackgroundHoverBrush", Color.FromArgb(0x35, primary.R, primary.G, primary.B));
+            SetOrUpdateBrush(selLightDict, "SkuaTagBorderBrush", Color.FromArgb(0x45, primary.R, primary.G, primary.B));
+            SetOrUpdateBrush(selLightDict, "SkuaTagBorderHoverBrush", Color.FromArgb(0x75, primary.R, primary.G, primary.B));
+            SetOrUpdateBrush(selLightDict, "SkuaTagTextBrush", Darken(primary, 0.20));
+        }
         if (app.Resources.ThemeDictionaries.TryGetValue(ThemeVariant.Dark, out IThemeVariantProvider? selDarkProvider) && selDarkProvider is IResourceDictionary selDarkDict)
+        {
             SetOrUpdateBrush(selDarkDict, "SkuaSelectionBrush", selectionDark);
+            SetOrUpdateBrush(selDarkDict, "SkuaTagBackgroundBrush", Color.FromArgb(0x22, primary.R, primary.G, primary.B));
+            SetOrUpdateBrush(selDarkDict, "SkuaTagBackgroundHoverBrush", Color.FromArgb(0x3B, primary.R, primary.G, primary.B));
+            SetOrUpdateBrush(selDarkDict, "SkuaTagBorderBrush", Color.FromArgb(0x4D, primary.R, primary.G, primary.B));
+            SetOrUpdateBrush(selDarkDict, "SkuaTagBorderHoverBrush", Color.FromArgb(0x80, primary.R, primary.G, primary.B));
+            SetOrUpdateBrush(selDarkDict, "SkuaTagTextBrush", Lighten(primary, 0.18));
+        }
 
         ApplyMaterialPaletteResources(app, primary, primaryForeground, sec, secFore);
         TrySetMaterialAccent(app, primary, sec);

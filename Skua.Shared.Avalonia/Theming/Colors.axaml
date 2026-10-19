@@ -14,6 +14,11 @@
     <SolidColorBrush x:Key="SkuaAccentPressedBrush" Color="#047857" />
     <SolidColorBrush x:Key="SkuaDangerHoverBrush" Color="#EF4444" />
     <SolidColorBrush x:Key="SkuaDangerForegroundBrush" Color="#FFFFFFFF" />
+    <SolidColorBrush x:Key="SkuaTagBackgroundBrush" Color="#2210B981" />
+    <SolidColorBrush x:Key="SkuaTagBackgroundHoverBrush" Color="#3B10B981" />
+    <SolidColorBrush x:Key="SkuaTagBorderBrush" Color="#4D10B981" />
+    <SolidColorBrush x:Key="SkuaTagBorderHoverBrush" Color="#8010B981" />
+    <SolidColorBrush x:Key="SkuaTagTextBrush" Color="#34D399" />
 
     <ResourceDictionary.ThemeDictionaries>
         <ResourceDictionary x:Key="Light">
