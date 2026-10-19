@@ -1,15 +1,36 @@
-## VibeSkua v2.0.2
+## VibeSkua v2.0.3
 
-This release resolves the `ScriptMap.FullName` room number bug, fixes first-run dependency compilation errors when running complex script packages, and enhances script path resolution to support unzipped GitHub repository archives.
+This release resolves the initial login connection freeze, introduces a rich account context menu in the Manager, enables real-time cross-process sync between clients and Manager, and delivers redesigned theme-aware account tag badges.
 
 ---
 
 ### What's Changed
 
-- **Butler V5 Upgrade (v1.2.7)**: Integrated Butler V5 v1.2.7, anonymizing player character names and stripping file paths in Skua's script log messages while preserving full diagnostics in Butler V5's dedicated debug logs.
-- **Room Number Resolution (`ScriptMap.FullName`)**: Fixed a bug where `ScriptMap.FullName` would return SmartFoxServer's internal socket session room ID (e.g. `ascendeclipse-8912378`) instead of the user-facing room number (`ascendeclipse-9123`). Restored accurate parsing from the client area banner, ensuring compatibility with scripts and plugins that validate room names.
-- **First-Run Script Include Compilation**: Fixed the `CS0246: The type or namespace name 'CoreBots' could not be found` error that occurred when running complex script packages for the first time. Included libraries are now compiled directly into the script assembly context without requiring background helper classes to be instantiated ahead of time.
-- **GitHub ZIP Archive Compatibility**: Enhanced `ScriptPathResolver` to automatically discover `//cs_include` paths within folders unzipped directly from GitHub (handling `-main` and `-master` repository suffixes as well as relative subfolder structures) without requiring users to manually rename script folders.
+### 1. Multi-Client Tab Bar & Group Assignment
+- Restored Tab Context Menu: Restored right-click context menu on client tabs to quickly add/remove running accounts from groups.
+- Login Validation: Blocks adding unauthenticated placeholder accounts (e.g. "User 1") to groups, displaying a prompt to log in first.
+- Settings Persistence: Group additions from client tabs now automatically register the account under ManagedAccounts in Skua.settings.json.
+
+---
+
+### 2. Account Manager Context Menu & Real-Time Sync
+- Account Context Menu: Added right-click menu to accounts in both List and Grid views (Start, Start with Script, Add/Remove Group, Edit Tags, Open Folder, Delete).
+- Cross-Process Live Sync: Added Windows named event (Global\VibeSkua.Settings.Changed) and FileSystemWatcher so changes made in client tabs reflect instantly in the Manager without restarting.
+- Instant In-Place Refresh: Eliminated the need to switch tabs inside the Manager to see updated accounts or group memberships.
+
+---
+
+### 3. Account Tag Chips Redesign & Dynamic Theming
+- Visible by Default: Enabled ShowTags = true by default so tags are visible without opening the edit dialog.
+- Live Theme Synchronization: Bound tag chip brushes to the active theme; colors now update immediately when switching themes in Options or Manager.
+- Redesigned Badge Styling: Revamped tag chips into modern translucent pills with soft 1px accent borders, hover highlights, and an integrated mini TagOutline icon.
+
+---
+
+### 4. Fix for Initial Login "Connecting to Server" Screen Freeze
+- Bypassed Flash 3-Second Port 843 Timeout: Flash Player was timing out for 3 seconds trying to reach TCP port 843 before falling back to port 5588. Implemented Security.loadPolicyFile("xmlsocket://<ip>:<port>") in AS3 and preloaded all server socket policies in parallel as soon as the server list appears, eliminating the 3-second freeze.
+- Removed Artificial Latency: Replaced a 1,000ms timer loop delay in connectToServer with immediate execution, reduced 1,000ms thread sleeps in ScriptServers.cs to 100ms, and skipped blocking HTTP calls when servers are already cached.
+- Guarded Handshake COM Calls: Guarded Stats.GetSpace() at loginResponse with if (Flash.IsWorldLoaded) to prevent COM calls into uninitialized world objects, and added null-checks in AS3 _getObjectA to prevent runtime #1009 errors.
 
 ---
 
