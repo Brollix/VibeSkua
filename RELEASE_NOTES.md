@@ -1,3 +1,13 @@
+## VibeSkua v2.0.4 (Hotfix)
+
+This hotfix resolves a Manager crash when starting accounts with a script selected.
+
+### What's Changed
+- **Account Launch Stability**: Fixed a crash where launching accounts while auto-start or a script was selected caused the Manager to crash during background settings synchronization.
+- **In-Place Account Refresh**: Settings updates from running client instances now smoothly sync with the Manager without disrupting account checkmarks or active launch queues.
+
+---
+
 ## VibeSkua v2.0.3
 
 This release resolves the initial login connection freeze, introduces a rich account context menu in the Manager, enables real-time cross-process sync between clients and Manager, and delivers redesigned theme-aware account tag badges.

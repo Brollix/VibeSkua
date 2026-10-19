@@ -55,8 +55,19 @@ public partial class LauncherViewModel : BotControlViewModelBase, IDisposable
     {
         if (message.Process != null)
         {
-            ProcessInfo procInfo = new(message.Process, message.AccountName ?? $"VibeSkua #{message.Process.Id}");
-            _dispatcherService.Invoke(() => recipient.SkuaProcesses.Add(procInfo));
+            try
+            {
+                ProcessInfo procInfo = new(message.Process, message.AccountName ?? $"VibeSkua #{message.Process.Id}");
+                _dispatcherService.Invoke(() =>
+                {
+                    try
+                    {
+                        recipient.SkuaProcesses.Add(procInfo);
+                    }
+                    catch { }
+                });
+            }
+            catch { }
         }
     }
 

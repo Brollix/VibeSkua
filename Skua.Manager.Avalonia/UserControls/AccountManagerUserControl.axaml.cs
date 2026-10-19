@@ -9,6 +9,7 @@ using Skua.Manager.Avalonia.ViewModels;
 using Skua.Shared.Avalonia.ViewModels.Dialogs;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -101,10 +102,17 @@ public partial class AccountManagerUserControl : UserControl
             return;
         }
 
-        foreach (IAccountItemViewModel account in selected)
+        try
         {
-            WeakReferenceMessenger.Default.Send(new StartAccountMessage(account, true));
-            await Task.Delay(1000);
+            foreach (IAccountItemViewModel account in selected)
+            {
+                WeakReferenceMessenger.Default.Send(new StartAccountMessage(account, true));
+                await Task.Delay(1000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"Error in StartSelectedWithScriptAsync: {ex.Message}");
         }
     }
 

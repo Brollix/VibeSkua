@@ -88,7 +88,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
     partial void OnShowTagsChanged(bool value)
     {
-        _settingsService.Set("ShowAccountTags", value);
+        PerformInternalSettingsChange(() => _settingsService.Set("ShowAccountTags", value));
     }
 
     [ObservableProperty]
@@ -96,7 +96,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
     partial void OnShowGridViewChanged(bool value)
     {
-        _settingsService.Set("ShowGridView", value);
+        PerformInternalSettingsChange(() => _settingsService.Set("ShowGridView", value));
     }
 
     [ObservableProperty]
@@ -149,7 +149,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     partial void OnScriptPathChanged(string value)
     {
         if (!string.IsNullOrEmpty(value))
-            _settingsService.Set("AutoStartScriptPath", value);
+            PerformInternalSettingsChange(() => _settingsService.Set("AutoStartScriptPath", value));
     }
 
     [ObservableProperty]
@@ -157,7 +157,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
     partial void OnStartWithScriptChanged(bool value)
     {
-        _settingsService.Set("AutoStartScript", value);
+        PerformInternalSettingsChange(() => _settingsService.Set("AutoStartScript", value));
     }
 
     [ObservableProperty]
@@ -166,7 +166,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     partial void OnSelectedServerChanged(Server value)
     {
         if (value != null)
-            _settingsService.Set("LastServer", value.Name);
+            PerformInternalSettingsChange(() => _settingsService.Set("LastServer", value.Name));
     }
 
     private List<Server> _cachedServers = new();
@@ -224,16 +224,31 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     [RelayCommand]
     public async Task StartAccounts()
     {
-        // TODO show dialog to choose between clients
-        // TODO manage ids for sync in the future
+        if (_isLaunching)
+            return;
 
-        _syncThemes = _settingsService.Get("syncTheme", false);
-        foreach (IAccountItemViewModel acc in Accounts)
+        try
         {
-            if (acc.UseCheck)
+            _isLaunching = true;
+            _syncThemes = _settingsService.Get("syncTheme", false);
+            List<IAccountItemViewModel> selectedAccounts = Accounts.Where(acc => acc.UseCheck).ToList();
+            foreach (IAccountItemViewModel acc in selectedAccounts)
             {
                 _LaunchAcc(acc.Username, acc.Password, acc.DisplayName, StartWithScript);
                 await Task.Delay(1000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"Error starting accounts: {ex.Message}");
+        }
+        finally
+        {
+            _isLaunching = false;
+            if (_pendingReload)
+            {
+                _pendingReload = false;
+                ScheduleReload();
             }
         }
     }
@@ -241,11 +256,32 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     [RelayCommand]
     public async Task StartAllAccounts()
     {
-        _syncThemes = _settingsService.Get("syncTheme", false);
-        foreach (IAccountItemViewModel acc in Accounts)
+        if (_isLaunching)
+            return;
+
+        try
         {
-            _LaunchAcc(acc.Username, acc.Password, acc.DisplayName, StartWithScript);
-            await Task.Delay(1000);
+            _isLaunching = true;
+            _syncThemes = _settingsService.Get("syncTheme", false);
+            List<IAccountItemViewModel> allAccounts = Accounts.ToList();
+            foreach (IAccountItemViewModel acc in allAccounts)
+            {
+                _LaunchAcc(acc.Username, acc.Password, acc.DisplayName, StartWithScript);
+                await Task.Delay(1000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"Error starting all accounts: {ex.Message}");
+        }
+        finally
+        {
+            _isLaunching = false;
+            if (_pendingReload)
+            {
+                _pendingReload = false;
+                ScheduleReload();
+            }
         }
     }
 
@@ -372,7 +408,8 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
     private async void _StartGroup(IGroupItemViewModel group, bool withScript)
     {
-        _syncThemes = _settingsService.Get("syncTheme", false);
+        if (_isLaunching)
+            return;
 
         if (withScript && string.IsNullOrEmpty(ScriptPath))
         {
@@ -380,11 +417,31 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
             return;
         }
 
-        bool runScript = withScript || StartWithScript;
-        foreach (IAccountItemViewModel account in group.Accounts)
+        try
         {
-            _LaunchAcc(account.Username, account.Password, account.DisplayName, runScript);
-            await Task.Delay(1000);
+            _isLaunching = true;
+            _syncThemes = _settingsService.Get("syncTheme", false);
+
+            bool runScript = withScript || StartWithScript;
+            List<IAccountItemViewModel> groupAccounts = group.Accounts.ToList();
+            foreach (IAccountItemViewModel account in groupAccounts)
+            {
+                _LaunchAcc(account.Username, account.Password, account.DisplayName, runScript);
+                await Task.Delay(1000);
+            }
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"Error starting group accounts: {ex.Message}");
+        }
+        finally
+        {
+            _isLaunching = false;
+            if (_pendingReload)
+            {
+                _pendingReload = false;
+                ScheduleReload();
+            }
         }
     }
 
@@ -630,22 +687,45 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     [RelayCommand]
     public void SaveSetup()
     {
-        _SaveAccounts();
-        _settingsService.Set("AutoStartScriptPath", ScriptPath);
-        _settingsService.Set("AutoStartScript", StartWithScript);
+        PerformInternalSettingsChange(() =>
+        {
+            _SaveAccountsInternal();
+            _settingsService.Set("AutoStartScriptPath", ScriptPath);
+            _settingsService.Set("AutoStartScript", StartWithScript);
+        });
         _dialogService.ShowMessageBox("Manager setup and account selection successfully saved.", "Setup Saved");
     }
 
+    private volatile bool _isLaunching = false;
+    private volatile bool _pendingReload = false;
+    private int _isSavingInternalCounter = 0;
     private FileSystemWatcher? _settingsWatcher;
     private RegisteredWaitHandle? _registeredWaitHandle;
     private EventWaitHandle? _globalNotifyEvent;
-    private bool _isSavingInternal = false;
     private CancellationTokenSource? _reloadDebounceCts;
     private readonly object _reloadLock = new();
 
+    private void PerformInternalSettingsChange(Action action)
+    {
+        Interlocked.Increment(ref _isSavingInternalCounter);
+        try
+        {
+            action();
+        }
+        finally
+        {
+            Task.Delay(1000).ContinueWith(_ => Interlocked.Decrement(ref _isSavingInternalCounter));
+        }
+    }
+
     public void ScheduleReload()
     {
-        if (_isSavingInternal) return;
+        if (_isSavingInternalCounter > 0) return;
+        if (_isLaunching)
+        {
+            _pendingReload = true;
+            return;
+        }
         lock (_reloadLock)
         {
             _reloadDebounceCts?.Cancel();
@@ -653,12 +733,16 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
             _reloadDebounceCts = new CancellationTokenSource();
             CancellationToken token = _reloadDebounceCts.Token;
 
-            Task.Delay(150, token).ContinueWith(t =>
+            Task.Delay(250, token).ContinueWith(t =>
             {
                 if (t.IsCanceled) return;
                 Dispatcher.UIThread.Post(() =>
                 {
-                    if (_isSavingInternal) return;
+                    if (_isSavingInternalCounter > 0 || _isLaunching)
+                    {
+                        if (_isLaunching) _pendingReload = true;
+                        return;
+                    }
                     ReloadAccountsAndGroups();
                 }, DispatcherPriority.Background);
             }, TaskScheduler.Default);
@@ -731,66 +815,100 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
     private void _SaveAccounts()
     {
-        _isSavingInternal = true;
-        try
+        PerformInternalSettingsChange(() =>
         {
-            Dictionary<string, AccountData> accs = new(StringComparer.OrdinalIgnoreCase);
-            foreach (IAccountItemViewModel account in Accounts)
-            {
-                accs[account.Username] = new AccountData
-                {
-                    DisplayName = account.DisplayName,
-                    Password = account.Password,
-                    Tags = account.Tags.ToList(),
-                    UseCheck = account.UseCheck
-                };
-            }
+            _SaveAccountsInternal();
+        });
+    }
 
-            _settingsService.Set("ManagedAccounts", accs);
-        }
-        finally
+    private void _SaveAccountsInternal()
+    {
+        Dictionary<string, AccountData> accs = new(StringComparer.OrdinalIgnoreCase);
+        foreach (IAccountItemViewModel account in Accounts)
         {
-            Task.Delay(600).ContinueWith(_ => _isSavingInternal = false);
+            accs[account.Username] = new AccountData
+            {
+                DisplayName = account.DisplayName,
+                Password = account.Password,
+                Tags = account.Tags.ToList(),
+                UseCheck = account.UseCheck
+            };
         }
+
+        _settingsService.Set("ManagedAccounts", accs);
     }
 
     private void _GetSavedAccounts()
     {
-        Accounts.Clear();
-        FilteredAccounts.Clear();
         Dictionary<string, AccountData>? accs = _settingsService.Get<Dictionary<string, AccountData>>("ManagedAccounts");
         if (accs is null)
             return;
 
+        // Remember which accounts are currently checked in UI
+        HashSet<string> currentlyChecked = Accounts.Where(a => a.UseCheck).Select(a => a.Username).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        // Remove accounts that are no longer in saved settings
+        for (int i = Accounts.Count - 1; i >= 0; i--)
+        {
+            if (!accs.ContainsKey(Accounts[i].Username))
+            {
+                Accounts.RemoveAt(i);
+            }
+        }
+
+        // Add or update accounts in-place
         foreach (KeyValuePair<string, AccountData> kvp in accs)
         {
             string password = kvp.Value.Password ?? string.Empty;
             if (password.StartsWith("enc:"))
                 password = Skua.Core.Utils.CryptoUtils.Decrypt(password);
 
-            AccountItemViewModel accountVm = new()
+            IAccountItemViewModel? existing = Accounts.FirstOrDefault(a => a.Username.Equals(kvp.Key, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
             {
-                Username = kvp.Key,
-                DisplayName = kvp.Value.DisplayName,
-                Password = password
-            };
-            if (kvp.Value.Tags != null)
-            {
-                foreach (string tag in kvp.Value.Tags)
-                    accountVm.Tags.Add(tag);
+                existing.DisplayName = kvp.Value.DisplayName;
+                existing.Password = password;
+
+                if (kvp.Value.Tags != null)
+                {
+                    if (!existing.Tags.SequenceEqual(kvp.Value.Tags))
+                    {
+                        existing.Tags.Clear();
+                        foreach (string tag in kvp.Value.Tags)
+                            existing.Tags.Add(tag);
+                    }
+                }
+                else
+                {
+                    existing.Tags.Clear();
+                }
             }
-            Accounts.Add(accountVm);
+            else
+            {
+                AccountItemViewModel accountVm = new()
+                {
+                    Username = kvp.Key,
+                    DisplayName = kvp.Value.DisplayName,
+                    Password = password,
+                    UseCheck = kvp.Value.UseCheck || currentlyChecked.Contains(kvp.Key)
+                };
+                if (kvp.Value.Tags != null)
+                {
+                    foreach (string tag in kvp.Value.Tags)
+                        accountVm.Tags.Add(tag);
+                }
+                Accounts.Add(accountVm);
+            }
         }
 
         ReindexAccounts();
-
         ApplyTagFilter();
+        SelectedAccountQuant = Accounts.Count(a => a.UseCheck);
     }
 
     private void _SaveGroups()
     {
-        _isSavingInternal = true;
-        try
+        PerformInternalSettingsChange(() =>
         {
             List<GroupData> groupsData = Groups.Select(g => new GroupData
             {
@@ -799,12 +917,8 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
             }).ToList();
 
             _settingsService.Set("AccountGroups", groupsData);
-            _SaveAccounts();
-        }
-        finally
-        {
-            Task.Delay(600).ContinueWith(_ => _isSavingInternal = false);
-        }
+            _SaveAccountsInternal();
+        });
     }
 
     private void _GetSavedGroups()
