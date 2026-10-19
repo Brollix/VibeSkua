@@ -36,6 +36,16 @@ public partial class MainWindow : Window
             }
             catch { }
         };
+
+        Activated += (s, e) =>
+        {
+            try
+            {
+                var accVm = Ioc.Default.GetService<AccountManagerViewModel>();
+                accVm?.ReloadAccountsAndGroups();
+            }
+            catch { }
+        };
     }
 
     protected override void OnClosing(WindowClosingEventArgs e)

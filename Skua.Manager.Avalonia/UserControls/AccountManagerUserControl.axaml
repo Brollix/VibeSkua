@@ -139,6 +139,19 @@
                             <materialIcons:MaterialIcon Kind="ArrowDown" Width="16" Height="16" />
                         </Button>
 
+                        <!-- Refresh Accounts Button -->
+                        <Button Grid.Column="5"
+                                Classes="icon"
+                                Width="28"
+                                Height="28"
+                                Margin="0,0,8,0"
+                                HorizontalAlignment="Right"
+                                VerticalAlignment="Center"
+                                Command="{Binding ReloadAccountsCommand}"
+                                ToolTip.Tip="Refresh Accounts &amp; Groups (F5)">
+                            <materialIcons:MaterialIcon Kind="Refresh" Width="15" Height="15" />
+                        </Button>
+
                         <!-- Add Account Button -->
                         <Button x:Name="ShowAddAccountButton"
                                 Grid.Column="6"

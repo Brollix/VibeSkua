@@ -21,6 +21,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 
 namespace Skua.Manager.Avalonia.ViewModels;
 
@@ -53,6 +54,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         _syncThemes = _settingsService.Get("syncTheme", false);
         _scriptPath = _settingsService.Get("AutoStartScriptPath", string.Empty);
         _startWithScript = _settingsService.Get("AutoStartScript", false);
+        SetupSettingsWatcher();
     }
 
     private readonly string _exePath = SkuaExecutableLocator.ExecutablePath;
@@ -621,21 +623,82 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         _dialogService.ShowMessageBox("Manager setup and account selection successfully saved.", "Setup Saved");
     }
 
+    private FileSystemWatcher? _settingsWatcher;
+    private bool _isSavingInternal = false;
+
+    private void SetupSettingsWatcher()
+    {
+        try
+        {
+            string dir = ClientFileSources.SkuaDIR;
+            if (Directory.Exists(dir))
+            {
+                _settingsWatcher = new FileSystemWatcher(dir, "Skua.settings.json")
+                {
+                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
+                    EnableRaisingEvents = true
+                };
+
+                DateTime lastReload = DateTime.MinValue;
+                _settingsWatcher.Changed += (s, e) =>
+                {
+                    if (_isSavingInternal) return;
+                    if ((DateTime.UtcNow - lastReload).TotalMilliseconds < 400) return;
+                    lastReload = DateTime.UtcNow;
+
+                    Dispatcher.UIThread.Post(async () =>
+                    {
+                        await Task.Delay(100);
+                        ReloadAccountsAndGroups();
+                    }, DispatcherPriority.Background);
+                };
+            }
+        }
+        catch { }
+    }
+
+    [RelayCommand]
+    public void ReloadAccounts()
+    {
+        ReloadAccountsAndGroups();
+    }
+
+    public void ReloadAccountsAndGroups()
+    {
+        try
+        {
+            _settingsService.ReloadSettings();
+            _GetSavedAccounts();
+            _GetSavedGroups();
+            RefreshTagFilters();
+            ApplyTagFilter();
+        }
+        catch { }
+    }
+
     private void _SaveAccounts()
     {
-        Dictionary<string, AccountData> accs = new(StringComparer.OrdinalIgnoreCase);
-        foreach (IAccountItemViewModel account in Accounts)
+        _isSavingInternal = true;
+        try
         {
-            accs[account.Username] = new AccountData
+            Dictionary<string, AccountData> accs = new(StringComparer.OrdinalIgnoreCase);
+            foreach (IAccountItemViewModel account in Accounts)
             {
-                DisplayName = account.DisplayName,
-                Password = account.Password,
-                Tags = account.Tags.ToList(),
-                UseCheck = account.UseCheck
-            };
-        }
+                accs[account.Username] = new AccountData
+                {
+                    DisplayName = account.DisplayName,
+                    Password = account.Password,
+                    Tags = account.Tags.ToList(),
+                    UseCheck = account.UseCheck
+                };
+            }
 
-        _settingsService.Set("ManagedAccounts", accs);
+            _settingsService.Set("ManagedAccounts", accs);
+        }
+        finally
+        {
+            Task.Delay(600).ContinueWith(_ => _isSavingInternal = false);
+        }
     }
 
     private void _GetSavedAccounts()
@@ -670,14 +733,22 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
     private void _SaveGroups()
     {
-        List<GroupData> groupsData = Groups.Select(g => new GroupData
+        _isSavingInternal = true;
+        try
         {
-            Name = g.Name,
-            Accounts = g.Accounts.Select<IAccountItemViewModel, string>(a => a.Username).ToList()
-        }).ToList();
+            List<GroupData> groupsData = Groups.Select(g => new GroupData
+            {
+                Name = g.Name,
+                Accounts = g.Accounts.Select<IAccountItemViewModel, string>(a => a.Username).ToList()
+            }).ToList();
 
-        _settingsService.Set("AccountGroups", groupsData);
-        _SaveAccounts();
+            _settingsService.Set("AccountGroups", groupsData);
+            _SaveAccounts();
+        }
+        finally
+        {
+            Task.Delay(600).ContinueWith(_ => _isSavingInternal = false);
+        }
     }
 
     private void _GetSavedGroups()

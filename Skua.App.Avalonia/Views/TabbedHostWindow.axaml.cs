@@ -1865,7 +1865,7 @@ public partial class TabbedHostWindow : Window
 
         void UpdateGroupSubMenu()
         {
-            PopulateAddToGroupMenu(addToGroupItem, title.Text);
+            PopulateAddToGroupMenu(addToGroupItem, newTab, info, title.Text);
         }
 
         UpdateGroupSubMenu();
@@ -1950,10 +1950,61 @@ public partial class TabbedHostWindow : Window
     }
 
     #region Group Assignment Helper
-    private void PopulateAddToGroupMenu(MenuItem parentItem, string accountName)
+    private string? GetTabLoggedInUsername(TabItem tab, TabInfo? info, string currentTitle)
+    {
+        if (info?.Process != null && !info.Process.HasExited)
+        {
+            try
+            {
+                string file = Path.Combine(Path.GetTempPath(), "VibeSkuaTabs", $"{info.Process.Id}.txt");
+                if (File.Exists(file))
+                {
+                    string name = File.ReadAllText(file).Trim();
+                    if (!string.IsNullOrWhiteSpace(name) &&
+                        !name.StartsWith("User ", StringComparison.OrdinalIgnoreCase) &&
+                        !name.StartsWith("Skua ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return name;
+                    }
+                }
+            }
+            catch { }
+        }
+
+        string title = currentTitle?.Trim() ?? "";
+        if (!string.IsNullOrWhiteSpace(title) &&
+            !title.StartsWith("User ", StringComparison.OrdinalIgnoreCase) &&
+            !title.StartsWith("Skua ", StringComparison.OrdinalIgnoreCase))
+        {
+            return title;
+        }
+
+        return null;
+    }
+
+    private void PopulateAddToGroupMenu(MenuItem parentItem, TabItem tab, TabInfo? info, string currentTitle)
     {
         parentItem.Items.Clear();
 
+        string? loggedInUsername = GetTabLoggedInUsername(tab, info, currentTitle);
+        if (string.IsNullOrWhiteSpace(loggedInUsername))
+        {
+            MenuItem notLoggedInItem = new MenuItem
+            {
+                Header = "Please log in first",
+                Icon = new MaterialIcon { Kind = MaterialIconKind.AlertCircleOutline, Width = 14, Height = 14 }
+            };
+            notLoggedInItem.Click += (s, ev) =>
+            {
+                Ioc.Default.GetService<IDialogService>()?.ShowMessageBox(
+                    "Please log in to your game account first before adding it to an account group.",
+                    "Account Not Logged In");
+            };
+            parentItem.Items.Add(notLoggedInItem);
+            return;
+        }
+
+        string accountName = loggedInUsername;
         ISettingsService? settings = Ioc.Default.GetService<ISettingsService>();
         List<GroupData> groups = settings?.Get<List<GroupData>>("AccountGroups") ?? new List<GroupData>();
 
@@ -1969,16 +2020,7 @@ public partial class TabbedHostWindow : Window
                 };
                 groupItem.Click += (s, ev) =>
                 {
-                    if (!alreadyInGroup)
-                    {
-                        group.Accounts.Add(accountName);
-                        settings?.Set("AccountGroups", groups);
-                        Ioc.Default.GetService<IDialogService>()?.ShowMessageBox($"Added '{accountName}' to group '{group.Name}'.", "Add to Group");
-                    }
-                    else
-                    {
-                        Ioc.Default.GetService<IDialogService>()?.ShowMessageBox($"'{accountName}' is already in group '{group.Name}'.", "Add to Group");
-                    }
+                    AddAccountToGroupAndManaged(accountName, group, groups, settings);
                 };
                 parentItem.Items.Add(groupItem);
             }
@@ -2011,15 +2053,42 @@ public partial class TabbedHostWindow : Window
                     existing = new GroupData { Name = newGroupName };
                     groups.Add(existing);
                 }
-                if (!existing.Accounts.Contains(accountName, StringComparer.OrdinalIgnoreCase))
-                {
-                    existing.Accounts.Add(accountName);
-                }
-                settings?.Set("AccountGroups", groups);
-                dialogService.ShowMessageBox($"Added '{accountName}' to group '{newGroupName}'.", "Add to Group");
+                AddAccountToGroupAndManaged(accountName, existing, groups, settings);
             }
         };
         parentItem.Items.Add(newGroupItem);
+    }
+
+    private void AddAccountToGroupAndManaged(string accountName, GroupData group, List<GroupData> groups, ISettingsService? settings)
+    {
+        if (settings == null) return;
+        var dialogService = Ioc.Default.GetService<IDialogService>();
+
+        // 1. Ensure the account exists in ManagedAccounts so it appears in VibeSkua Manager!
+        var accs = settings.Get<Dictionary<string, AccountData>>("ManagedAccounts") ?? new();
+        if (!accs.ContainsKey(accountName))
+        {
+            accs[accountName] = new AccountData
+            {
+                DisplayName = accountName,
+                Password = string.Empty,
+                Tags = new List<string>(),
+                UseCheck = false
+            };
+            settings.Set("ManagedAccounts", accs);
+        }
+
+        // 2. Ensure account is in the selected group
+        if (!group.Accounts.Contains(accountName, StringComparer.OrdinalIgnoreCase))
+        {
+            group.Accounts.Add(accountName);
+            settings.Set("AccountGroups", groups);
+            dialogService?.ShowMessageBox($"Added '{accountName}' to group '{group.Name}'.", "Add to Group");
+        }
+        else
+        {
+            dialogService?.ShowMessageBox($"'{accountName}' is already in group '{group.Name}'.", "Add to Group");
+        }
     }
     #endregion
     #endregion

@@ -31,6 +31,7 @@ public partial class AccountManagerUserControl : UserControl
         WeakReferenceMessenger.Default.Register<AccountManagerUserControl, EditAccountMessage>(this, (r, m) => r.EditAccount(m.Account));
         WeakReferenceMessenger.Default.Register<AccountManagerUserControl, AddAccountToGroupMessage>(this, (r, m) => r.AddAccountToGroup(m.Account));
         WeakReferenceMessenger.Default.Register<AccountManagerUserControl, AddTagsMessage>(this, (r, m) => r.EditAccountTags(m.Account));
+        AttachedToVisualTree += (s, e) => _viewModel.ReloadAccountsAndGroups();
         Unloaded += OnUnloaded;
     }
 

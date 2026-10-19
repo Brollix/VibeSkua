@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Skua.Core.Interfaces.ViewModels;
 
 namespace Skua.Manager.Avalonia.UserControls;
@@ -24,6 +25,18 @@ public partial class AccountGridTile : UserControl
 
         account.ToggleSelectionCommand.Execute(null);
         e.Handled = true;
+    }
+
+    private async void CopyUsername_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is IAccountItemViewModel account && !string.IsNullOrEmpty(account.Username))
+        {
+            var topLevel = TopLevel.GetTopLevel(this);
+            if (topLevel?.Clipboard != null)
+            {
+                await topLevel.Clipboard.SetTextAsync(account.Username);
+            }
+        }
     }
 
     private static bool IsFromInteractiveControl(object? source, Border boundary)
