@@ -10,6 +10,9 @@
              mc:Ignorable="d"
              d:DesignWidth="220"
              d:DesignHeight="80">
+    <UserControl.ContextMenu>
+        <uc:AccountItemContextMenu />
+    </UserControl.ContextMenu>
     <Border Classes="account-row account-row-grid"
             Classes.selected="{Binding UseCheck}"
             Padding="12,6"

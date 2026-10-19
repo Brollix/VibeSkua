@@ -11,6 +11,7 @@ using Material.Icons;
 using Material.Icons.Avalonia;
 using Skua.Core.Interfaces;
 using Skua.Core.Messaging;
+using Skua.Core.Models;
 using Skua.Core.AppStartup;
 using Skua.Shared.Avalonia.ViewModels;
 using Skua.Shared.Avalonia.ViewModels.ScriptRepo;
@@ -1853,11 +1854,40 @@ public partial class TabbedHostWindow : Window
         ctx.Items.Add(closeItem);
         ctx.Items.Add(closeOthersItem);
         ctx.Items.Add(closeRightItem);
+        ctx.Items.Add(new Separator());
+
+        MenuItem addToGroupItem = new MenuItem
+        {
+            Header = "Add to Group",
+            Icon = new MaterialIcon { Kind = MaterialIconKind.AccountMultiplePlus, Width = 14, Height = 14 }
+        };
+        ctx.Items.Add(addToGroupItem);
+
+        void UpdateGroupSubMenu()
+        {
+            PopulateAddToGroupMenu(addToGroupItem, title.Text);
+        }
+
+        UpdateGroupSubMenu();
+        headerPanel.ContextRequested += (s, ev) => UpdateGroupSubMenu();
+        newTab.ContextRequested += (s, ev) => UpdateGroupSubMenu();
+
         headerPanel.ContextMenu = ctx;
+        newTab.ContextMenu = ctx;
 
         Point startPoint = new Point();
         headerPanel.PointerPressed += (s, ev) => 
         {
+            var prop = ev.GetCurrentPoint(headerPanel).Properties;
+            if (prop.IsRightButtonPressed)
+            {
+                InstancesTabControl.SelectedItem = newTab;
+                return;
+            }
+
+            if (!prop.IsLeftButtonPressed)
+                return;
+
             startPoint = ev.GetPosition(null);
             InstancesTabControl.SelectedItem = newTab;
             
@@ -1875,6 +1905,14 @@ public partial class TabbedHostWindow : Window
                 DoReposition();
             }
             ev.Handled = true;
+        };
+
+        newTab.PointerPressed += (s, ev) =>
+        {
+            if (ev.GetCurrentPoint(newTab).Properties.IsRightButtonPressed)
+            {
+                InstancesTabControl.SelectedItem = newTab;
+            }
         };
         
         headerPanel.PointerMoved += async (s, ev) =>
@@ -1910,5 +1948,79 @@ public partial class TabbedHostWindow : Window
         });
         #endregion
     }
+
+    #region Group Assignment Helper
+    private void PopulateAddToGroupMenu(MenuItem parentItem, string accountName)
+    {
+        parentItem.Items.Clear();
+
+        ISettingsService? settings = Ioc.Default.GetService<ISettingsService>();
+        List<GroupData> groups = settings?.Get<List<GroupData>>("AccountGroups") ?? new List<GroupData>();
+
+        if (groups.Count > 0)
+        {
+            foreach (var group in groups)
+            {
+                bool alreadyInGroup = group.Accounts.Contains(accountName, StringComparer.OrdinalIgnoreCase);
+                MenuItem groupItem = new MenuItem
+                {
+                    Header = group.Name,
+                    Icon = alreadyInGroup ? new MaterialIcon { Kind = MaterialIconKind.Check, Width = 14, Height = 14 } : null
+                };
+                groupItem.Click += (s, ev) =>
+                {
+                    if (!alreadyInGroup)
+                    {
+                        group.Accounts.Add(accountName);
+                        settings?.Set("AccountGroups", groups);
+                        Ioc.Default.GetService<IDialogService>()?.ShowMessageBox($"Added '{accountName}' to group '{group.Name}'.", "Add to Group");
+                    }
+                    else
+                    {
+                        Ioc.Default.GetService<IDialogService>()?.ShowMessageBox($"'{accountName}' is already in group '{group.Name}'.", "Add to Group");
+                    }
+                };
+                parentItem.Items.Add(groupItem);
+            }
+            parentItem.Items.Add(new Separator());
+        }
+        else
+        {
+            MenuItem emptyItem = new MenuItem { Header = "No groups created", IsEnabled = false };
+            parentItem.Items.Add(emptyItem);
+            parentItem.Items.Add(new Separator());
+        }
+
+        MenuItem newGroupItem = new MenuItem
+        {
+            Header = "+ New Group...",
+            Icon = new MaterialIcon { Kind = MaterialIconKind.Plus, Width = 14, Height = 14 }
+        };
+        newGroupItem.Click += (s, ev) =>
+        {
+            var dialogService = Ioc.Default.GetService<IDialogService>();
+            if (dialogService == null) return;
+
+            var inputVm = new InputDialogViewModel("New Group", "Enter group name:", "Group Name", false);
+            if (dialogService.ShowDialog(inputVm) == true && !string.IsNullOrWhiteSpace(inputVm.DialogTextInput))
+            {
+                string newGroupName = inputVm.DialogTextInput.Trim();
+                var existing = groups.FirstOrDefault(g => g.Name.Equals(newGroupName, StringComparison.OrdinalIgnoreCase));
+                if (existing == null)
+                {
+                    existing = new GroupData { Name = newGroupName };
+                    groups.Add(existing);
+                }
+                if (!existing.Accounts.Contains(accountName, StringComparer.OrdinalIgnoreCase))
+                {
+                    existing.Accounts.Add(accountName);
+                }
+                settings?.Set("AccountGroups", groups);
+                dialogService.ShowMessageBox($"Added '{accountName}' to group '{newGroupName}'.", "Add to Group");
+            }
+        };
+        parentItem.Items.Add(newGroupItem);
+    }
+    #endregion
     #endregion
 }
