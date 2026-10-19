@@ -3,6 +3,7 @@ using System.Collections.Specialized;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 
 namespace Skua.Core.Services;
 
@@ -549,6 +550,14 @@ public class UnifiedSettingsService
             }
 
             File.Move(tempFile, ClientFileSources.SkuaSettingsDIR, overwrite: true);
+
+            // Signal cross-process settings change event
+            try
+            {
+                using EventWaitHandle notifyEvent = new(false, EventResetMode.AutoReset, @"Global\VibeSkua.Settings.Changed");
+                notifyEvent.Set();
+            }
+            catch { }
         }
         catch (Exception ex)
         {

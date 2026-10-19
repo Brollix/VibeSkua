@@ -42,7 +42,7 @@ public partial class MainWindow : Window
             try
             {
                 var accVm = Ioc.Default.GetService<AccountManagerViewModel>();
-                accVm?.ReloadAccountsAndGroups();
+                accVm?.ScheduleReload();
             }
             catch { }
         };

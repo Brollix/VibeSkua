@@ -2006,6 +2006,7 @@ public partial class TabbedHostWindow : Window
 
         string accountName = loggedInUsername;
         ISettingsService? settings = Ioc.Default.GetService<ISettingsService>();
+        settings?.ReloadSettings();
         List<GroupData> groups = settings?.Get<List<GroupData>>("AccountGroups") ?? new List<GroupData>();
 
         if (groups.Count > 0)
@@ -2020,7 +2021,7 @@ public partial class TabbedHostWindow : Window
                 };
                 groupItem.Click += (s, ev) =>
                 {
-                    AddAccountToGroupAndManaged(accountName, group, groups, settings);
+                    AddAccountToGroupAndManaged(accountName, group, settings);
                 };
                 parentItem.Items.Add(groupItem);
             }
@@ -2053,16 +2054,18 @@ public partial class TabbedHostWindow : Window
                     existing = new GroupData { Name = newGroupName };
                     groups.Add(existing);
                 }
-                AddAccountToGroupAndManaged(accountName, existing, groups, settings);
+                AddAccountToGroupAndManaged(accountName, existing, settings);
             }
         };
         parentItem.Items.Add(newGroupItem);
     }
 
-    private void AddAccountToGroupAndManaged(string accountName, GroupData group, List<GroupData> groups, ISettingsService? settings)
+    private void AddAccountToGroupAndManaged(string accountName, GroupData group, ISettingsService? settings)
     {
         if (settings == null) return;
         var dialogService = Ioc.Default.GetService<IDialogService>();
+
+        settings.ReloadSettings();
 
         // 1. Ensure the account exists in ManagedAccounts so it appears in VibeSkua Manager!
         var accs = settings.Get<Dictionary<string, AccountData>>("ManagedAccounts") ?? new();
@@ -2079,15 +2082,23 @@ public partial class TabbedHostWindow : Window
         }
 
         // 2. Ensure account is in the selected group
-        if (!group.Accounts.Contains(accountName, StringComparer.OrdinalIgnoreCase))
+        var currentGroups = settings.Get<List<GroupData>>("AccountGroups") ?? new List<GroupData>();
+        var targetGroup = currentGroups.FirstOrDefault(g => g.Name.Equals(group.Name, StringComparison.OrdinalIgnoreCase));
+        if (targetGroup == null)
         {
-            group.Accounts.Add(accountName);
-            settings.Set("AccountGroups", groups);
-            dialogService?.ShowMessageBox($"Added '{accountName}' to group '{group.Name}'.", "Add to Group");
+            targetGroup = new GroupData { Name = group.Name };
+            currentGroups.Add(targetGroup);
+        }
+
+        if (!targetGroup.Accounts.Contains(accountName, StringComparer.OrdinalIgnoreCase))
+        {
+            targetGroup.Accounts.Add(accountName);
+            settings.Set("AccountGroups", currentGroups);
+            dialogService?.ShowMessageBox($"Added '{accountName}' to group '{targetGroup.Name}'.", "Add to Group");
         }
         else
         {
-            dialogService?.ShowMessageBox($"'{accountName}' is already in group '{group.Name}'.", "Add to Group");
+            dialogService?.ShowMessageBox($"'{accountName}' is already in group '{targetGroup.Name}'.", "Add to Group");
         }
     }
     #endregion

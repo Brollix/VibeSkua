@@ -21,6 +21,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Threading;
 using Avalonia.Threading;
 
 namespace Skua.Manager.Avalonia.ViewModels;
@@ -54,6 +55,8 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         _syncThemes = _settingsService.Get("syncTheme", false);
         _scriptPath = _settingsService.Get("AutoStartScriptPath", string.Empty);
         _startWithScript = _settingsService.Get("AutoStartScript", false);
+        _showTags = _settingsService.Get("ShowAccountTags", true);
+        _showGridView = _settingsService.Get("ShowGridView", false);
         SetupSettingsWatcher();
     }
 
@@ -81,10 +84,20 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
     // UI State Properties
     [ObservableProperty]
-    private bool _showTags;
+    private bool _showTags = true;
+
+    partial void OnShowTagsChanged(bool value)
+    {
+        _settingsService.Set("ShowAccountTags", value);
+    }
 
     [ObservableProperty]
     private bool _showGridView;
+
+    partial void OnShowGridViewChanged(bool value)
+    {
+        _settingsService.Set("ShowGridView", value);
+    }
 
     [ObservableProperty]
     private int _columns = 3;
@@ -624,34 +637,74 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     }
 
     private FileSystemWatcher? _settingsWatcher;
+    private RegisteredWaitHandle? _registeredWaitHandle;
+    private EventWaitHandle? _globalNotifyEvent;
     private bool _isSavingInternal = false;
+    private CancellationTokenSource? _reloadDebounceCts;
+    private readonly object _reloadLock = new();
+
+    public void ScheduleReload()
+    {
+        if (_isSavingInternal) return;
+        lock (_reloadLock)
+        {
+            _reloadDebounceCts?.Cancel();
+            _reloadDebounceCts?.Dispose();
+            _reloadDebounceCts = new CancellationTokenSource();
+            CancellationToken token = _reloadDebounceCts.Token;
+
+            Task.Delay(150, token).ContinueWith(t =>
+            {
+                if (t.IsCanceled) return;
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (_isSavingInternal) return;
+                    ReloadAccountsAndGroups();
+                }, DispatcherPriority.Background);
+            }, TaskScheduler.Default);
+        }
+    }
 
     private void SetupSettingsWatcher()
     {
         try
         {
+            // 1. Cross-process instant signaling via named EventWaitHandle
+            try
+            {
+                _globalNotifyEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Global\VibeSkua.Settings.Changed");
+                _registeredWaitHandle = ThreadPool.RegisterWaitForSingleObject(
+                    _globalNotifyEvent,
+                    (state, timedOut) =>
+                    {
+                        ScheduleReload();
+                    },
+                    null,
+                    -1,
+                    false);
+            }
+            catch { }
+
+            // 2. FileSystemWatcher watching all write/create/rename events in Skua directory
             string dir = ClientFileSources.SkuaDIR;
             if (Directory.Exists(dir))
             {
-                _settingsWatcher = new FileSystemWatcher(dir, "Skua.settings.json")
+                _settingsWatcher = new FileSystemWatcher(dir)
                 {
-                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
+                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName | NotifyFilters.CreationTime,
                     EnableRaisingEvents = true
                 };
 
-                DateTime lastReload = DateTime.MinValue;
-                _settingsWatcher.Changed += (s, e) =>
+                void OnFileChanged(string? fileName)
                 {
-                    if (_isSavingInternal) return;
-                    if ((DateTime.UtcNow - lastReload).TotalMilliseconds < 400) return;
-                    lastReload = DateTime.UtcNow;
+                    if (string.IsNullOrEmpty(fileName)) return;
+                    if (!fileName.Equals("Skua.settings.json", StringComparison.OrdinalIgnoreCase)) return;
+                    ScheduleReload();
+                }
 
-                    Dispatcher.UIThread.Post(async () =>
-                    {
-                        await Task.Delay(100);
-                        ReloadAccountsAndGroups();
-                    }, DispatcherPriority.Background);
-                };
+                _settingsWatcher.Changed += (s, e) => OnFileChanged(e.Name);
+                _settingsWatcher.Created += (s, e) => OnFileChanged(e.Name);
+                _settingsWatcher.Renamed += (s, e) => OnFileChanged(e.Name);
             }
         }
         catch { }
@@ -721,8 +774,11 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
                 DisplayName = kvp.Value.DisplayName,
                 Password = password
             };
-            foreach (string tag in kvp.Value.Tags)
-                accountVm.Tags.Add(tag);
+            if (kvp.Value.Tags != null)
+            {
+                foreach (string tag in kvp.Value.Tags)
+                    accountVm.Tags.Add(tag);
+            }
             Accounts.Add(accountVm);
         }
 
