@@ -643,7 +643,8 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
                             break;
 
                         case "loginResponse":
-                            Stats.GetSpace();
+                            if (Flash.IsWorldLoaded)
+                                Stats.GetSpace();
                             Options.CustomName = string.Empty;
                             Options.CustomGuild = string.Empty;
                             Servers.IsIntentionalLogout = false;

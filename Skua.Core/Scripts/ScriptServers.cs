@@ -225,8 +225,11 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
     {
         try
         {
-            GetServers(true).AsTask().GetAwaiter().GetResult();
-            ReloginLog($"Refreshed server list ({CachedServers.Count} servers from API).");
+            if (CachedServers.Count == 0)
+            {
+                GetServers(true).AsTask().GetAwaiter().GetResult();
+                ReloginLog($"Refreshed server list ({CachedServers.Count} servers from API).");
+            }
         }
         catch
         {
@@ -376,7 +379,8 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
             return false;
         }
 
-        Thread.Sleep(1000);
+        Thread.Sleep(100);
+        try { Flash.Call("loadPolicyFile", ip, 5588); } catch { }
         ConnectIP(ip);
 
         Wait.ForTrue(() => Player.Playing && Flash.IsWorldLoaded, Options.LoginTimeout / 100);
@@ -424,7 +428,7 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
             return false;
         }
 
-        Thread.Sleep(1000);
+        Thread.Sleep(100);
         ConnectToServer(JsonConvert.SerializeObject(server));
 
         Wait.ForTrue(() => Player.Playing && Flash.IsWorldLoaded, Options.LoginTimeout / 100);
@@ -504,7 +508,10 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
                 bool serverListExists = !Flash.IsNull("mcLogin.sl.iList");
                 int serverEntries = Flash.GetGameObject<int>("mcLogin.sl.iList.numChildren", 0);
                 if (loginVisible && serverListExists && serverEntries > 0 && ServerList.Exists(IsValidReloginServerData))
+                {
+                    try { Flash.Call("loadPolicyFiles"); } catch { }
                     return true;
+                }
 
                 await Task.Delay(250, token);
             }
@@ -514,7 +521,11 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
         bool finalServerListExists = !Flash.IsNull("mcLogin.sl.iList");
         int finalServerEntries = Flash.GetGameObject<int>("mcLogin.sl.iList.numChildren", 0);
         bool success = finalLoginVisible && finalServerListExists && finalServerEntries > 0 && ServerList.Exists(IsValidReloginServerData);
-        if (!success)
+        if (success)
+        {
+            try { Flash.Call("loadPolicyFiles"); } catch { }
+        }
+        else
         {
             ReloginLog("Server list screen failed to load (authentication timeout or freeze). Resetting login UI.");
             try
@@ -574,6 +585,8 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
                 if (!Flash.Call<bool>("clickServer", targetServer.Name))
                 {
                     ReloginLog($"Server {targetServer.Name} not present in login list, connecting via IP {targetServer.IP}:{targetServer.Port}.");
+                    int port = targetServer.Port > 0 ? targetServer.Port : 5588;
+                    try { Flash.Call("loadPolicyFile", targetServer.IP, port); } catch { }
                     if (targetServer.Port > 0)
                         ConnectIP(targetServer.IP, targetServer.Port);
                     else

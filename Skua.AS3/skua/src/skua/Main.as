@@ -20,6 +20,7 @@ import flash.utils.Timer;
 import flash.utils.getQualifiedClassName;
 
 import skua.api.Auras;
+import skua.api.Server;
 import skua.module.ModalMC;
 import skua.module.Modules;
 import skua.util.SFSEvent;
@@ -144,6 +145,7 @@ public class Main extends MovieClip {
         Modules.init();
         this.stg.addEventListener(Event.ENTER_FRAME, Modules.handleFrame);
         this.stg.addEventListener(Event.ENTER_FRAME, this.monitorLoginScreen);
+        this.stg.addEventListener(Event.ENTER_FRAME, this.monitorServerList);
 
         this.game.stage.addEventListener(KeyboardEvent.KEY_DOWN, this.key_StageGame);
         
@@ -215,6 +217,33 @@ public class Main extends MovieClip {
                 this.game.mcLogin.mcTitle.addChild(this.customBGReady);
             }
         }
+    }
+
+    private var _policyFilesLoaded:Boolean = false;
+
+    private function monitorServerList(event:Event):void {
+        if (this._policyFilesLoaded || !this.game) return;
+
+        try {
+            var hasServers:Boolean = false;
+            if (this.game.serialCmd && this.game.serialCmd.servers) {
+                var servers:Array = this.game.serialCmd.servers as Array;
+                if (servers && servers.length > 0) {
+                    hasServers = true;
+                }
+            }
+            if (!hasServers && this.game.mcLogin && this.game.mcLogin.sl && this.game.mcLogin.sl.iList) {
+                var iList:* = this.game.mcLogin.sl.iList;
+                if (iList && iList.numChildren > 0) {
+                    hasServers = true;
+                }
+            }
+
+            if (hasServers) {
+                this._policyFilesLoaded = true;
+                Server.loadPolicyFiles();
+            }
+        } catch (e:Error) {}
     }
 
     private function initCustomBackground():void {
@@ -365,6 +394,7 @@ public class Main extends MovieClip {
     public static function _getObjectA(root:*, parts:Array):* {
         var obj:* = root;
         for (var i:int = 0; i < parts.length; i++) {
+            if (obj == null) return null;
             obj = obj[parts[i]];
         }
         return obj;
@@ -426,7 +456,10 @@ public class Main extends MovieClip {
     }
 
     private function onGameRemoved(event:Event):void {
-        if (event.target == this.game) this.stopPacketCapture();
+        if (event.target == this.game) {
+            this._policyFilesLoaded = false;
+            this.stopPacketCapture();
+        }
     }
 
     public static function sendClientPacket(packet:String, type:String):void {
