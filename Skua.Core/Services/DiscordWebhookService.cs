@@ -28,11 +28,13 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
 
     // Queue system
     private readonly ConcurrentQueue<Func<Task>> _messageQueue = new();
+
     private readonly SemaphoreSlim _queueSemaphore = new(0);
     private readonly CancellationTokenSource _cts = new();
 
     // Snapshot state
     private int _startGold;
+
     private int _startExp;
     private int _startLevel;
 
@@ -42,7 +44,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         _screenshotService = screenshotService;
         _serviceProvider = serviceProvider;
         _httpClient = new HttpClient();
-        
+
         // Start background queue processor
         _ = ProcessQueueAsync();
         Initialize();
@@ -51,13 +53,13 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
     public void Initialize()
     {
         if (_initialized) return;
-        
+
         StrongReferenceMessenger.Default.Register<DiscordWebhookService, ScriptStartedMessage, int>(this, (int)MessageChannels.ScriptStatus, (r, m) => r.OnScriptStarted(m));
         StrongReferenceMessenger.Default.Register<DiscordWebhookService, ScriptStoppedMessage, int>(this, (int)MessageChannels.ScriptStatus, (r, m) => r.OnScriptStopped(m));
         StrongReferenceMessenger.Default.Register<DiscordWebhookService, ScriptErrorMessage, int>(this, (int)MessageChannels.ScriptStatus, (r, m) => r.OnScriptError(m));
         StrongReferenceMessenger.Default.Register<DiscordWebhookService, ReloginTriggeredMessage, int>(this, (int)MessageChannels.GameEvents, (r, m) => r.OnRelogin(m));
         StrongReferenceMessenger.Default.Register<DiscordWebhookService, ItemDroppedMessage, int>(this, (int)MessageChannels.GameEvents, (r, m) => r.OnItemDropped(m));
-        
+
         _initialized = true;
     }
 
@@ -74,7 +76,10 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
                     // Rate limit: Max 2 messages per second
                     await Task.Delay(500, _cts.Token);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Trace.WriteLine($"Discord webhook queue action failed: {ex}");
+                }
             }
         }
     }
@@ -102,7 +107,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
     {
         _scriptStartTime = DateTime.Now;
         var bot = _serviceProvider.GetService<IScriptInterface>();
-        
+
         if (bot != null && bot.Player.Playing)
         {
             _startGold = bot.Player.Gold;
@@ -127,7 +132,16 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         {
             EnqueueAction(async () => await SendEmbedAsync("Script Started", $"**{GetBotName()}** has begun execution of **{scriptName}**.", 0x00FF00)); // Green
         }
-            
+
+        // Send an initial dashboard snapshot immediately. WebhookPingInterval defaults to 0,
+        // which disables the periodic timer, so relying on the timer alone leaves the dashboard
+        // without character, equipment, and quest data after Script Started.
+        EnqueueAction(async () =>
+        {
+            List<object> fields = BuildDashboardSnapshotFields();
+            await SendEmbedAsync("Health Ping", $"**{GetBotName()}** is running.", 0x808080, fields);
+        });
+
         StartPingTimer();
     }
 
@@ -159,7 +173,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
                 string botName = GetBotName();
 
                 var fields = new List<object>();
-                
+
                 if (goldEarned != 0) fields.Add(new { name = "Gold Earned", value = goldEarned > 0 ? $"{goldEarned:N0}" : "0", inline = true });
                 if (expEarned != 0) fields.Add(new { name = "XP Earned", value = expEarned > 0 ? $"{expEarned:N0}" : "0", inline = true });
                 fields.Add(new { name = "Time Elapsed", value = $"{timeElapsed.Hours:D2}:{timeElapsed.Minutes:D2}:{timeElapsed.Seconds:D2}", inline = false });
@@ -187,7 +201,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
             };
             EnqueueAction(async () => await SendEmbedAsync("Script Error", $"**{GetBotName()}** crashed unexpectedly.", 0xFF0000, fields)); // Red
         }
-            
+
         StopPingTimer();
     }
 
@@ -204,10 +218,13 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
     private void StartPingTimer()
     {
         var settings = _settingsService.GetClient();
-        if (settings == null || settings.WebhookPingInterval <= 0) return;
-        
+        if (settings == null) return;
+
+        // Keep dashboard counters live even when optional webhook pings are disabled.
+        // Respect a configured interval; otherwise refresh dashboard snapshots every minute.
+        int intervalMinutes = settings.WebhookPingInterval > 0 ? settings.WebhookPingInterval : 1;
         _pingTimer?.Dispose();
-        var intervalMs = (int)TimeSpan.FromMinutes(settings.WebhookPingInterval).TotalMilliseconds;
+        int intervalMs = (int)TimeSpan.FromMinutes(intervalMinutes).TotalMilliseconds;
         _pingTimer = new System.Threading.Timer(OnPingTimerElapsed, null, intervalMs, intervalMs);
     }
 
@@ -219,13 +236,81 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
     private void OnPingTimerElapsed(object? state)
     {
         var settings = _settingsService.GetClient();
-        if (settings == null || settings.WebhookPingInterval <= 0)
+        if (settings == null)
         {
             StopPingTimer();
             return;
         }
-        
-        EnqueueAction(async () => await SendEmbedAsync("Health Ping", $"**{GetBotName()}** is running flawlessly.", 0x808080)); // Gray
+
+        EnqueueAction(async () =>
+        {
+            List<object> fields = BuildDashboardSnapshotFields();
+            await SendEmbedAsync("Health Ping", $"**{GetBotName()}** is running flawlessly.", 0x808080, fields);
+        });
+    }
+
+    /// <summary>
+    /// Builds a compact snapshot for the local dashboard using the existing VibeSkua scripting interfaces.
+    /// </summary>
+    /// <returns>Webhook fields containing current character, equipment, and active quest data.</returns>
+    private List<object> BuildDashboardSnapshotFields()
+    {
+        List<object> fields = new();
+        IScriptInterface? bot = _serviceProvider.GetService<IScriptInterface>();
+        if (bot?.Player == null || !bot.Player.Playing)
+            return fields;
+
+        fields.Add(new { name = "Character", value = GetBotName(), inline = true });
+
+        // Include location and script state so the relay can populate the dashboard's existing fields.
+        string mapName = bot.Map?.FullName ?? string.Empty;
+        fields.Add(new { name = "Map", value = string.IsNullOrWhiteSpace(mapName) ? "Unknown" : mapName, inline = true });
+        fields.Add(new { name = "Room", value = bot.Map != null ? $"{bot.Player.Cell}-{bot.Player.Pad} (Room {bot.Map.RoomID})" : "Unknown", inline = true });
+
+        string scriptName = string.IsNullOrWhiteSpace(bot.Manager?.LoadedScript)
+            ? "None"
+            : System.IO.Path.GetFileNameWithoutExtension(bot.Manager.LoadedScript);
+        fields.Add(new { name = "Script", value = scriptName, inline = true });
+
+        fields.Add(new { name = "Level", value = bot.Player.Level.ToString(), inline = true });
+        fields.Add(new { name = "Gold", value = bot.Player.Gold.ToString("N0"), inline = true });
+        fields.Add(new { name = "AC", value = bot.Player.Coins.ToString("N0"), inline = true });
+        fields.Add(new { name = "HP", value = $"{bot.Player.Health}/{bot.Player.MaxHealth}", inline = true });
+        fields.Add(new { name = "MP", value = $"{bot.Player.Mana}/{bot.Player.MaxMana}", inline = true });
+
+        string equipment = string.Join("\n", bot.Inventory.Items
+            .Where(item => item.Equipped)
+            .Select(item => item.Name)
+            .Where(name => !string.IsNullOrWhiteSpace(name)));
+
+        if (string.IsNullOrWhiteSpace(equipment))
+            equipment = "No equipped items reported.";
+        if (equipment.Length > 1000)
+            equipment = equipment[..1000];
+
+        string quests = string.Join("\n", bot.Quests.Active
+            .Where(quest => quest != null && !string.IsNullOrWhiteSpace(quest.Name))
+            .Select(quest => quest.Name));
+
+        if (string.IsNullOrWhiteSpace(quests))
+            quests = "No active quests reported.";
+        if (quests.Length > 1000)
+            quests = quests[..1000];
+
+        fields.Add(new { name = "Equipment", value = equipment, inline = false });
+
+        // Report the actual item count; the public inventory interface does not expose total bag slots.
+        fields.Add(new { name = "Inventory", value = $"{bot.Inventory.Items.Count} items", inline = true });
+        fields.Add(new { name = "Quest", value = quests, inline = false });
+
+        // These are the live counters displayed in Combat > Stats in Skua.
+        // Dashboard "Quests" represents quests completed and turned in.
+        fields.Add(new { name = "Kills", value = bot.Stats.Kills.ToString(), inline = true });
+        fields.Add(new { name = "Drops", value = bot.Stats.Drops.ToString(), inline = true });
+        fields.Add(new { name = "Quests", value = bot.Stats.QuestsCompleted.ToString(), inline = true });
+        fields.Add(new { name = "Deaths", value = bot.Stats.Deaths.ToString(), inline = true });
+        fields.Add(new { name = "Relogins", value = bot.Stats.Relogins.ToString(), inline = true });
+        return fields;
     }
 
     public async Task TestWebhookAsync()
@@ -240,7 +325,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
 
     public async Task SendScreenshotAsync(string message)
     {
-        EnqueueAction(async () => 
+        EnqueueAction(async () =>
         {
             try
             {
@@ -248,7 +333,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
                 if (string.IsNullOrWhiteSpace(url)) return;
 
                 byte[] screenshotBytes = await _screenshotService.TakeScreenshotAsync();
-                
+
                 var embed = new
                 {
                     description = message,
