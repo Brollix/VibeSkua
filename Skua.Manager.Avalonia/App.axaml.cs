@@ -53,6 +53,15 @@ public partial class App : Application
         clientFiles.CreateDirectories();
         clientFiles.CreateFiles();
 
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            try
+            {
+                _ = Ioc.Default.GetService<Skua.Core.Interfaces.IGetScriptsService>()?.GetScriptsAsync(null, default);
+            }
+            catch { }
+        });
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.Startup += OnStartup;

@@ -12,16 +12,16 @@ namespace Skua.Shared.Avalonia.ViewModels.ScriptRepo;
 
 public partial class ScriptInfoViewModel : ObservableObject
 {
-    public ScriptInfoViewModel(ScriptInfo info, string? localFileOverride = null, bool isCustom = false, bool? isDownloaded = null, int? localSize = null)
+    public ScriptInfoViewModel(ScriptInfo info, string? localFileOverride = null, bool isCustom = false, bool? isDownloaded = null, int? localSize = null, bool isPinned = false)
     {
         Info = info;
         _localFileOverride = localFileOverride;
         IsCustom = isCustom;
         _downloaded = isDownloaded ?? info.CachedDownloaded ?? DownloadedFileExists;
         _localSize = localSize ?? info.CachedLocalSize ?? (Downloaded ? (int)new FileInfo(LocalFile).Length : 0);
+        _isPinned = isPinned;
         
-        string tagsStr = info.Tags != null && info.Tags.Length > 0 ? string.Join(" ", info.Tags) : string.Empty;
-        SearchIndex = $"{info.Name} {DisplayPath} {tagsStr}".ToLowerInvariant();
+        UpdateSearchIndex();
     }
 
     public ScriptInfo Info { get; }
@@ -31,7 +31,32 @@ public partial class ScriptInfoViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Outdated), nameof(StatusText), nameof(StatusColor), nameof(StatusBackground))]
     private int _localSize;
 
-    public string SearchIndex { get; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PinIcon), nameof(PinColor), nameof(PinToolTip))]
+    private bool _isPinned;
+
+    partial void OnIsPinnedChanged(bool value)
+    {
+        UpdateSearchIndex();
+    }
+
+    public string PinIcon => IsPinned ? "Pin" : "PinOutline";
+    public string PinColor => IsPinned ? "#F59E0B" : "#9CA3AF";
+    public string PinToolTip => IsPinned ? "Unpin script" : "Pin script to top";
+    public string ScriptKey => (IsCustom ? LocalFile : FilePath).Replace('\\', '/').Trim();
+
+    private string _searchIndex = string.Empty;
+    public string SearchIndex
+    {
+        get => _searchIndex;
+        private set => SetProperty(ref _searchIndex, value);
+    }
+
+    private void UpdateSearchIndex()
+    {
+        string tagsStr = Info.Tags != null && Info.Tags.Length > 0 ? string.Join(" ", Info.Tags) : string.Empty;
+        SearchIndex = $"{Info.Name} {DisplayPath} {tagsStr} {(IsPinned ? "pinned" : string.Empty)}".ToLowerInvariant();
+    }
     public string FileName => Info.Name;
     public int Size => Info.Size;
     public string LocalFile => _localFileOverride ?? Info.LocalFile;

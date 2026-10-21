@@ -147,6 +147,17 @@
                             </TextBlock>
                         </Border>
 
+                        <Border Background="#451A03"
+                                BorderBrush="#D97706"
+                                BorderThickness="1"
+                                CornerRadius="12"
+                                Padding="8,2"
+                                IsVisible="{Binding PinnedQuantity}">
+                            <TextBlock FontSize="10" FontWeight="Bold" Foreground="#FBBF24">
+                                <Run Text="📌 " /><Run Text="{Binding PinnedQuantity}" /><Run Text=" Pinned" />
+                            </TextBlock>
+                        </Border>
+
                         <Border Background="#064E3B"
                                 BorderBrush="#059669"
                                 BorderThickness="1"
@@ -219,7 +230,14 @@
                      IsEnabled="{Binding !IsBusy}"
                      BorderThickness="0"
                      Background="Transparent"
-                     Padding="0">
+                     Padding="0"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                <ListBox.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <VirtualizingStackPanel />
+                    </ItemsPanelTemplate>
+                </ListBox.ItemsPanel>
                 <ListBox.Styles>
                     <Style Selector="ListBoxItem">
                         <Setter Property="Padding" Value="0,0,0,6" />
@@ -236,6 +254,15 @@
 
                 <ListBox.ContextMenu>
                     <ContextMenu>
+                        <MenuItem Command="{Binding TogglePinCommand}"
+                                  CommandParameter="{Binding SelectedItem}"
+                                  Header="Pin / Unpin Script"
+                                  IsEnabled="{Binding SelectedItem, Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <MenuItem.Icon>
+                                <materialIcons:MaterialIcon Kind="Pin" Width="14" Height="14" Foreground="#F59E0B" />
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
                         <MenuItem Command="{Binding DownloadCommand}"
                                   Header="Download Script"
                                   IsEnabled="{Binding SelectedItem.Downloaded, Converter={x:Static ObjectConverters.IsNull}, FallbackValue=True}">
@@ -269,6 +296,14 @@
                                 Padding="14,10">
                             <Border.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem Command="{Binding #Root.((scriptRepo:ScriptRepoViewModel)DataContext).TogglePinCommand}"
+                                              CommandParameter="{Binding .}"
+                                              Header="{Binding PinToolTip}">
+                                        <MenuItem.Icon>
+                                            <materialIcons:MaterialIcon Kind="{Binding PinIcon}" Width="14" Height="14" Foreground="{Binding PinColor}" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator />
                                     <MenuItem Command="{Binding #Root.((scriptRepo:ScriptRepoViewModel)DataContext).DownloadCommand}"
                                               CommandParameter="{Binding .}"
                                               Header="Download Script"
@@ -324,6 +359,20 @@
                                                 IsVisible="{Binding IsCustom}"
                                                 VerticalAlignment="Center">
                                             <TextBlock Text="LOCAL" FontSize="9" FontWeight="Bold" Foreground="#C4B5FD" VerticalAlignment="Center" />
+                                        </Border>
+
+                                        <!-- Pinned Tag -->
+                                        <Border CornerRadius="10"
+                                                Padding="6,1"
+                                                Background="#451A03"
+                                                BorderBrush="#F59E0B"
+                                                BorderThickness="1"
+                                                IsVisible="{Binding IsPinned}"
+                                                VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal" Spacing="3" VerticalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="Pin" Width="10" Height="10" Foreground="#FBBF24" VerticalAlignment="Center" />
+                                                <TextBlock Text="PINNED" FontSize="9" FontWeight="Bold" Foreground="#FBBF24" VerticalAlignment="Center" />
+                                            </StackPanel>
                                         </Border>
 
                                         <!-- Script Name -->
@@ -426,6 +475,17 @@
                                             Orientation="Horizontal"
                                             Spacing="5"
                                             VerticalAlignment="Center">
+                                    <!-- Pin / Unpin Button -->
+                                    <Button Classes="skua-button"
+                                            Height="28"
+                                            Width="30"
+                                            Padding="0"
+                                            Command="{Binding #Root.((scriptRepo:ScriptRepoViewModel)DataContext).TogglePinCommand}"
+                                            CommandParameter="{Binding .}"
+                                            ToolTip.Tip="{Binding PinToolTip}">
+                                        <materialIcons:MaterialIcon Kind="{Binding PinIcon}" Width="14" Height="14" Foreground="{Binding PinColor}" />
+                                    </Button>
+
                                     <!-- Start Script Button -->
                                     <Button Classes="skua-button skua-primary"
                                             Height="28"

@@ -321,13 +321,28 @@ public partial class OptionItemControl : UserControl
 
         TextBox textBox = CreateBoundTextBox(vm);
         textBox.Height = 32;
-        textBox.MinWidth = 120;
+        textBox.Width = 240;
+        textBox.MaxWidth = 240;
         textBox.CornerRadius = new CornerRadius(6);
         textBox.BorderThickness = new Thickness(1);
         textBox.FontSize = StandardOptionFontSize;
         textBox.Padding = new Thickness(10, 0);
         textBox.VerticalContentAlignment = VerticalAlignment.Center;
         textBox.Margin = new Thickness(0, 0, 6, 0);
+
+        void UpdateTooltip()
+        {
+            if (!string.IsNullOrWhiteSpace(textBox.Text))
+                ToolTip.SetTip(textBox, textBox.Text);
+            else if (!string.IsNullOrEmpty(vm.Description))
+                ToolTip.SetTip(textBox, vm.Description);
+        }
+        UpdateTooltip();
+        textBox.PropertyChanged += (_, e) =>
+        {
+            if (e.Property == TextBox.TextProperty)
+                UpdateTooltip();
+        };
 
         Button button = CreateBoundButton(vm, "Set", () => textBox.Text ?? string.Empty);
         button.Classes.Add("skua-button");

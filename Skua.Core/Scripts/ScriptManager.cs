@@ -152,13 +152,24 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
 
             LoadScriptConfig(script);
 
+            bool hasOptions = Config != null && (Config.Options.Count > 0 || Config.MultipleOptions.Count > 0);
             bool needsConfig;
             lock (_configuredLock)
             {
-                needsConfig = _configured.TryGetValue(Config!.Storage, out bool b) && !b;
+                needsConfig = hasOptions && _configured.TryGetValue(Config!.Storage, out bool b) && !b;
             }
 
-            ManualResetEventSlim scriptReady = new(false);
+
+            if (needsConfig)
+            {
+                if (!SilentConfig)
+                    await Task.Run(() => Config!.Configure());
+
+                lock (_configuredLock)
+                {
+                    _configured[Config!.Storage] = true;
+                }
+            }
 
             Handlers.Clear();
 
@@ -171,7 +182,7 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
             {
                 Exception? exception = null;
                 ScriptCts = new();
-                scriptReady.Set();
+
 
                 try
                 {
@@ -271,19 +282,6 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
 
             StrongReferenceMessenger.Default.Send<ScriptStartedMessage, int>((int)MessageChannels.ScriptStatus);
             _diagnostics.RecordEvent("Script", "Started", correlationId: scriptCorrelationId);
-
-            if (needsConfig)
-            {
-                _ = Task.Run(() =>
-                {
-                    scriptReady.Wait();
-                    Config!.Configure();
-                    lock (_configuredLock)
-                    {
-                        _configured[Config!.Storage] = true;
-                    }
-                });
-            }
 
             return null;
         }

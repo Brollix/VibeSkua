@@ -83,6 +83,59 @@ public partial class ScriptSchedulerViewModel : BotControlViewModelBase
         _windowService.ShowManagedWindow("Script Repo");
     }
 
+    [ObservableProperty]
+    private ScriptItemViewModel? _selectedScript;
+
+    [RelayCommand]
+    private void MoveScriptUp(ScriptItemViewModel item)
+    {
+        if (IsRunningQueue)
+        {
+            _dialogService.ShowMessageBox("Cannot reorder scripts while the playlist is running.", "Scheduler Running");
+            return;
+        }
+
+        if (item == null) return;
+        int index = ScriptQueue.IndexOf(item);
+        if (index > 0)
+        {
+            ScriptQueue.Move(index, index - 1);
+            SelectedScript = item;
+        }
+    }
+
+    [RelayCommand]
+    private void MoveScriptDown(ScriptItemViewModel item)
+    {
+        if (IsRunningQueue)
+        {
+            _dialogService.ShowMessageBox("Cannot reorder scripts while the playlist is running.", "Scheduler Running");
+            return;
+        }
+
+        if (item == null) return;
+        int index = ScriptQueue.IndexOf(item);
+        if (index >= 0 && index < ScriptQueue.Count - 1)
+        {
+            ScriptQueue.Move(index, index + 1);
+            SelectedScript = item;
+        }
+    }
+
+    [RelayCommand]
+    private void MoveSelectedUp()
+    {
+        if (SelectedScript != null)
+            MoveScriptUp(SelectedScript);
+    }
+
+    [RelayCommand]
+    private void MoveSelectedDown()
+    {
+        if (SelectedScript != null)
+            MoveScriptDown(SelectedScript);
+    }
+
     [RelayCommand]
     private void RemoveScript(ScriptItemViewModel item)
     {

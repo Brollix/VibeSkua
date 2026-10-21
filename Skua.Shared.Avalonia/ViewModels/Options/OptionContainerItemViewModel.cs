@@ -57,6 +57,34 @@ public partial class OptionContainerItemViewModel : ObservableObject, IOptionCon
     [ObservableProperty]
     private string? _selectedValue;
 
+    partial void OnSelectedValueChanged(string? value)
+    {
+        _value = value ?? string.Empty;
+        OnPropertyChanged(nameof(Value));
+    }
+
+    public bool BoolValue
+    {
+        get => _value is bool b ? b : (bool.TryParse(_value?.ToString(), out bool parsed) && parsed);
+        set
+        {
+            _value = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(Value));
+        }
+    }
+
+    public string TextValue
+    {
+        get => _value?.ToString() ?? string.Empty;
+        set
+        {
+            _value = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(Value));
+        }
+    }
+
     public IOptionContainer Container { get; }
     public IOption Option { get; }
     public Type Type { get; }
@@ -72,20 +100,22 @@ public partial class OptionContainerItemViewModel : ObservableObject, IOptionCon
         {
             string defaultStr = Option.DefaultValue?.ToString()?.Replace('_', ' ') ?? (EnumValues?.Count > 0 ? EnumValues[0] : string.Empty);
             SelectedValue = EnumValues != null && EnumValues.Contains(defaultStr) ? defaultStr : (EnumValues?.Count > 0 ? EnumValues[0] : string.Empty);
-            Value = SelectedValue;
+            _value = SelectedValue;
+            OnPropertyChanged(nameof(Value));
         }
         else if (Type == typeof(bool))
         {
+            bool defBool = false;
             if (Option.DefaultValue is bool b)
-                Value = b;
+                defBool = b;
             else if (bool.TryParse(Option.DefaultValue?.ToString(), out bool parsedBool))
-                Value = parsedBool;
-            else
-                Value = false;
+                defBool = parsedBool;
+
+            BoolValue = defBool;
         }
         else
         {
-            Value = Option.DefaultValue?.ToString() ?? string.Empty;
+            TextValue = Option.DefaultValue?.ToString() ?? string.Empty;
         }
     }
 }

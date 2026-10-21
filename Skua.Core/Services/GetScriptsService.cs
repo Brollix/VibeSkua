@@ -64,15 +64,13 @@ public partial class GetScriptsService : ObservableObject, IGetScriptsService
     {
         try
         {
-            Scripts.Clear();
-
-            progress?.Report("Fetching scripts...");
-            List<ScriptInfo> scripts = await GetScriptsInfo(refresh, token);
+            progress?.Report("Loading scripts...");
+            List<ScriptInfo> scripts = await Task.Run(() => GetScriptsInfo(refresh, token), token).ConfigureAwait(false);
 
             progress?.Report($"Found {scripts.Count} scripts.");
-            _scripts.AddRange(scripts);
-
-            progress?.Report($"Fetched {scripts.Count} scripts.");
+            
+            _scripts.ReplaceRange(scripts);
+            progress?.Report($"Loaded {scripts.Count} scripts.");
             OnPropertyChanged(nameof(Scripts));
         }
         catch (TaskCanceledException)
@@ -107,31 +105,27 @@ public partial class GetScriptsService : ObservableObject, IGetScriptsService
         string cacheFile = ClientFileSources.SkuaScriptsCacheFile;
         List<ScriptInfo>? scripts = null;
 
-        // 1. Fast path: Read from local disk cache if available, not explicitly refreshing, and cache is fresh (< 2 hours)
+        // 1. Fast path: Always read from local disk cache immediately if available and not explicitly refreshing
         if (!refresh && File.Exists(cacheFile))
         {
             try
             {
-                bool isCacheFresh = (DateTime.UtcNow - File.GetLastWriteTimeUtc(cacheFile)) <= TimeSpan.FromHours(2);
-                if (isCacheFresh)
+                string cachedJson = await File.ReadAllTextAsync(cacheFile, token).ConfigureAwait(false);
+                if (!string.IsNullOrWhiteSpace(cachedJson))
                 {
-                    string cachedJson = await File.ReadAllTextAsync(cacheFile, token);
-                    if (!string.IsNullOrWhiteSpace(cachedJson))
-                    {
-                        scripts = JsonConvert.DeserializeObject<List<ScriptInfo>>(cachedJson);
-                    }
+                    scripts = JsonConvert.DeserializeObject<List<ScriptInfo>>(cachedJson);
                 }
             }
             catch { }
         }
 
-        // 2. Fetch from GitHub if no cache, stale cache, or refresh requested
+        // 2. Fetch from GitHub if no cache exists or explicit refresh requested
         if (scripts == null || !scripts.Any())
         {
             try
             {
-                using HttpResponseMessage response = await ValidatedHttpExtensions.GetAsync(HttpClients.GitHubRaw, _rawScriptsJsonUrl, token);
-                string content = await response.Content.ReadAsStringAsync(token);
+                using HttpResponseMessage response = await ValidatedHttpExtensions.GetAsync(HttpClients.GitHubRaw, _rawScriptsJsonUrl, token).ConfigureAwait(false);
+                string content = await response.Content.ReadAsStringAsync(token).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(content))
                     throw new InvalidDataException("scripts.json is empty or null");
 
@@ -144,7 +138,7 @@ public partial class GetScriptsService : ObservableObject, IGetScriptsService
                 {
                     string dir = Path.GetDirectoryName(cacheFile)!;
                     if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                    await File.WriteAllTextAsync(cacheFile, content, token);
+                    await File.WriteAllTextAsync(cacheFile, content, token).ConfigureAwait(false);
                 }
                 catch { }
             }
@@ -153,11 +147,34 @@ public partial class GetScriptsService : ObservableObject, IGetScriptsService
                 // Gracefully fallback to existing cache if offline or GitHub request fails during background refresh
                 try
                 {
-                    string cachedJson = await File.ReadAllTextAsync(cacheFile, token);
+                    string cachedJson = await File.ReadAllTextAsync(cacheFile, token).ConfigureAwait(false);
                     scripts = JsonConvert.DeserializeObject<List<ScriptInfo>>(cachedJson);
                 }
                 catch { }
             }
+        }
+        else if (!refresh && File.Exists(cacheFile) && (DateTime.UtcNow - File.GetLastWriteTimeUtc(cacheFile)) > TimeSpan.FromHours(12))
+        {
+            // Cache was served immediately, but is older than 12 hours: trigger background refresh silently!
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using HttpResponseMessage response = await ValidatedHttpExtensions.GetAsync(HttpClients.GitHubRaw, _rawScriptsJsonUrl, CancellationToken.None).ConfigureAwait(false);
+                    string content = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(content))
+                    {
+                        var freshScripts = JsonConvert.DeserializeObject<List<ScriptInfo>>(content);
+                        if (freshScripts != null && freshScripts.Any())
+                        {
+                            string dir = Path.GetDirectoryName(cacheFile)!;
+                            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+                            await File.WriteAllTextAsync(cacheFile, content).ConfigureAwait(false);
+                        }
+                    }
+                }
+                catch { }
+            });
         }
 
         // 3. Apply creation dates from memory-cached dictionary
@@ -177,7 +194,8 @@ public partial class GetScriptsService : ObservableObject, IGetScriptsService
 
                 if (!string.IsNullOrEmpty(fileToRead))
                 {
-                    var rawDict = JsonConvert.DeserializeObject<Dictionary<string, DateTime>>(File.ReadAllText(fileToRead));
+                    string datesJson = await File.ReadAllTextAsync(fileToRead, token).ConfigureAwait(false);
+                    var rawDict = JsonConvert.DeserializeObject<Dictionary<string, DateTime>>(datesJson);
                     if (rawDict != null)
                     {
                         _cachedDates = new Dictionary<string, DateTime>(rawDict, StringComparer.OrdinalIgnoreCase);
@@ -196,7 +214,7 @@ public partial class GetScriptsService : ObservableObject, IGetScriptsService
                 }
             }
 
-            if (_cachedDates != null)
+            if (_cachedDates != null && scripts != null)
             {
                 foreach (var s in scripts)
                 {
@@ -213,7 +231,7 @@ public partial class GetScriptsService : ObservableObject, IGetScriptsService
         }
         catch { }
 
-        return scripts;
+        return scripts ?? new List<ScriptInfo>();
     }
 
     public async Task UpdateScriptDatesAsync(IProgress<string>? progress, CancellationToken token)

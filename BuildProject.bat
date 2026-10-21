@@ -32,7 +32,7 @@ echo Building App (Fast Dev Build)...
 dotnet build .\Skua.App.Avalonia\Skua.App.Avalonia.csproj -c Release
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to build App.
-    pause
+    if "%~1"=="" pause
     exit /b %ERRORLEVEL%
 )
 
@@ -40,7 +40,7 @@ echo Building Manager (Fast Dev Build)...
 dotnet build .\Skua.Manager.Avalonia\Skua.Manager.Avalonia.csproj -c Release
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to build Manager.
-    pause
+    if "%~1"=="" pause
     exit /b %ERRORLEVEL%
 )
 
@@ -48,7 +48,7 @@ echo Building DailyTracker Plugin (Fast Dev Build)...
 dotnet build .\Skua.Plugin.DailyTracker\Skua.Plugin.DailyTracker.csproj -c Release
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to build DailyTracker Plugin.
-    pause
+    if "%~1"=="" pause
     exit /b %ERRORLEVEL%
 )
 
@@ -56,7 +56,7 @@ echo Building ButlerV5 Plugin (Fast Dev Build)...
 dotnet build .\Skua.Plugin.ButlerV5\Skua.Plugin.ButlerV5.csproj -c Release
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to build ButlerV5 Plugin.
-    pause
+    if "%~1"=="" pause
     exit /b %ERRORLEVEL%
 )
 
@@ -64,7 +64,7 @@ echo Packaging and organizing output to match WPF release structure...
 powershell -ExecutionPolicy Bypass -File "%~dp0package-build.ps1"
 if %ERRORLEVEL% NEQ 0 (
     echo Failed to package build output.
-    pause
+    if "%~1"=="" pause
     exit /b %ERRORLEVEL%
 )
 

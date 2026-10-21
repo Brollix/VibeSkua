@@ -50,7 +50,7 @@ public partial class ApplicationOptionsViewModel : BotControlViewModelBase
         }
     }
 
-    public List<string> Categories { get; } = new() { "All", "General & Performance", "Auto Updates", "Discord Webhooks" };
+    public List<string> Categories { get; } = new() { "All", "General & Performance", "Auto Updates", "Webhooks" };
 
     public IEnumerable<OptionGroupViewModel> FilteredGroups
     {
@@ -92,7 +92,8 @@ public partial class ApplicationOptionsViewModel : BotControlViewModelBase
 
         var webhookItems = ApplicationOptions.Where(i =>
             i.Content.Contains("Webhook", StringComparison.OrdinalIgnoreCase) ||
-            i.Content.Contains("Discord", StringComparison.OrdinalIgnoreCase)
+            i.Content.Contains("Discord", StringComparison.OrdinalIgnoreCase) ||
+            i.Content.Contains("Nexus", StringComparison.OrdinalIgnoreCase)
         ).ToList();
 
         var otherItems = ApplicationOptions.Except(generalItems).Except(updateItems).Except(webhookItems).ToList();
@@ -115,9 +116,9 @@ public partial class ApplicationOptionsViewModel : BotControlViewModelBase
             },
             new()
             {
-                Title = "Discord Webhooks & Alerts",
-                Icon = "Discord",
-                Description = "Remote script notifications, crash alerts, relog pings, and rare drop alerts",
+                Title = "Webhooks & Alerts",
+                Icon = "Webhook",
+                Description = "Remote script notifications, crash alerts, relog pings, and rare drop alerts for Discord & Skua Nexus",
                 Items = webhookItems
             }
         };

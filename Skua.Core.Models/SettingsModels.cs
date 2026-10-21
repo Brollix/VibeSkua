@@ -171,6 +171,9 @@ public class SharedSettings
     [JsonPropertyName("UserCustomScriptsList")]
     public StringCollection UserCustomScriptsList { get; set; } = new();
 
+    [JsonPropertyName("UserPinnedScripts")]
+    public StringCollection UserPinnedScripts { get; set; } = new();
+
     [JsonPropertyName("ApplicationVersion")]
     public string ApplicationVersion { get; set; } = ClientFileSources.AssemblyVersion;
 
@@ -213,6 +216,8 @@ public class SharedSettings
 
         if (string.IsNullOrEmpty(ApplicationVersion))
             ApplicationVersion = ClientFileSources.AssemblyVersion;
+
+        UserPinnedScripts ??= new();
     }
 }
 
@@ -233,8 +238,14 @@ public class ClientSettings
     [JsonPropertyName("UserCustomScriptsList")]
     public StringCollection UserCustomScriptsList { get; set; } = new();
 
+    [JsonPropertyName("UserPinnedScripts")]
+    public StringCollection UserPinnedScripts { get; set; } = new();
+
     [JsonPropertyName("DiscordWebhookUrl")]
     public string DiscordWebhookUrl { get; set; } = string.Empty;
+
+    [JsonPropertyName("NexusWebhookUrl")]
+    public string NexusWebhookUrl { get; set; } = string.Empty;
 
     [JsonPropertyName("WebhookNotifyStarted")]
     public bool WebhookNotifyStarted { get; set; } = true;
@@ -302,6 +313,7 @@ public class ClientSettings
     public void InitializeDefaults()
     {
         UserOptions ??= new();
+        UserPinnedScripts ??= new();
 
         if (FastTravels == null || FastTravels.Count == 0)
         {
@@ -369,6 +381,9 @@ public class ManagerSettings
     [JsonPropertyName("UserCustomScriptsList")]
     public StringCollection UserCustomScriptsList { get; set; } = new();
 
+    [JsonPropertyName("UserPinnedScripts")]
+    public StringCollection UserPinnedScripts { get; set; } = new();
+
     [JsonPropertyName("ManagedAccounts")]
     [JsonConverter(typeof(AccountDataDictionaryJsonConverter))]
     public Dictionary<string, AccountData> ManagedAccounts { get; set; } = new(StringComparer.OrdinalIgnoreCase);
@@ -397,6 +412,7 @@ public class ManagerSettings
         }
 
         ManagedAccounts ??= new(StringComparer.OrdinalIgnoreCase);
+        UserPinnedScripts ??= new();
     }
 }
 
