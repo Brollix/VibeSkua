@@ -221,6 +221,8 @@ public partial class TabbedHostWindow : Window
     }
 
     private readonly string[] _initialArgs;
+    private bool _initialInstanceStarted = false;
+    private bool _initialInstanceStarted = false;
     private readonly Dictionary<TabItem, TabInfo> _tabs = new();
     private bool _needsReposition = false;
     private bool _isRepositioning = false;
@@ -265,10 +267,19 @@ public partial class TabbedHostWindow : Window
     private void ProcessNextSpawn()
     {
         if (_isSpawning || _spawnQueue.Count == 0 || _isClosing) return;
-        
+
         _isSpawning = true;
         Action next = _spawnQueue.Dequeue();
-        next.Invoke();
+        try
+        {
+            next.Invoke();
+        }
+        catch (Exception ex)
+        {
+            _isSpawning = false;
+            Trace.WriteLine($"VibeSkua child spawn failed: {ex}");
+            Dispatcher.UIThread.Post(ProcessNextSpawn, DispatcherPriority.Background);
+        }
     }
     #endregion
 
@@ -288,10 +299,10 @@ public partial class TabbedHostWindow : Window
 
         Opened += TabbedHostWindow_Opened;
         PositionChanged += (s, e) => OnWindowPositionChanged(e.Point);
-        SizeChanged += (s, e) => { DoReposition(); UpdateTabScrollButtons(); };
+        SizeChanged += (s, e) => { ScheduleReposition(); UpdateTabScrollButtons(); };
         
-        PropertyChanged += (s, e) => { if (e.Property == WindowStateProperty || e.Property == IsVisibleProperty) DoReposition(); };
-        Activated += (s, e) => { DoReposition(); UpdateTabScrollButtons(); };
+        PropertyChanged += (s, e) => { if (e.Property == WindowStateProperty || e.Property == IsVisibleProperty) ScheduleReposition(); };
+        Activated += (s, e) => { ScheduleReposition(); UpdateTabScrollButtons(); };
         Closing += OnWindowClosing;
         Closed += OnWindowClosed;
 
@@ -427,7 +438,18 @@ public partial class TabbedHostWindow : Window
         }
         catch { }
 
-        AddNewInstance(_initialArgs);
+        // Avalonia can raise Opened again after a hidden window is shown. Only launch
+        // the startup instance once; subsequent tray restores must reuse existing tabs.
+        if (!_initialInstanceStarted)
+        {
+            _initialInstanceStarted = true;
+            // Prevent a tray restore from launching the startup account a second time.
+        if (!_initialInstanceStarted)
+        {
+            _initialInstanceStarted = true;
+            AddNewInstance(_initialArgs);
+        }
+        }
     }
 
     private IntPtr HostWindowSubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, nuint uIdSubclass, IntPtr dwRefData)
@@ -1281,7 +1303,8 @@ public partial class TabbedHostWindow : Window
                         newPos.Y + tile.OffsetY,
                         tile.Width,
                         tile.Height,
-                        SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS | SWP_NOZORDER);
+                        SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS | SWP_NOZORDER);
+                    ShowWindow(tile.Hwnd, SW_SHOW);
                 }
             }
             return;
@@ -1307,13 +1330,26 @@ public partial class TabbedHostWindow : Window
                 targetY,
                 _childWidth,
                 _childHeight,
-                SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS | SWP_NOZORDER);
+                SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_NOZORDER);
         }
     }
+
+    private bool _repositionScheduled = false;
 
     private void ScheduleReposition()
     {
         _needsReposition = true;
+        if (_repositionScheduled || _isClosing) return;
+
+        _repositionScheduled = true;
+        Dispatcher.UIThread.Post(() =>
+        {
+            _repositionScheduled = false;
+            if (_isClosing || !IsLoaded) return;
+
+            _needsReposition = false;
+            DoReposition();
+        }, DispatcherPriority.Render);
     }
 
     private void DoReposition()
@@ -1348,11 +1384,9 @@ public partial class TabbedHostWindow : Window
 
             if (WindowState == WindowState.Minimized || !IsVisible)
             {
-                foreach (var info in _tabs.Values)
-                {
-                    if (info.ChildHwnd != IntPtr.Zero)
-                        SetWindowPos(info.ChildHwnd, HWND_TOP, -32000, -32000, 0, 0, SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS | SWP_NOSIZE);
-                }
+                // Let Windows handle visibility for owned windows when the host is hidden.
+                // Explicitly hiding the embedded Flash HWND can leave the child renderer black
+                // after restoration, so do not send SW_HIDE to child windows here.
                 return;
             }
 
@@ -1382,7 +1416,9 @@ public partial class TabbedHostWindow : Window
             _lastFastX = Position.X;
             _lastFastY = Position.Y;
 
-            uint baseFlags = SWP_SHOWWINDOW | SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS | SWP_NOZORDER;
+            // Do not include SWP_SHOWWINDOW in queued position requests. A stale async request
+            // can otherwise re-show a child after the host has been hidden from the tray.
+            uint baseFlags = SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS | SWP_NOZORDER;
 
             var activeWindows = InstancesTabControl.Items.OfType<TabItem>()
                 .Where(t => _tabs.ContainsKey(t))
@@ -1426,6 +1462,7 @@ public partial class TabbedHostWindow : Window
                         Height = cellH
                     });
                     SetWindowPos(activeWindows[i].ChildHwnd, IntPtr.Zero, x + c * cellW, y + r * cellH, cellW, cellH, baseFlags);
+                    ShowWindow(activeWindows[i].ChildHwnd, SW_SHOW);
                     if (activeWindows[i].IsThrottled)
                     {
                         activeWindows[i].IsThrottled = false;
@@ -1469,6 +1506,7 @@ public partial class TabbedHostWindow : Window
                 if (activeChildHwnd != IntPtr.Zero)
                 {
                     SetWindowPos(activeChildHwnd, IntPtr.Zero, x, y, w, h, baseFlags);
+                    ShowWindow(activeChildHwnd, SW_SHOW);
                     if (activeInfo != null && activeInfo.IsThrottled)
                     {
                         activeInfo.IsThrottled = false;
@@ -1489,7 +1527,9 @@ public partial class TabbedHostWindow : Window
                         PostMessage(info.ChildHwnd, WM_SKUA_THROTTLE, new IntPtr(1), IntPtr.Zero);
                     }
 
-                    SetWindowPos(info.ChildHwnd, IntPtr.Zero, -32000, -32000, 0, 0, baseFlags | SWP_NOSIZE);
+                    // Keep inactive tabs hidden instead of moving them off-screen with an async
+                    // SWP_SHOWWINDOW request that could race with tray hide/show.
+                    ShowWindow(info.ChildHwnd, SW_HIDE);
                 }
             }
         }
@@ -1559,7 +1599,21 @@ public partial class TabbedHostWindow : Window
 
         if (_tabs.Count == 0 || !InstancesTabControl.Items.OfType<TabItem>().Any())
         {
-            Close();
+            // Keep the host window alive when the final account tab closes.
+            // This allows the user to open another tab without restarting VibeSkua.
+            _lastSelectedTab = null;
+            _lastActiveHwnd = IntPtr.Zero;
+            _isGridViewEnabled = false;
+
+            // Explicitly keep the host alive and visible after the final child exits.
+            // The host is the desktop MainWindow, so closing a child tab must not leave
+            // the application with no visible window or trigger an accidental shutdown.
+            if (!IsVisible)
+                Show();
+            if (WindowState == WindowState.Minimized)
+                WindowState = WindowState.Normal;
+            Activate();
+            ScheduleReposition();
             return;
         }
 
@@ -1752,8 +1806,13 @@ public partial class TabbedHostWindow : Window
 
         EnqueueSpawn(() =>
         {
-            if (_isClosing) return;
-            
+            if (_isClosing || !_tabs.ContainsKey(newTab))
+            {
+                _isSpawning = false;
+                ProcessNextSpawn();
+                return;
+            }
+
             Process p = new Process();
             p.StartInfo.FileName = Process.GetCurrentProcess().MainModule?.FileName ?? "";
             p.StartInfo.ArgumentList.Add("--embed");
@@ -1779,7 +1838,24 @@ public partial class TabbedHostWindow : Window
                 });
             };
 
-            p.Start();
+            try
+            {
+                p.Start();
+            }
+            catch (Exception ex)
+            {
+                p.Dispose();
+                _isSpawning = false;
+                Trace.WriteLine($"VibeSkua failed to start child process for tab '{tabName}': {ex}");
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (_tabs.ContainsKey(newTab))
+                        CloseTab(newTab);
+                    ProcessNextSpawn();
+                }, DispatcherPriority.Background);
+                return;
+            }
+
             info.Process = p;
             try
             {
