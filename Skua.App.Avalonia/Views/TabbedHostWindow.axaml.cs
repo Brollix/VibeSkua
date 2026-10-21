@@ -1303,7 +1303,7 @@ public partial class TabbedHostWindow : Window
                         newPos.Y + tile.OffsetY,
                         tile.Width,
                         tile.Height,
-                        SWP_NOACTIVATE | SWP_ASYNCWINDOWPOS | SWP_NOZORDER);
+                        SWP_NOACTIVATE | SWP_NOZORDER);
                     ShowWindow(tile.Hwnd, SW_SHOW);
                 }
             }
