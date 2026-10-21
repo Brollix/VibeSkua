@@ -33,6 +33,7 @@ namespace Skua.App.Avalonia.Views;
 public partial class TabbedHostWindow : Window
 {
     #region Win32 API
+
     public delegate IntPtr SubclassProc(IntPtr hWnd, uint uMsg, IntPtr wParam, IntPtr lParam, nuint uIdSubclass, IntPtr dwRefData);
 
     [DllImport("comctl32.dll", SetLastError = true)]
@@ -117,6 +118,7 @@ public partial class TabbedHostWindow : Window
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern IntPtr GetWindow(IntPtr hWnd, uint uCmd);
+
     private const int WS_EX_TOOLWINDOW = 0x00000080;
     private const int SW_SHOW = 5;
     private const int SW_HIDE = 0;
@@ -209,9 +211,11 @@ public partial class TabbedHostWindow : Window
         }
         catch { }
     }
-    #endregion
+
+    #endregion Win32 API
 
     #region Tab State
+
     private class TabInfo
     {
         public Process Process { get; set; } = null!;
@@ -221,7 +225,6 @@ public partial class TabbedHostWindow : Window
     }
 
     private readonly string[] _initialArgs;
-    private bool _initialInstanceStarted = false;
     private bool _initialInstanceStarted = false;
     private readonly Dictionary<TabItem, TabInfo> _tabs = new();
     private bool _needsReposition = false;
@@ -253,6 +256,7 @@ public partial class TabbedHostWindow : Window
         public int Width;
         public int Height;
     }
+
     private readonly List<GridTile> _gridTiles = new();
 
     private Queue<Action> _spawnQueue = new Queue<Action>();
@@ -281,11 +285,16 @@ public partial class TabbedHostWindow : Window
             Dispatcher.UIThread.Post(ProcessNextSpawn, DispatcherPriority.Background);
         }
     }
-    #endregion
 
-    public TabbedHostWindow() : this(Array.Empty<string>()) { }
+    #endregion Tab State
 
-    public TabbedHostWindow(string rawInitialArgs) : this(ParseRawCommandLine(rawInitialArgs)) { }
+    public TabbedHostWindow() : this(Array.Empty<string>())
+    {
+    }
+
+    public TabbedHostWindow(string rawInitialArgs) : this(ParseRawCommandLine(rawInitialArgs))
+    {
+    }
 
     public TabbedHostWindow(string[]? initialArgs)
     {
@@ -300,7 +309,7 @@ public partial class TabbedHostWindow : Window
         Opened += TabbedHostWindow_Opened;
         PositionChanged += (s, e) => OnWindowPositionChanged(e.Point);
         SizeChanged += (s, e) => { ScheduleReposition(); UpdateTabScrollButtons(); };
-        
+
         PropertyChanged += (s, e) => { if (e.Property == WindowStateProperty || e.Property == IsVisibleProperty) ScheduleReposition(); };
         Activated += (s, e) => { ScheduleReposition(); UpdateTabScrollButtons(); };
         Closing += OnWindowClosing;
@@ -348,7 +357,7 @@ public partial class TabbedHostWindow : Window
         if (_isClosing || _tabs.Count == 0) return;
 
         var entries = _tabs.Select(kvp => (Tab: kvp.Key, Pid: kvp.Value?.Process?.Id ?? 0)).ToList();
-        
+
         Task.Run(() =>
         {
             string dir = Path.Combine(Path.GetTempPath(), "VibeSkuaTabs");
@@ -401,6 +410,7 @@ public partial class TabbedHostWindow : Window
     }
 
     #region Lifecycle
+
     private void TabbedHostWindow_Opened(object? sender, EventArgs e)
     {
         _hostHwnd = this.TryGetPlatformHandle()?.Handle ?? IntPtr.Zero;
@@ -443,12 +453,7 @@ public partial class TabbedHostWindow : Window
         if (!_initialInstanceStarted)
         {
             _initialInstanceStarted = true;
-            // Prevent a tray restore from launching the startup account a second time.
-        if (!_initialInstanceStarted)
-        {
-            _initialInstanceStarted = true;
             AddNewInstance(_initialArgs);
-        }
         }
     }
 
@@ -519,7 +524,7 @@ public partial class TabbedHostWindow : Window
         {
             IntPtr childHwnd = wParam;
             int pid = lParam.ToInt32();
-            
+
             Dispatcher.UIThread.Post(() =>
             {
                 if (_isClosing || childHwnd == IntPtr.Zero) return;
@@ -560,7 +565,7 @@ public partial class TabbedHostWindow : Window
     private void AttachChildWindow(TabInfo info, IntPtr childHwnd)
     {
         if (info.ChildHwnd != IntPtr.Zero) return;
-        
+
         info.ChildHwnd = childHwnd;
         if (info.Process != null)
             HotKeys.RegisterSkuaPid((uint)info.Process.Id);
@@ -626,9 +631,11 @@ public partial class TabbedHostWindow : Window
             Environment.Exit(0);
         });
     }
-    #endregion
+
+    #endregion Lifecycle
 
     #region Pipe Server
+
     private void StartPipeServer()
     {
         Task.Run(async () =>
@@ -723,9 +730,11 @@ public partial class TabbedHostWindow : Window
 
         return args.ToArray();
     }
-    #endregion
+
+    #endregion Pipe Server
 
     #region Tab Switching & Positioning
+
     private const int WM_SKUA_GRIDVIEW = 0x0400 + 444;
     private const int WM_SKUA_START_SCRIPT = 0x0400 + 445;
     private const int WM_SKUA_STOP_SCRIPT = 0x0400 + 446;
@@ -768,11 +777,11 @@ public partial class TabbedHostWindow : Window
             string tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "skua_global_playlist.json");
             var data = m.Queue.Select(x => new ScriptSchedulerViewModel.SavedScriptItem { Path = x.Path, Id = x.Id, Name = x.Name }).ToList();
             System.IO.File.WriteAllText(tempFile, System.Text.Json.JsonSerializer.Serialize(data));
-            
+
             foreach (var info in _tabs.Values)
                 if (info.ChildHwnd != IntPtr.Zero)
                     PostMessage(info.ChildHwnd, WM_SKUA_ARMY_SCHEDULER, IntPtr.Zero, IntPtr.Zero);
-                    
+
             dialogService.ShowMessageBox("Army Scheduler payload has been broadcasted. All active accounts will now seamlessly rebuild their queues and begin executing the playlist.", "Army Scheduler Started");
         }
         catch { }
@@ -786,7 +795,7 @@ public partial class TabbedHostWindow : Window
             foreach (var info in _tabs.Values)
                 if (info.ChildHwnd != IntPtr.Zero)
                     PostMessage(info.ChildHwnd, WM_SKUA_ARMY_SCHEDULER_STOP, IntPtr.Zero, IntPtr.Zero);
-                    
+
             var dialogService = Ioc.Default.GetRequiredService<IDialogService>();
             dialogService.ShowMessageBox("Stop signal has been successfully broadcasted. All accounts are now halting their schedulers.", "Army Scheduler Stopped");
         }
@@ -807,7 +816,7 @@ public partial class TabbedHostWindow : Window
             Ioc.Default.GetRequiredService<IDialogService>().ShowMessageBox(ex.ToString(), "Error Opening Scheduler");
         }
     }
-    
+
     private bool _ignoreSelectionChange = false;
 
     public void EnterGridView()
@@ -1029,10 +1038,10 @@ public partial class TabbedHostWindow : Window
     {
         var options = sender as IScriptOption;
         if (options == null) return;
-        
+
         int optionId = -1;
         bool val = false;
-        
+
         switch (e.PropertyName)
         {
             case "LagKiller": optionId = 1; val = options.LagKiller; break;
@@ -1042,7 +1051,7 @@ public partial class TabbedHostWindow : Window
             case "InfiniteRange": optionId = 5; val = options.InfiniteRange; break;
             case "StreamerMode": optionId = 9; val = options.StreamerMode; break;
         }
-        
+
         if (optionId != -1)
         {
             foreach (var info in _tabs.Values)
@@ -1055,13 +1064,13 @@ public partial class TabbedHostWindow : Window
     {
         if (MenuStartScripts != null) MenuStartScripts.IsEnabled = false;
         if (MenuStopScripts != null) MenuStopScripts.IsEnabled = false;
-        
+
         foreach (var info in _tabs.Values)
             if (info.ChildHwnd != IntPtr.Zero)
                 PostMessage(info.ChildHwnd, WM_SKUA_SET_OPTION, new IntPtr(99), new IntPtr(1));
-        
+
         await Task.Delay(2000);
-        
+
         if (MenuStartScripts != null) MenuStartScripts.IsEnabled = true;
         if (MenuStopScripts != null) MenuStopScripts.IsEnabled = true;
     }
@@ -1070,13 +1079,13 @@ public partial class TabbedHostWindow : Window
     {
         if (MenuStartScripts != null) MenuStartScripts.IsEnabled = false;
         if (MenuStopScripts != null) MenuStopScripts.IsEnabled = false;
-        
+
         foreach (var info in _tabs.Values)
             if (info.ChildHwnd != IntPtr.Zero)
                 PostMessage(info.ChildHwnd, WM_SKUA_SET_OPTION, new IntPtr(99), new IntPtr(0));
-        
+
         await Task.Delay(4000);
-        
+
         if (MenuStartScripts != null) MenuStartScripts.IsEnabled = true;
         if (MenuStopScripts != null) MenuStopScripts.IsEnabled = true;
     }
@@ -1178,7 +1187,7 @@ public partial class TabbedHostWindow : Window
     {
         var vm = new InputDialogViewModel("Jump Army to Map / Cell", "Enter target location (Map,Cell):", "e.g., yulgar-1,Enter", false);
         vm.DialogTextInput = string.IsNullOrEmpty(_lastJumpCell) ? _lastJumpMap : $"{_lastJumpMap},{_lastJumpCell}";
-        
+
         if (Ioc.Default.GetRequiredService<IDialogService>().ShowDialog(vm) == true)
         {
             string[] parts = (vm.DialogTextInput ?? "").Split(',');
@@ -1190,7 +1199,7 @@ public partial class TabbedHostWindow : Window
                 _lastJumpCell = targetCell;
                 string tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "skua_global_jump.txt");
                 System.IO.File.WriteAllLines(tempFile, new[] { targetMap, targetCell });
-                
+
                 foreach (var info in _tabs.Values)
                     if (info.ChildHwnd != IntPtr.Zero)
                         PostMessage(info.ChildHwnd, WM_SKUA_JUMP_MAP, IntPtr.Zero, IntPtr.Zero);
@@ -1202,7 +1211,7 @@ public partial class TabbedHostWindow : Window
     {
         var vm = new InputDialogViewModel("Jump Army to Player", "Enter target player username:", "e.g., Artix", false);
         vm.DialogTextInput = _lastJumpPlayer;
-        
+
         if (Ioc.Default.GetRequiredService<IDialogService>().ShowDialog(vm) == true)
         {
             string targetPlayer = vm.DialogTextInput?.Trim() ?? "";
@@ -1211,7 +1220,7 @@ public partial class TabbedHostWindow : Window
                 _lastJumpPlayer = targetPlayer;
                 string tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "skua_global_jump_player.txt");
                 System.IO.File.WriteAllText(tempFile, targetPlayer);
-                
+
                 foreach (var info in _tabs.Values)
                     if (info.ChildHwnd != IntPtr.Zero)
                         PostMessage(info.ChildHwnd, WM_SKUA_JUMP_PLAYER, IntPtr.Zero, IntPtr.Zero);
@@ -1226,7 +1235,7 @@ public partial class TabbedHostWindow : Window
     {
         var vm = new InputDialogViewModel("Accept Quest (Army)", "Enter quest ID to accept/register on all accounts:", "e.g., 1907", false);
         vm.DialogTextInput = _lastAcceptQuestId;
-        
+
         if (Ioc.Default.GetRequiredService<IDialogService>().ShowDialog(vm) == true)
         {
             string questId = vm.DialogTextInput?.Trim() ?? "";
@@ -1235,7 +1244,7 @@ public partial class TabbedHostWindow : Window
                 _lastAcceptQuestId = questId;
                 string tempFile = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "skua_global_accept_quest.txt");
                 System.IO.File.WriteAllLines(tempFile, new[] { questId, "-1" });
-                
+
                 foreach (var info in _tabs.Values)
                     if (info.ChildHwnd != IntPtr.Zero)
                         PostMessage(info.ChildHwnd, WM_SKUA_ACCEPT_QUEST, IntPtr.Zero, IntPtr.Zero);
@@ -1260,8 +1269,6 @@ public partial class TabbedHostWindow : Window
             if (GridViewIcon != null) GridViewIcon[!MaterialIcon.ForegroundProperty] = new global::Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("SkuaTextBrush");
         }
     }
-
-
 
     private void OnWindowPositionChanged(PixelPoint newPos)
     {
@@ -1425,7 +1432,7 @@ public partial class TabbedHostWindow : Window
                 .Select(t => _tabs[t])
                 .Where(v => v.ChildHwnd != IntPtr.Zero)
                 .ToList();
-            
+
             bool isLoading = false;
             if (_isGridViewEnabled)
             {
@@ -1489,8 +1496,8 @@ public partial class TabbedHostWindow : Window
                     activeChildHwnd = _tabs.Values.FirstOrDefault(t => t.ChildHwnd != IntPtr.Zero)?.ChildHwnd ?? IntPtr.Zero;
                 }
                 HotKeys.ActiveChildHwnd = activeChildHwnd;
-                
-                if (x == _lastX && y == _lastY && w == _lastW && h == _lastH && 
+
+                if (x == _lastX && y == _lastY && w == _lastW && h == _lastH &&
                     activeChildHwnd == _lastActiveHwnd && _lastGridViewState == _isGridViewEnabled)
                 {
                     return;
@@ -1543,7 +1550,8 @@ public partial class TabbedHostWindow : Window
             }
         }
     }
-    #endregion
+
+    #endregion Tab Switching & Positioning
 
     private static IntPtr FindWindowByProcessId(int processId)
     {
@@ -1556,7 +1564,7 @@ public partial class TabbedHostWindow : Window
                 System.Text.StringBuilder sb = new(256);
                 GetWindowText(hWnd, sb, sb.Capacity);
                 string title = sb.ToString();
-                
+
                 // Match WPF exactly: just check if it's visible and belongs to the process.
                 if (IsWindowVisible(hWnd))
                 {
@@ -1570,6 +1578,7 @@ public partial class TabbedHostWindow : Window
     }
 
     #region Tab Management
+
     private void CloseTab(TabItem tab)
     {
         if (!_tabs.ContainsKey(tab) && !InstancesTabControl.Items.Contains(tab))
@@ -1649,10 +1658,11 @@ public partial class TabbedHostWindow : Window
             .Where(p => p != null)
             .Select(p => p!.Children.OfType<TextBlock>().FirstOrDefault(tb => tb.Text != "✕")?.Text)
             .Where(t => t != null && (t.StartsWith("User ") || t.StartsWith("Skua ")))
-            .Select(t => { 
+            .Select(t =>
+            {
                 string numStr = t!.StartsWith("User ") ? t.Substring(5) : t.Substring(5);
-                int.TryParse(numStr, out int id); 
-                return id; 
+                int.TryParse(numStr, out int id);
+                return id;
             })
             .ToList();
 
@@ -1660,7 +1670,7 @@ public partial class TabbedHostWindow : Window
         {
             availableId++;
         }
-        
+
         string tabName = "User " + availableId;
         for (int i = 0; i < clientArgs.Length; i++)
         {
@@ -1673,8 +1683,9 @@ public partial class TabbedHostWindow : Window
         }
 
         #region Tab Header UI
+
         StackPanel headerPanel = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-        
+
         MaterialIcon tabIcon = new MaterialIcon
         {
             Kind = MaterialIconKind.ShieldAccountOutline,
@@ -1687,9 +1698,9 @@ public partial class TabbedHostWindow : Window
 
         TextBox editTitle = new TextBox
         {
-            Text = tabName, 
-            IsVisible = false, 
-            MinWidth = 60, 
+            Text = tabName,
+            IsVisible = false,
+            MinWidth = 60,
             MaxWidth = 180,
             Height = 24,
             VerticalAlignment = VerticalAlignment.Center,
@@ -1702,7 +1713,7 @@ public partial class TabbedHostWindow : Window
         editTitle[!TextBox.ForegroundProperty] = new global::Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("SkuaTextBrush");
         editTitle[!TextBox.CaretBrushProperty] = new global::Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("SkuaTextBrush");
         editTitle[!TextBox.BorderBrushProperty] = new global::Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("SkuaBorderBrush");
-        
+
         TextBlock title = new TextBlock
         {
             Text = tabName,
@@ -1740,9 +1751,9 @@ public partial class TabbedHostWindow : Window
 
         closeBtn.PointerEntered += (s, ev) => { closeTxt.Foreground = Brushes.White; closeBtn.Background = new SolidColorBrush(Color.Parse("#EF4444")); };
         closeBtn.PointerExited += (s, ev) => { closeTxt[!TextBlock.ForegroundProperty] = new global::Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("SkuaMutedTextBrush"); closeBtn.Background = Brushes.Transparent; };
-        
+
         TabInfo info = new TabInfo();
-        
+
         Action closeEditMode = () =>
         {
             if (!editTitle.IsVisible) return;
@@ -1761,17 +1772,18 @@ public partial class TabbedHostWindow : Window
             editTitle.Text = title.Text;
             title.IsVisible = false;
             editTitle.IsVisible = true;
-            
-            Dispatcher.UIThread.Post(() => {
+
+            Dispatcher.UIThread.Post(() =>
+            {
                 editTitle.Focus();
                 editTitle.SelectAll();
             }, DispatcherPriority.Input);
-            
+
             ev.Handled = true;
         };
-        
+
         editTitle.LostFocus += (s, ev) => closeEditMode();
-        
+
         editTitle.KeyDown += (s, ev) =>
         {
             if (ev.Key == Key.Enter)
@@ -1786,7 +1798,8 @@ public partial class TabbedHostWindow : Window
                 ev.Handled = true;
             }
         };
-        #endregion
+
+        #endregion Tab Header UI
 
         TabItem newTab = new TabItem { Header = headerPanel };
         DragDrop.SetAllowDrop(newTab, true);
@@ -1801,7 +1814,7 @@ public partial class TabbedHostWindow : Window
             TabScrollViewer.Offset = new Vector(Math.Max(0, TabScrollViewer.Extent.Width - TabScrollViewer.Viewport.Width), 0);
             UpdateTabScrollButtons();
         }, DispatcherPriority.Background);
-        
+
         _tabs[newTab] = info;
 
         EnqueueSpawn(() =>
@@ -1899,12 +1912,13 @@ public partial class TabbedHostWindow : Window
         });
 
         #region Tab Interactions
-        closeBtn.PointerPressed += (s, ev) => 
+
+        closeBtn.PointerPressed += (s, ev) =>
         {
             CloseTab(newTab);
             ev.Handled = true;
         };
-        
+
         headerPanel.PointerReleased += (s, ev) =>
         {
             if (ev.InitialPressMouseButton == MouseButton.Middle)
@@ -1952,7 +1966,7 @@ public partial class TabbedHostWindow : Window
         newTab.ContextMenu = ctx;
 
         Point startPoint = new Point();
-        headerPanel.PointerPressed += (s, ev) => 
+        headerPanel.PointerPressed += (s, ev) =>
         {
             var prop = ev.GetCurrentPoint(headerPanel).Properties;
             if (prop.IsRightButtonPressed)
@@ -1966,7 +1980,7 @@ public partial class TabbedHostWindow : Window
 
             startPoint = ev.GetPosition(null);
             InstancesTabControl.SelectedItem = newTab;
-            
+
             if (_isGridViewEnabled)
             {
                 _isGridViewEnabled = false;
@@ -1990,11 +2004,11 @@ public partial class TabbedHostWindow : Window
                 InstancesTabControl.SelectedItem = newTab;
             }
         };
-        
+
         headerPanel.PointerMoved += async (s, ev) =>
         {
             if (editTitle.IsVisible) return;
-            
+
             if (ev.GetCurrentPoint(null).Properties.IsLeftButtonPressed)
             {
                 Point mousePos = ev.GetPosition(null);
@@ -2007,7 +2021,7 @@ public partial class TabbedHostWindow : Window
                 }
             }
         };
-        
+
         newTab.AddHandler(DragDrop.DropEvent, (s, ev) =>
         {
             if (ev.Data.Contains("TabItem"))
@@ -2022,10 +2036,12 @@ public partial class TabbedHostWindow : Window
                 }
             }
         });
-        #endregion
+
+        #endregion Tab Interactions
     }
 
     #region Group Assignment Helper
+
     private string? GetTabLoggedInUsername(TabItem tab, TabInfo? info, string currentTitle)
     {
         if (info?.Process != null && !info.Process.HasExited)
@@ -2177,6 +2193,8 @@ public partial class TabbedHostWindow : Window
             dialogService?.ShowMessageBox($"'{accountName}' is already in group '{targetGroup.Name}'.", "Add to Group");
         }
     }
-    #endregion
-    #endregion
+
+    #endregion Group Assignment Helper
+
+    #endregion Tab Management
 }
