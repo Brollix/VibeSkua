@@ -67,6 +67,7 @@ public class Server {
     }
 
     public static function clickServer(serverName:String):String {
+        loadPolicyFiles();
         var source:* = Main.instance.game.mcLogin.sl.iList;
         for (var i:int = 0; i < source.numChildren; i++) {
             var child:* = source.getChildAt(i);
