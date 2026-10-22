@@ -76,6 +76,18 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
     {
         IsIntentionalLogout = true;
         CommunityToolkit.Mvvm.Messaging.StrongReferenceMessenger.Default.Send<Skua.Core.Messaging.LogoutRequestedMessage, int>(new(), (int)Skua.Core.Messaging.MessageChannels.GameEvents);
+        DisconnectToLogin();
+    }
+
+    public void DisconnectForRelogin()
+    {
+        IsIntentionalLogout = false;
+        CommunityToolkit.Mvvm.Messaging.StrongReferenceMessenger.Default.Send<Skua.Core.Messaging.LogoutMessage, int>((int)Skua.Core.Messaging.MessageChannels.GameEvents);
+        DisconnectToLogin();
+    }
+
+    private void DisconnectToLogin()
+    {
         if (IsConnected)
             Flash.CallGameFunction("sfc.disconnect");
         Flash.CallGameFunction("gotoAndPlay", "Login");
@@ -363,7 +375,7 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
         ReloginLog($"Relogging using IP {ip}.");
 
         Thread.Sleep(2000);
-        Logout();
+        DisconnectForRelogin();
 
         Stats.Relogins++;
         if (_loginInfoSetted)
@@ -412,7 +424,7 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
         Options.AutoRelogin = false;
         ReloginLog($"Relogging on server {server.Name} [{server.PlayerCount}/{server.MaxPlayers}].");
 
-        Logout();
+        DisconnectForRelogin();
         Stats.Relogins++;
 
         if (_loginInfoSetted)
@@ -564,7 +576,7 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
 
                 if (IsConnected || tries > 1)
                 {
-                    Logout();
+                    DisconnectForRelogin();
                     await Task.Delay(2000, token);
                 }
 

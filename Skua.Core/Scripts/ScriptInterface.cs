@@ -405,7 +405,7 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
                 {
                     if (Flash.GetGameObject("mcConnDetail.txtDetail.text") == "loading map")
                     {
-                        Servers.Logout();
+                        BeginLogout();
                         return;
                     }
                     Map.Join(Map.LastMap);
@@ -413,7 +413,7 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
             }
             else
             {
-                Servers.Logout();
+                BeginLogout();
             }
         }
         if (connDetail == lastConnDetail)
@@ -746,7 +746,9 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
         _waitForLogin = true;
         Messenger.Send<ReloginTriggeredMessage, int>(new(kicked), (int)MessageChannels.GameEvents);
 
-        int delay = (Options.SafeRelogin && kicked) ? 70000 : Options.ReloginTryDelay;
+        int delay = Options.ReloginTryDelay;
+        if (Options.SafeRelogin && kicked)
+            delay = 70000;
         Relogin(delay, wasRunning);
     }
 
@@ -765,7 +767,7 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
 
     private void Relogin(int delay, bool startScript)
     {
-        Servers.Logout();
+        Servers.DisconnectForRelogin();
         Log($"Waiting {delay}ms for re-login.");
         CancellationTokenSource reloginCts = new();
         _reloginCTS = reloginCts;

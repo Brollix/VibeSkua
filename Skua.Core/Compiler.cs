@@ -36,32 +36,21 @@ public class Compiler : CSharpScriptExecution
 
     private static readonly ConcurrentDictionary<int, string> _compiledRegistry = new();
     private static readonly ConcurrentDictionary<string, Assembly> _loadedAssemblies = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly ConcurrentDictionary<string, bool> _validAssemblyCache = new(StringComparer.OrdinalIgnoreCase);
 
     public static bool FastVerifyAssembly(string path)
     {
         if (string.IsNullOrEmpty(path) || !File.Exists(path))
             return false;
 
-        if (_validAssemblyCache.TryGetValue(path, out bool isValid))
-            return isValid;
-
         try
         {
             AssemblyName.GetAssemblyName(path);
-            _validAssemblyCache[path] = true;
             return true;
         }
         catch
         {
-            _validAssemblyCache[path] = false;
             return false;
         }
-    }
-
-    public static void InvalidateAssemblyVerification(string path)
-    {
-        _validAssemblyCache.TryRemove(path, out _);
     }
 
     public static bool IsCompiled(int hash) => _compiledRegistry.ContainsKey(hash) || TryLoadFromDiskCache(hash, null) != null;
@@ -348,7 +337,6 @@ public class Compiler : CSharpScriptExecution
                     try
                     {
                         File.Delete(cachedPath);
-                        InvalidateAssemblyVerification(cachedPath);
                     }
                     catch
                     {
@@ -418,7 +406,6 @@ public class Compiler : CSharpScriptExecution
                         try
                         {
                             File.Delete(outputPath);
-                            InvalidateAssemblyVerification(outputPath);
                         }
                         catch
                         {
@@ -521,7 +508,6 @@ public class Compiler : CSharpScriptExecution
             return false;
         }
 
-        _validAssemblyCache[outputPath] = true;
         return true;
     }
 
@@ -656,7 +642,6 @@ public class Compiler : CSharpScriptExecution
                     try
                     {
                         File.Delete(file);
-                        InvalidateAssemblyVerification(file);
                     }
                     catch
                     {
