@@ -82,7 +82,6 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
     public void DisconnectForRelogin()
     {
         IsIntentionalLogout = false;
-        CommunityToolkit.Mvvm.Messaging.StrongReferenceMessenger.Default.Send<Skua.Core.Messaging.LogoutMessage, int>((int)Skua.Core.Messaging.MessageChannels.GameEvents);
         DisconnectToLogin();
     }
 
@@ -373,8 +372,10 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
         bool autoRelogSwitch = Options.AutoRelogin;
         Options.AutoRelogin = false;
         ReloginLog($"Relogging using IP {ip}.");
+        StrongReferenceMessenger.Default.Send<LogoutRequestedMessage, int>(new(), (int)MessageChannels.GameEvents);
 
         Thread.Sleep(2000);
+        StrongReferenceMessenger.Default.Send<LogoutMessage, int>((int)MessageChannels.GameEvents);
         DisconnectForRelogin();
 
         Stats.Relogins++;
@@ -424,6 +425,8 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
         Options.AutoRelogin = false;
         ReloginLog($"Relogging on server {server.Name} [{server.PlayerCount}/{server.MaxPlayers}].");
 
+        StrongReferenceMessenger.Default.Send<LogoutRequestedMessage, int>(new(), (int)MessageChannels.GameEvents);
+        StrongReferenceMessenger.Default.Send<LogoutMessage, int>((int)MessageChannels.GameEvents);
         DisconnectForRelogin();
         Stats.Relogins++;
 
@@ -466,8 +469,10 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
 
     public async Task<bool> EnsureRelogin(CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         IsIntentionalLogout = false;
         await GetServers(true);
+        token.ThrowIfCancellationRequested();
         Server? server = SelectReloginServer();
         if (server is null)
         {
@@ -482,8 +487,10 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
 
     public async Task<bool> EnsureRelogin(string serverName, CancellationToken token)
     {
+        token.ThrowIfCancellationRequested();
         IsIntentionalLogout = false;
         await GetServers(true);
+        token.ThrowIfCancellationRequested();
         Server? server = SelectReloginServerByName(serverName, true) ?? SelectReloginServer();
         if (server is null)
         {
@@ -529,6 +536,7 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
             }
         }
         catch { }
+        token.ThrowIfCancellationRequested();
         bool finalLoginVisible = Flash.GetGameObject<bool>("mcLogin.visible", false);
         bool finalServerListExists = !Flash.IsNull("mcLogin.sl.iList");
         int finalServerEntries = Flash.GetGameObject<int>("mcLogin.sl.iList.numChildren", 0);
@@ -560,6 +568,7 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
             {
                 tries++;
                 await GetServers(true);
+                token.ThrowIfCancellationRequested();
                 ReloginLog($"Attempt {tries}/{Options.ReloginTries}: refreshed server list ({CachedServers.Count} servers).");
 
                 Server? targetServer = SelectReloginServer(preferredServerName, attemptedServers);
@@ -594,6 +603,7 @@ public partial class ScriptServers : ObservableRecipient, IScriptServers
                     continue;
                 }
 
+                token.ThrowIfCancellationRequested();
                 if (!Flash.Call<bool>("clickServer", targetServer.Name))
                 {
                     ReloginLog($"Server {targetServer.Name} not present in login list, connecting via IP {targetServer.IP}:{targetServer.Port}.");

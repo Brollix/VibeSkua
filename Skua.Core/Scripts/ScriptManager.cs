@@ -804,7 +804,9 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
                 _includedFilesLock.EnterReadLock();
                 try
                 {
-                    matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.OrdinalIgnoreCase));
+                    matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.Ordinal));
+                    if (matchingFile is null && OperatingSystem.IsWindows())
+                        matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.OrdinalIgnoreCase));
                 }
                 finally
                 {
@@ -865,7 +867,9 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
                     _includedFilesLock.EnterReadLock();
                     try
                     {
-                        matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.OrdinalIgnoreCase));
+                        matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.Ordinal));
+                        if (matchingFile is null && OperatingSystem.IsWindows())
+                            matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.OrdinalIgnoreCase));
                     }
                     finally
                     {

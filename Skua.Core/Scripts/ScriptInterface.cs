@@ -405,7 +405,10 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
                 {
                     if (Flash.GetGameObject("mcConnDetail.txtDetail.text") == "loading map")
                     {
-                        BeginLogout();
+                        if (Options.AutoRelogin)
+                            BeginLogout();
+                        else
+                            Servers.Logout();
                         return;
                     }
                     Map.Join(Map.LastMap);
@@ -413,7 +416,10 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
             }
             else
             {
-                BeginLogout();
+                if (Options.AutoRelogin)
+                    BeginLogout();
+                else
+                    Servers.Logout();
             }
         }
         if (connDetail == lastConnDetail)
@@ -677,16 +683,16 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
                     case "cmd":
                         if (parts.Length >= 5 && parts[4] == "logout")
                         {
-                            Messenger.Send<LogoutMessage, int>((int)MessageChannels.GameEvents);
                             if (_waitForLogin)
                             {
                                 break;
                             }
 
+                            Messenger.Send<LogoutMessage, int>((int)MessageChannels.GameEvents);
                             if (Player.Kicked)
                             {
                                 Log("Kick logout detected. Triggering auto re-login.");
-                                BeginLogout();
+                                BeginLogout(logoutNotified: true);
                             }
                             else if (Servers.IsIntentionalLogout)
                             {
@@ -728,7 +734,7 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
         _waitForLogin = false;
     }
 
-    private async Task OnLogout()
+    private async Task OnLogout(bool logoutNotified)
     {
         if (!Options.AutoRelogin || _waitForLogin || Servers.IsIntentionalLogout)
             return;
@@ -741,22 +747,44 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
 
         Log("Auto re-login triggered.");
         bool wasRunning = Manager.ScriptRunning;
-        await Manager.StopScript();
-        bool kicked = Player.Kicked;
+        CancellationTokenSource reloginCts = new();
+        _reloginCTS = reloginCts;
         _waitForLogin = true;
-        Messenger.Send<ReloginTriggeredMessage, int>(new(kicked), (int)MessageChannels.GameEvents);
+        try
+        {
+            if (!logoutNotified)
+                Messenger.Send<LogoutMessage, int>((int)MessageChannels.GameEvents);
+            await Manager.StopScript();
+            reloginCts.Token.ThrowIfCancellationRequested();
+            bool kicked = Player.Kicked;
+            Messenger.Send<ReloginTriggeredMessage, int>(new(kicked), (int)MessageChannels.GameEvents);
 
-        int delay = Options.ReloginTryDelay;
-        if (Options.SafeRelogin && kicked)
-            delay = 70000;
-        Relogin(delay, wasRunning);
+            int delay = Options.ReloginTryDelay;
+            if (Options.SafeRelogin && kicked)
+                delay = 70000;
+            Relogin(delay, wasRunning, reloginCts);
+        }
+        catch
+        {
+            if (ReferenceEquals(_reloginCTS, reloginCts))
+            {
+                _reloginCTS = null;
+                _waitForLogin = false;
+            }
+            reloginCts.Dispose();
+            throw;
+        }
     }
 
-    private async void BeginLogout()
+    private async void BeginLogout(bool logoutNotified = false)
     {
         try
         {
-            await OnLogout();
+            await OnLogout(logoutNotified);
+        }
+        catch (OperationCanceledException)
+        {
+            Log("Auto re-login cancelled.");
         }
         catch (Exception ex)
         {
@@ -765,18 +793,19 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
         }
     }
 
-    private void Relogin(int delay, bool startScript)
+    private void Relogin(int delay, bool startScript, CancellationTokenSource reloginCts)
     {
+        reloginCts.Token.ThrowIfCancellationRequested();
         Servers.DisconnectForRelogin();
         Log($"Waiting {delay}ms for re-login.");
-        CancellationTokenSource reloginCts = new();
-        _reloginCTS = reloginCts;
         _reloginTask = Schedule(delay, async _ =>
         {
             try
             {
+                reloginCts.Token.ThrowIfCancellationRequested();
                 Stats.Relogins++;
                 bool relogged = await Servers.EnsureRelogin(reloginCts.Token);
+                reloginCts.Token.ThrowIfCancellationRequested();
                 if (startScript && relogged)
                     await Ioc.Default.GetService<IScriptManager>()!.StartScript();
                 else if (startScript && !relogged)
