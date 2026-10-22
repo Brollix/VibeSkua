@@ -10,5 +10,6 @@ public interface IDiscordWebhookService
     Task SendScreenshotAsync(string message);
     Task SendEmbedAsync(string title, string description, int color, List<object>? fields = null);
     Task TestWebhookAsync();
+    Task TestNexusWebhookAsync();
     bool SuppressDefaultNotifications { get; set; }
 }

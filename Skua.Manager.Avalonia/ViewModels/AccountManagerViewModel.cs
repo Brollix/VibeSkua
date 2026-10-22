@@ -308,6 +308,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         {
             account.UseCheck = false;
         }
+        SelectedAccountQuant = 0;
     }
 
     [RelayCommand]
@@ -360,6 +361,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         {
             account.UseCheck = true;
         }
+        SelectedAccountQuant = Accounts.Count(a => a.UseCheck);
     }
 
     private void _RemoveAccount(IAccountItemViewModel account)

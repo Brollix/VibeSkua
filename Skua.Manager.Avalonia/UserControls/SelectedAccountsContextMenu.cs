@@ -24,15 +24,17 @@ public class SelectedAccountsContextMenu : ContextMenu
         {
             FindOwner()?.AddSelectedToGroupAction();
         });
+        MenuItem selectAll = CreateBoundMenuItem("Select All", "SelectAllCommand", MaterialIconKind.SelectAll);
         MenuItem deselectAll = CreateBoundMenuItem("Deselect All", "DeselectAllCommand", MaterialIconKind.CheckboxBlankOutline);
 
         Items.Add(startSelected);
         Items.Add(startWithScript);
         Items.Add(new Separator());
+        Items.Add(selectAll);
+        Items.Add(deselectAll);
+        Items.Add(new Separator());
         Items.Add(addTags);
         Items.Add(addToGroup);
-        Items.Add(new Separator());
-        Items.Add(deselectAll);
     }
 
     private AccountManagerUserControl? FindOwner()

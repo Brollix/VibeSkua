@@ -648,9 +648,9 @@ public class DialogService : IDialogService
             Child = layout,
             BoxShadow = new BoxShadows(new BoxShadow
             {
-                Blur = 24,
-                Spread = 4,
-                Color = Color.FromArgb(180, 0, 0, 0)
+                Blur = 12,
+                Spread = 2,
+                Color = Color.FromArgb(140, 0, 0, 0)
             })
         };
         rootBorder[!Border.BorderBrushProperty] = new global::Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("SkuaBorderBrush");

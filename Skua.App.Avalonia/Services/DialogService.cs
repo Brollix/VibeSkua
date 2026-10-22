@@ -17,6 +17,7 @@ using Skua.Shared.Avalonia.Controls;
 using Skua.Shared.Avalonia.Controls.Options;
 using Skua.Shared.Avalonia.Controls.Shell;
 using Skua.Shared.Avalonia.ViewModels.Dialogs;
+using CommunityToolkit.Mvvm.DependencyInjection;
 using Skua.Shared.Avalonia.ViewModels.Options;
 using System;
 using System.Collections.Generic;
@@ -421,9 +422,48 @@ public class DialogService : IDialogService
         return result;
     }
 
+    private static string GetCurrentAccountName()
+    {
+        try
+        {
+            var bot = Ioc.Default.GetService<IScriptInterface>();
+            if (bot?.Player != null && !string.IsNullOrWhiteSpace(bot.Player.Username) && bot.Player.Username != "loginInfo.strUsername")
+                return bot.Player.Username.Trim();
+
+            if (bot?.Servers != null && !string.IsNullOrWhiteSpace(bot.Servers.CachedUsername))
+                return bot.Servers.CachedUsername.Trim();
+
+            string[] args = Environment.GetCommandLineArgs();
+            for (int i = 0; i < args.Length - 1; i++)
+            {
+                if ((args[i] == "-u" || args[i] == "--user") && !string.IsNullOrWhiteSpace(args[i + 1]))
+                    return args[i + 1].Trim();
+            }
+        }
+        catch { }
+        return string.Empty;
+    }
+
+    private static string ResolveOptionContainerTitle(string? title)
+    {
+        string accountName = GetCurrentAccountName();
+        if (string.IsNullOrWhiteSpace(title) || title == "Script Options" || title == nameof(OptionContainerViewModel))
+        {
+            return string.IsNullOrWhiteSpace(accountName) ? "Script Options" : $"Script Options - {accountName}";
+        }
+
+        if (!string.IsNullOrWhiteSpace(accountName) && !title.Contains(accountName, StringComparison.OrdinalIgnoreCase))
+        {
+            return $"{title} - {accountName}";
+        }
+
+        return title;
+    }
+
     private static bool? ShowOptionContainerDialog(OptionContainerViewModel vm, string title)
     {
-        Window dialog = CreateBaseDialog(string.IsNullOrWhiteSpace(title) ? "Script Options" : title);
+        string resolvedTitle = ResolveOptionContainerTitle(title);
+        Window dialog = CreateBaseDialog(resolvedTitle);
         dialog.SizeToContent = SizeToContent.Manual;
         dialog.Width = 560;
         dialog.MinWidth = 460;
@@ -516,7 +556,7 @@ public class DialogService : IDialogService
         Grid.SetRow(buttonPanel, 1);
         rootLayout.Children.Add(buttonPanel);
 
-        dialog.Content = WrapWithShell(string.IsNullOrWhiteSpace(title) ? "Script Options" : title, rootLayout);
+        dialog.Content = WrapWithShell(resolvedTitle, rootLayout);
         Show(dialog);
         return result;
     }
@@ -689,9 +729,9 @@ public class DialogService : IDialogService
             Child = layout,
             BoxShadow = new BoxShadows(new BoxShadow
             {
-                Blur = 24,
-                Spread = 4,
-                Color = Color.FromArgb(180, 0, 0, 0)
+                Blur = 12,
+                Spread = 2,
+                Color = Color.FromArgb(140, 0, 0, 0)
             })
         };
         rootBorder[!Border.BorderBrushProperty] = new global::Avalonia.Markup.Xaml.MarkupExtensions.DynamicResourceExtension("SkuaBorderBrush");

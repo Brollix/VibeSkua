@@ -3,6 +3,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vms="clr-namespace:Skua.Shared.Avalonia.ViewModels.Options"
+             xmlns:controls="clr-namespace:Skua.Shared.Avalonia.Controls.Options"
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="Skua.Shared.Avalonia.Controls.Options.OptionContainerUserControl"
              x:DataType="vms:OptionContainerViewModel"
@@ -63,32 +64,8 @@
                                        IsVisible="{Binding Option.Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                           </StackPanel>
 
-                          <!-- Value Editor Controls -->
-                          <Panel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
-                            <!-- Boolean (CheckBox) -->
-                            <CheckBox IsVisible="{Binding IsBool}"
-                                      IsChecked="{Binding Value, Mode=TwoWay}"
-                                      HorizontalAlignment="Right" />
-
-                            <!-- Enum (ComboBox) -->
-                            <ComboBox IsVisible="{Binding IsEnum}"
-                                      ItemsSource="{Binding EnumValues}"
-                                      SelectedItem="{Binding SelectedValue, Mode=TwoWay}"
-                                      MinWidth="160"
-                                      MaxWidth="220"
-                                      Height="32"
-                                      HorizontalAlignment="Right" />
-
-                            <!-- Text / Number (TextBox) -->
-                            <TextBox IsVisible="{Binding IsText}"
-                                     Text="{Binding Value, Mode=TwoWay}"
-                                     MinWidth="140"
-                                     MaxWidth="220"
-                                     Height="32"
-                                     Padding="8,4"
-                                     VerticalContentAlignment="Center"
-                                     HorizontalAlignment="Right" />
-                          </Panel>
+                          <!-- Value Editor Control -->
+                          <controls:OptionValueEditorControl Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" />
                         </Grid>
                       </Border>
                     </DataTemplate>

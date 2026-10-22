@@ -1,3 +1,29 @@
+## VibeSkua v2.0.6
+
+This release introduces script pinning, playlist reordering in the Script Scheduler, native Skua Nexus webhook alerts with live statistics reporting, and major performance optimizations for script search and options dialogs.
+
+### What's Changed
+- **Script Pinning**: Pin your favorite scripts to keep them anchored at the top of the Script Repository, with a dedicated "Pinned" category filter.
+- **Script Search Performance**: Eliminated first-launch lag and window freezes using asynchronous cache loading and background processing.
+- **Script Scheduler Queue Reordering**: Added Up and Down controls to easily reorder queued scripts in playlists.
+- **Skua Nexus Webhook Integration**: Added native Skua Nexus webhook support alongside Discord, delivering automated dual alerts, character information, equipment/quest snapshots, and live bot statistics.
+- **Script Options Account Disambiguation**: Window titles now display the active account name (`Script Options - [Account]`) for multi-client clarity.
+- **Script Options Performance**: Resolved popup lag and freezes by fixing a startup race condition and streamlining option editor controls.
+- **Account Manager Bulk Selection**: Added a "Select All" button to quickly toggle all accounts for batch operations.
+- **Webhook Input UI Fix**: Constrained the webhook input box to prevent window overflow and ensure the "Set" button stays visible.
+- **Script Loader Credits**: Updated community issue report contacts to `@Tato2/@lonewolf_12`.
+
+---
+
+## VibeSkua v2.0.5
+
+Updates webhook reporting for live dashboard snapshots.
+
+### What's Changed
+- **Webhook Statistics & Account Snapshots**: Added automated character data, equipment, quest, and live bot statistics reporting.
+
+---
+
 ## VibeSkua v2.0.4 (Hotfix)
 
 This hotfix resolves a Manager crash when starting accounts with a script selected.

@@ -59,10 +59,11 @@ public sealed class SkuaStartupHandler : IDisposable
             });
         }
 
-        if (!string.IsNullOrWhiteSpace(_options.Username) && !string.IsNullOrWhiteSpace(_options.Password))
+        if (!string.IsNullOrWhiteSpace(_options.Username))
         {
-            _bot.Flash.FlashCall += Login;
-            _bot.Servers.SetLoginInfo(_options.Username!, _options.Password!);
+            _bot.Servers.SetLoginInfo(_options.Username!, _options.Password ?? string.Empty);
+            if (!string.IsNullOrWhiteSpace(_options.Password))
+                _bot.Flash.FlashCall += Login;
         }
     }
 

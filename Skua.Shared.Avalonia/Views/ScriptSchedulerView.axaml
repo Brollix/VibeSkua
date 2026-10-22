@@ -69,6 +69,7 @@
                 CornerRadius="8"
                 Padding="4">
             <ListBox ItemsSource="{Binding ScriptQueue}"
+                     SelectedItem="{Binding SelectedScript}"
                      Background="Transparent"
                      BorderThickness="0"
                      HorizontalAlignment="Stretch">
@@ -80,7 +81,41 @@
                                 CornerRadius="6"
                                 Margin="0,0,0,4"
                                 Padding="10,8">
-                            <Grid ColumnDefinitions="3*,*,*,Auto,Auto" Margin="2" VerticalAlignment="Center">
+                            <Border.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Move Up"
+                                              Command="{Binding DataContext.MoveScriptUpCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                              CommandParameter="{Binding}">
+                                        <MenuItem.Icon>
+                                            <materialIcons:MaterialIcon Kind="ArrowUp" Width="14" Height="14" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <MenuItem Header="Move Down"
+                                              Command="{Binding DataContext.MoveScriptDownCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                              CommandParameter="{Binding}">
+                                        <MenuItem.Icon>
+                                            <materialIcons:MaterialIcon Kind="ArrowDown" Width="14" Height="14" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator />
+                                    <MenuItem Header="Edit Script Options"
+                                              Command="{Binding DataContext.EditScriptConfigCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                              CommandParameter="{Binding}">
+                                        <MenuItem.Icon>
+                                            <materialIcons:MaterialIcon Kind="Cog" Width="14" Height="14" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                    <Separator />
+                                    <MenuItem Header="Remove from Queue"
+                                              Command="{Binding DataContext.RemoveScriptCommand, RelativeSource={RelativeSource AncestorType=ListBox}}"
+                                              CommandParameter="{Binding}">
+                                        <MenuItem.Icon>
+                                            <materialIcons:MaterialIcon Kind="Close" Width="14" Height="14" Foreground="#EF4444" />
+                                        </MenuItem.Icon>
+                                    </MenuItem>
+                                </ContextMenu>
+                            </Border.ContextMenu>
+                            <Grid ColumnDefinitions="3*,*,*,Auto,Auto,Auto,Auto" Margin="2" VerticalAlignment="Center">
                                 <TextBox Grid.Column="0"
                                          Text="{Binding Name, UpdateSourceTrigger=PropertyChanged}"
                                          VerticalAlignment="Center"
@@ -118,17 +153,41 @@
                                 
                                 <Button Grid.Column="3" 
                                         Classes="skua-button" 
-                                        Command="{Binding DataContext.EditScriptConfigCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" 
+                                        Command="{Binding DataContext.MoveScriptUpCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" 
                                         CommandParameter="{Binding}" 
                                         Width="30"
                                         Height="30"
                                         Padding="0"
                                         Margin="6,0,0,0"
+                                        ToolTip.Tip="Move script up in playlist">
+                                    <materialIcons:MaterialIcon Kind="ArrowUp" Width="15" Height="15" />
+                                </Button>
+                                
+                                <Button Grid.Column="4" 
+                                        Classes="skua-button" 
+                                        Command="{Binding DataContext.MoveScriptDownCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" 
+                                        CommandParameter="{Binding}" 
+                                        Width="30"
+                                        Height="30"
+                                        Padding="0"
+                                        Margin="4,0,0,0"
+                                        ToolTip.Tip="Move script down in playlist">
+                                    <materialIcons:MaterialIcon Kind="ArrowDown" Width="15" Height="15" />
+                                </Button>
+                                
+                                <Button Grid.Column="5" 
+                                        Classes="skua-button" 
+                                        Command="{Binding DataContext.EditScriptConfigCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" 
+                                        CommandParameter="{Binding}" 
+                                        Width="30"
+                                        Height="30"
+                                        Padding="0"
+                                        Margin="4,0,0,0"
                                         ToolTip.Tip="Edit Script Options">
                                     <materialIcons:MaterialIcon Kind="Cog" Width="15" Height="15" />
                                 </Button>
                                 
-                                <Button Grid.Column="4" 
+                                <Button Grid.Column="6" 
                                         Classes="skua-button" 
                                         Command="{Binding DataContext.RemoveScriptCommand, RelativeSource={RelativeSource AncestorType=ListBox}}" 
                                         CommandParameter="{Binding}" 

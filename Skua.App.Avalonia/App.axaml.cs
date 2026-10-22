@@ -348,6 +348,12 @@ public partial class App : Application
         {
             Console.Error.WriteLine($"Startup hotkey init failed: {ex.GetType().Name}: {ex.Message}");
         }
+
+        try
+        {
+            _ = Ioc.Default.GetService<Skua.Core.Interfaces.IGetScriptsService>()?.GetScriptsAsync(null, default);
+        }
+        catch { }
     }
 
     private static void OnDesktopExit(object? sender, ControlledApplicationLifetimeExitEventArgs e)

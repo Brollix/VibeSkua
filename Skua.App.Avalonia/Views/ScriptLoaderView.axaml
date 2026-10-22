@@ -189,7 +189,7 @@
                 ToolTip.Tip="Open Discord feedback and issue channel">
             <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
                 <materialIcons:MaterialIcon Kind="HelpCircleOutline" Width="14" Height="14" VerticalAlignment="Center" />
-                <TextBlock Text="Report Issues to @Tato2/@bogalj" VerticalAlignment="Center" />
+                <TextBlock Text="Report Issues to @Tato2/@lonewolf_12" VerticalAlignment="Center" />
             </StackPanel>
         </Button>
     </Grid>

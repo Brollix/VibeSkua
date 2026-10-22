@@ -34,7 +34,6 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
 
     // Snapshot state
     private int _startGold;
-
     private int _startExp;
     private int _startLevel;
 
@@ -152,6 +151,11 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         {
             _scriptStartTime = null;
             StopPingTimer();
+            EnqueueAction(async () =>
+            {
+                List<object> fields = BuildDashboardSnapshotFields();
+                await SendEmbedAsync("Health Ping", $"**{GetBotName()}** has stopped.", 0x808080, fields);
+            });
             return;
         }
 
@@ -182,6 +186,12 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
             }
         }
 
+        EnqueueAction(async () =>
+        {
+            List<object> fields = BuildDashboardSnapshotFields();
+            await SendEmbedAsync("Health Ping", $"**{GetBotName()}** has stopped.", 0x808080, fields);
+        });
+
         _scriptStartTime = null;
         StopPingTimer();
     }
@@ -201,6 +211,12 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
             };
             EnqueueAction(async () => await SendEmbedAsync("Script Error", $"**{GetBotName()}** crashed unexpectedly.", 0xFF0000, fields)); // Red
         }
+
+        EnqueueAction(async () =>
+        {
+            List<object> fields = BuildDashboardSnapshotFields();
+            await SendEmbedAsync("Health Ping", $"**{GetBotName()}** crashed.", 0xFF0000, fields);
+        });
 
         StopPingTimer();
     }
@@ -258,7 +274,11 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         List<object> fields = new();
         IScriptInterface? bot = _serviceProvider.GetService<IScriptInterface>();
         if (bot?.Player == null || !bot.Player.Playing)
+        {
+            fields.Add(new { name = "Character", value = GetBotName(), inline = true });
+            fields.Add(new { name = "Status", value = "Idle / Not in World", inline = true });
             return fields;
+        }
 
         fields.Add(new { name = "Character", value = GetBotName(), inline = true });
 
@@ -313,9 +333,40 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         return fields;
     }
 
+    private List<string> GetConfiguredWebhookUrls()
+    {
+        var list = new List<string>(2);
+        var clientSettings = _settingsService.GetClient();
+        if (clientSettings != null)
+        {
+            if (!string.IsNullOrWhiteSpace(clientSettings.DiscordWebhookUrl))
+                list.Add(clientSettings.DiscordWebhookUrl.Trim());
+            if (!string.IsNullOrWhiteSpace(clientSettings.NexusWebhookUrl))
+                list.Add(clientSettings.NexusWebhookUrl.Trim());
+        }
+        return list;
+    }
+
     public async Task TestWebhookAsync()
     {
-        EnqueueAction(async () => await SendEmbedAsync("Webhook Test Successful!", "Your VibeSkua Discord Webhooks are perfectly configured.", 0x00FF00));
+        var url = _settingsService.GetClient()?.DiscordWebhookUrl;
+        if (string.IsNullOrWhiteSpace(url)) return;
+        EnqueueAction(async () =>
+        {
+            List<object> fields = BuildDashboardSnapshotFields();
+            await SendEmbedToUrlAsync(url, "Discord Webhook Test Successful!", "Your VibeSkua Discord Webhooks are perfectly configured.", 0x00FF00, fields);
+        });
+    }
+
+    public async Task TestNexusWebhookAsync()
+    {
+        var url = _settingsService.GetClient()?.NexusWebhookUrl;
+        if (string.IsNullOrWhiteSpace(url)) return;
+        EnqueueAction(async () =>
+        {
+            List<object> fields = BuildDashboardSnapshotFields();
+            await SendEmbedToUrlAsync(url, "Skua Nexus Webhook Test Successful!", "Your VibeSkua Nexus Webhooks are perfectly configured.", 0x00FF00, fields);
+        });
     }
 
     public async Task SendMessageAsync(string message)
@@ -329,8 +380,8 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         {
             try
             {
-                var url = _settingsService.GetClient()?.DiscordWebhookUrl;
-                if (string.IsNullOrWhiteSpace(url)) return;
+                var urls = GetConfiguredWebhookUrls();
+                if (urls.Count == 0) return;
 
                 byte[] screenshotBytes = await _screenshotService.TakeScreenshotAsync();
 
@@ -341,34 +392,16 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
                     image = new { url = "attachment://screenshot.png" }
                 };
 
-                for (int attempt = 0; attempt < 3; attempt++)
+                var payloadJson = JsonSerializer.Serialize(new { embeds = new[] { embed } });
+
+                foreach (var url in urls)
                 {
-                    using var formData = new MultipartFormDataContent();
-                    var payloadJson = JsonSerializer.Serialize(new { embeds = new[] { embed } });
-                    formData.Add(new StringContent(payloadJson), "payload_json");
-
-                    if (screenshotBytes != null && screenshotBytes.Length > 0)
-                    {
-                        var imageContent = new ByteArrayContent(screenshotBytes);
-                        imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
-                        formData.Add(imageContent, "file", "screenshot.png");
-                    }
-
-                    using var response = await _httpClient.PostAsync(url, formData);
-                    if (response.IsSuccessStatusCode)
-                        break;
-
-                    if ((int)response.StatusCode == 429)
-                    {
-                        await Task.Delay(1500 * (attempt + 1));
-                        continue;
-                    }
-                    break;
+                    await PostMultipartToUrlAsync(url, payloadJson, screenshotBytes);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Trace.WriteLine($"Discord SendScreenshotAsync failed: {ex.Message}");
+                System.Diagnostics.Trace.WriteLine($"SendScreenshotAsync failed: {ex.Message}");
             }
         });
     }
@@ -389,12 +422,20 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
 
     private async Task PostWebhookAsync(object payload)
     {
+        var urls = GetConfiguredWebhookUrls();
+        if (urls.Count == 0) return;
+
+        var json = JsonSerializer.Serialize(payload);
+        foreach (var url in urls)
+        {
+            await PostJsonToUrlAsync(url, json);
+        }
+    }
+
+    private async Task PostJsonToUrlAsync(string url, string json)
+    {
         try
         {
-            var url = _settingsService.GetClient()?.DiscordWebhookUrl;
-            if (string.IsNullOrWhiteSpace(url)) return;
-
-            var json = JsonSerializer.Serialize(payload);
             for (int attempt = 0; attempt < 3; attempt++)
             {
                 using var content = new StringContent(json, Encoding.UTF8, "application/json");
@@ -412,7 +453,56 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Trace.WriteLine($"Discord PostWebhookAsync failed: {ex.Message}");
+            System.Diagnostics.Trace.WriteLine($"Webhook PostJsonToUrlAsync failed for {url}: {ex.Message}");
+        }
+    }
+
+    private async Task SendEmbedToUrlAsync(string url, string title, string description, int color, List<object>? fields = null)
+    {
+        var embed = new
+        {
+            title = title,
+            description = description,
+            color = color,
+            fields = fields?.ToArray()
+        };
+
+        var payload = new { embeds = new[] { embed } };
+        var json = JsonSerializer.Serialize(payload);
+        await PostJsonToUrlAsync(url, json);
+    }
+
+    private async Task PostMultipartToUrlAsync(string url, string payloadJson, byte[]? screenshotBytes)
+    {
+        try
+        {
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                using var formData = new MultipartFormDataContent();
+                formData.Add(new StringContent(payloadJson), "payload_json");
+
+                if (screenshotBytes != null && screenshotBytes.Length > 0)
+                {
+                    var imageContent = new ByteArrayContent(screenshotBytes);
+                    imageContent.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+                    formData.Add(imageContent, "file", "screenshot.png");
+                }
+
+                using var response = await _httpClient.PostAsync(url, formData);
+                if (response.IsSuccessStatusCode)
+                    break;
+
+                if ((int)response.StatusCode == 429)
+                {
+                    await Task.Delay(1500 * (attempt + 1));
+                    continue;
+                }
+                break;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Webhook PostMultipartToUrlAsync failed for {url}: {ex.Message}");
         }
     }
 

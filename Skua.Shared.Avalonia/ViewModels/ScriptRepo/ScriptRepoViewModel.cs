@@ -34,6 +34,9 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
         OpenScriptFolderCommand = new RelayCommand(_processService.OpenVSC);
     }
 
+    private bool _isLoadingInitial;
+    private readonly SemaphoreSlim _refreshSemaphore = new(1, 1);
+
     protected override void OnActivated()
     {
         _getScriptsService.PropertyChanged += GetScriptsService_PropertyChanged;
@@ -53,6 +56,8 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
 
     private async Task LoadInitialScripts()
     {
+        if (_isLoadingInitial) return;
+        _isLoadingInitial = true;
         IsBusy = true;
         try
         {
@@ -63,6 +68,7 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
         finally
         {
             IsBusy = false;
+            _isLoadingInitial = false;
         }
         await RefreshScriptsList();
     }
@@ -74,7 +80,7 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
 
     private void GetScriptsService_PropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(IGetScriptsService.Scripts))
+        if (e.PropertyName == nameof(IGetScriptsService.Scripts) && !_isLoadingInitial)
         {
             _ = RefreshScriptsList();
         }
@@ -88,14 +94,14 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
     private bool _isManagerMode;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DownloadedQuantity), nameof(OutdatedQuantity), nameof(ScriptQuantity), nameof(BotScriptQuantity))]
+    [NotifyPropertyChangedFor(nameof(DownloadedQuantity), nameof(OutdatedQuantity), nameof(ScriptQuantity), nameof(BotScriptQuantity), nameof(PinnedQuantity))]
     private RangedObservableCollection<ScriptInfoViewModel> _scripts = new();
 
     [ObservableProperty]
     private RangedObservableCollection<ScriptInfoViewModel> _filteredScripts = new();
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DownloadedQuantity), nameof(OutdatedQuantity), nameof(ScriptQuantity), nameof(BotScriptQuantity))]
+    [NotifyPropertyChangedFor(nameof(DownloadedQuantity), nameof(OutdatedQuantity), nameof(ScriptQuantity), nameof(BotScriptQuantity), nameof(PinnedQuantity))]
     private ScriptInfoViewModel? _selectedItem;
 
     [ObservableProperty]
@@ -120,13 +126,14 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
 
     public List<string> FilterOptions { get; } = new()
     {
-        "All", "Army", "Classes", "Dailies", "Evil", "Farm", "Good", "Legion", "Local", "Nation", "Other", "Rep", "Seasonal", "Story", "Ultras"
+        "All", "Pinned", "Army", "Classes", "Dailies", "Evil", "Farm", "Good", "Legion", "Local", "Nation", "Other", "Rep", "Seasonal", "Story", "Ultras"
     };
 
     public int DownloadedQuantity => _scripts.Count(s => s.Downloaded);
     public int OutdatedQuantity => _scripts.Count(s => s.Outdated);
     public int ScriptQuantity => _scripts.Count;
     public int BotScriptQuantity => _scripts.Count;
+    public int PinnedQuantity => _scripts.Count(s => s.IsPinned);
     public bool ShowStartButton => !IsManagerMode;
     public IRelayCommand OpenScriptFolderCommand { get; }
 
@@ -201,23 +208,70 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
         if (_scripts.Count == 0) return;
 
         List<ScriptInfoViewModel> sorted = _scripts.ToList();
-        if (SortBy == "Date Created")
+        sorted.Sort((a, b) =>
         {
-            if (SortDescending)
-                sorted.Sort((a, b) => (b.Info.CreationDate ?? DateTime.MinValue).CompareTo(a.Info.CreationDate ?? DateTime.MinValue));
+            if (a.IsPinned != b.IsPinned)
+                return a.IsPinned ? -1 : 1;
+
+            if (SortBy == "Date Created")
+            {
+                int cmp = (a.Info.CreationDate ?? DateTime.MinValue).CompareTo(b.Info.CreationDate ?? DateTime.MinValue);
+                return SortDescending ? -cmp : cmp;
+            }
             else
-                sorted.Sort((a, b) => (a.Info.CreationDate ?? DateTime.MinValue).CompareTo(b.Info.CreationDate ?? DateTime.MinValue));
-        }
-        else
-        {
-            if (SortDescending)
-                sorted.Sort((a, b) => string.Compare(b.FileName, a.FileName, StringComparison.OrdinalIgnoreCase));
-            else
-                sorted.Sort((a, b) => string.Compare(a.FileName, b.FileName, StringComparison.OrdinalIgnoreCase));
-        }
+            {
+                int cmp = string.Compare(a.FileName, b.FileName, StringComparison.OrdinalIgnoreCase);
+                return SortDescending ? -cmp : cmp;
+            }
+        });
 
         _scripts.ReplaceRange(sorted);
         ApplySearchFilter();
+    }
+
+    [RelayCommand]
+    private async Task TogglePin(ScriptInfoViewModel? script = null)
+    {
+        ScriptInfoViewModel? target = script ?? SelectedItem;
+        if (target is null)
+            return;
+
+        target.IsPinned = !target.IsPinned;
+
+        ISettingsService? settingsService = Ioc.Default.GetService<ISettingsService>();
+        if (settingsService != null)
+        {
+            StringCollection? pinnedList = settingsService.Get<StringCollection>("UserPinnedScripts")
+                                           ?? settingsService.GetShared()?.UserPinnedScripts
+                                           ?? new StringCollection();
+
+            string key = target.ScriptKey;
+            for (int i = pinnedList.Count - 1; i >= 0; i--)
+            {
+                if (string.Equals(pinnedList[i]?.Replace('\\', '/').Trim(), key, StringComparison.OrdinalIgnoreCase))
+                {
+                    pinnedList.RemoveAt(i);
+                }
+            }
+
+            if (target.IsPinned)
+            {
+                pinnedList.Add(key);
+            }
+
+            settingsService.Set("UserPinnedScripts", pinnedList);
+        }
+
+        OnPropertyChanged(nameof(PinnedQuantity));
+
+        if (string.Equals(FilterBy, "Pinned", StringComparison.OrdinalIgnoreCase))
+        {
+            await RefreshScriptsList();
+        }
+        else
+        {
+            ApplySort();
+        }
     }
 
     [RelayCommand]
@@ -362,180 +416,222 @@ public partial class ScriptRepoViewModel : BotControlViewModelBase
 
     private async Task RefreshScriptsList()
     {
-        ISettingsService? settingsService = Ioc.Default.GetService<ISettingsService>();
-        settingsService?.ReloadSettings();
+        if (!await _refreshSemaphore.WaitAsync(0))
+            return;
 
-        List<ScriptInfoViewModel> scriptViewModels = await Task.Run(() =>
+        try
         {
-            // 1. Single-pass fast dictionary of existing local files
-            Dictionary<string, long> existingLocalFiles = new(StringComparer.OrdinalIgnoreCase);
-            try
+            List<ScriptInfoViewModel> scriptViewModels = await Task.Run(() =>
             {
-                if (Directory.Exists(ClientFileSources.SkuaScriptsDIR))
-                {
-                    DirectoryInfo dirInfo = new(ClientFileSources.SkuaScriptsDIR);
-                    foreach (FileInfo file in dirInfo.EnumerateFiles("*.cs", SearchOption.AllDirectories))
-                    {
-                        existingLocalFiles[Path.GetFullPath(file.FullName)] = file.Length;
-                    }
-                }
-            }
-            catch { }
+                ISettingsService? settingsService = Ioc.Default.GetService<ISettingsService>();
+                settingsService?.ReloadSettings();
 
-            List<ScriptInfoViewModel> viewModels = new();
-            string filter = FilterBy;
-            bool isAllFilter = string.Equals(filter, "All", StringComparison.OrdinalIgnoreCase);
-            bool isLocalFilter = string.Equals(filter, "Local", StringComparison.OrdinalIgnoreCase);
+                StringCollection? pinnedList = settingsService?.Get<StringCollection>("UserPinnedScripts")
+                                               ?? settingsService?.GetShared()?.UserPinnedScripts;
+                HashSet<string> pinnedSet = new(
+                    pinnedList?.Cast<string>().Where(s => !string.IsNullOrWhiteSpace(s)).Select(s => s.Replace('\\', '/').Trim()) ?? Enumerable.Empty<string>(),
+                    StringComparer.OrdinalIgnoreCase
+                );
 
-            // 1. Repository scripts (only if NOT filtering exclusively by "Local")
-            if (!isLocalFilter && _getScriptsService?.Scripts != null)
-            {
-                foreach (ScriptInfo script in _getScriptsService.Scripts)
-                {
-                    if (!isAllFilter)
-                    {
-                        bool matches = false;
-                        string[] parts = script.FilePath.Split('/', '\\');
-                        for (int i = 0; i < parts.Length; i++)
-                        {
-                            if (parts[i].StartsWith(filter, StringComparison.OrdinalIgnoreCase))
-                            {
-                                matches = true;
-                                break;
-                            }
-                        }
-                        if (!matches) continue;
-                    }
-
-                    if (string.IsNullOrWhiteSpace(script.Name) || script.Name.Equals("null", StringComparison.OrdinalIgnoreCase))
-                        script.Name = !string.IsNullOrWhiteSpace(script.FileName) && !script.FileName.Equals("null", StringComparison.OrdinalIgnoreCase)
-                            ? Path.GetFileNameWithoutExtension(script.FileName)
-                            : Path.GetFileNameWithoutExtension(script.FilePath);
-
-                    if (string.IsNullOrWhiteSpace(script.Description) || script.Description.Equals("null", StringComparison.OrdinalIgnoreCase))
-                        script.Description = "No description provided.";
-
-                    if (script.Tags == null || script.Tags.Length == 0 || (script.Tags.Length == 1 && script.Tags[0] == "null"))
-                        script.Tags = new[] { "no-tags" };
-
-                    string localPath = Path.GetFullPath(script.LocalFile);
-                    bool downloaded = existingLocalFiles.TryGetValue(localPath, out long size) || (existingLocalFiles.Count == 0 && File.Exists(localPath));
-                    int localSize = downloaded ? (int)(size > 0 ? size : (File.Exists(localPath) ? new FileInfo(localPath).Length : 0)) : 0;
-                    script.CachedDownloaded = downloaded;
-                    script.CachedLocalSize = localSize;
-
-                    viewModels.Add(new ScriptInfoViewModel(script, null, false, downloaded, localSize));
-                }
-            }
-
-            // 2. Custom Folders and Custom Scripts (shown when FilterBy is "All" or "Local")
-            if (isAllFilter || isLocalFilter)
-            {
+                // 1. Single-pass fast dictionary of existing local files
+                Dictionary<string, long> existingLocalFiles = new(StringComparer.OrdinalIgnoreCase);
                 try
                 {
-                    string? localFolder = settingsService?.Get<string>("UserCustomScriptsFolder");
-                    if (string.IsNullOrWhiteSpace(localFolder))
-                        localFolder = settingsService?.GetShared()?.UserCustomScriptsFolder;
-                    if (string.IsNullOrWhiteSpace(localFolder))
-                        localFolder = settingsService?.GetClient()?.UserCustomScriptsFolder;
-                    if (string.IsNullOrWhiteSpace(localFolder))
-                        localFolder = settingsService?.GetManager()?.UserCustomScriptsFolder;
-                    if (string.IsNullOrWhiteSpace(localFolder) && _customScripts != null)
+                    if (Directory.Exists(ClientFileSources.SkuaScriptsDIR))
                     {
-                        var roots = _customScripts.GetSearchRoots();
-                        if (roots != null && roots.Count > 0)
-                            localFolder = roots[0];
-                    }
-
-                    if (!string.IsNullOrEmpty(localFolder) && Directory.Exists(localFolder))
-                    {
-                        DirectoryInfo customDir = new(localFolder);
-                        foreach (FileInfo file in customDir.EnumerateFiles("*.cs", SearchOption.AllDirectories))
+                        foreach (string filePath in Directory.EnumerateFiles(ClientFileSources.SkuaScriptsDIR, "*.cs", SearchOption.AllDirectories))
                         {
-                            ScriptInfo info = new()
+                            try
                             {
-                                Name = Path.GetFileNameWithoutExtension(file.Name),
-                                FileName = file.Name,
-                                FilePath = file.FullName,
-                                Description = "Local Custom Script",
-                                Tags = new[] { "Local" },
-                                CreationDate = file.CreationTime,
-                                Size = (int)file.Length,
-                                Sha256 = null,
-                                CachedDownloaded = true,
-                                CachedLocalSize = (int)file.Length
-                            };
-                            viewModels.Add(new ScriptInfoViewModel(info, file.FullName, isCustom: true, isDownloaded: true, localSize: (int)file.Length));
-                        }
-                    }
-
-                    StringCollection? scriptList = settingsService?.Get<StringCollection>("UserCustomScriptsList");
-                    if (scriptList == null || scriptList.Count == 0)
-                        scriptList = settingsService?.GetShared()?.UserCustomScriptsList;
-                    if (scriptList == null || scriptList.Count == 0)
-                        scriptList = settingsService?.GetClient()?.UserCustomScriptsList;
-                    if (scriptList == null || scriptList.Count == 0)
-                        scriptList = settingsService?.GetManager()?.UserCustomScriptsList;
-
-                    if (scriptList != null && scriptList.Count > 0)
-                    {
-                        HashSet<string> seenPaths = new(viewModels.Select(v => v.LocalFile), StringComparer.OrdinalIgnoreCase);
-                        foreach (string? filePath in scriptList)
-                        {
-                            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) continue;
-                            if (seenPaths.Contains(filePath)) continue;
-
-                            FileInfo file = new(filePath);
-                            ScriptInfo info = new()
+                                existingLocalFiles[Path.GetFullPath(filePath)] = new FileInfo(filePath).Length;
+                            }
+                            catch
                             {
-                                Name = Path.GetFileNameWithoutExtension(file.Name),
-                                FileName = file.Name,
-                                FilePath = file.FullName,
-                                Description = "Local Single Script",
-                                Tags = new[] { "Local", "Single" },
-                                CreationDate = file.CreationTime,
-                                Size = (int)file.Length,
-                                Sha256 = null,
-                                CachedDownloaded = true,
-                                CachedLocalSize = (int)file.Length
-                            };
-                            seenPaths.Add(filePath);
-                            viewModels.Add(new ScriptInfoViewModel(info, filePath, isCustom: true, isDownloaded: true, localSize: (int)file.Length));
+                                existingLocalFiles[Path.GetFullPath(filePath)] = 0;
+                            }
                         }
                     }
                 }
                 catch { }
-            }
 
-            // 3. Fast in-place sorting
-            if (SortBy == "Date Created")
-            {
-                if (SortDescending)
-                    viewModels.Sort((a, b) => (b.Info.CreationDate ?? DateTime.MinValue).CompareTo(a.Info.CreationDate ?? DateTime.MinValue));
-                else
-                    viewModels.Sort((a, b) => (a.Info.CreationDate ?? DateTime.MinValue).CompareTo(b.Info.CreationDate ?? DateTime.MinValue));
-            }
-            else
-            {
-                if (SortDescending)
-                    viewModels.Sort((a, b) => string.Compare(b.FileName, a.FileName, StringComparison.OrdinalIgnoreCase));
-                else
-                    viewModels.Sort((a, b) => string.Compare(a.FileName, b.FileName, StringComparison.OrdinalIgnoreCase));
-            }
+                List<ScriptInfoViewModel> viewModels = new();
+                string filter = FilterBy;
+                bool isAllFilter = string.Equals(filter, "All", StringComparison.OrdinalIgnoreCase);
+                bool isPinnedFilter = string.Equals(filter, "Pinned", StringComparison.OrdinalIgnoreCase);
+                bool isLocalFilter = string.Equals(filter, "Local", StringComparison.OrdinalIgnoreCase);
 
-            return viewModels;
-        });
+                // 1. Repository scripts (only if NOT filtering exclusively by "Local")
+                if (!isLocalFilter && _getScriptsService?.Scripts != null)
+                {
+                    foreach (ScriptInfo script in _getScriptsService.Scripts)
+                    {
+                        string repoKey = script.FilePath.Replace('\\', '/').Trim();
+                        bool isPinned = pinnedSet.Contains(repoKey) || pinnedSet.Contains(script.LocalFile.Replace('\\', '/').Trim());
 
-        _scripts.ReplaceRange(scriptViewModels);
+                        if (isPinnedFilter)
+                        {
+                            if (!isPinned) continue;
+                        }
+                        else if (!isAllFilter)
+                        {
+                            bool matches = false;
+                            string[] parts = script.FilePath.Split('/', '\\');
+                            for (int i = 0; i < parts.Length; i++)
+                            {
+                                if (parts[i].StartsWith(filter, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    matches = true;
+                                    break;
+                                }
+                            }
+                            if (!matches) continue;
+                        }
 
-        ApplySearchFilter();
-        OnPropertyChanged(nameof(Scripts));
-        OnPropertyChanged(nameof(DownloadedQuantity));
-        OnPropertyChanged(nameof(OutdatedQuantity));
-        OnPropertyChanged(nameof(ScriptQuantity));
-        OnPropertyChanged(nameof(BotScriptQuantity));
-        if (_updateDatesCts == null || _updateDatesCts.IsCancellationRequested)
-            IsBusy = false;
+                        if (string.IsNullOrWhiteSpace(script.Name) || script.Name.Equals("null", StringComparison.OrdinalIgnoreCase))
+                            script.Name = !string.IsNullOrWhiteSpace(script.FileName) && !script.FileName.Equals("null", StringComparison.OrdinalIgnoreCase)
+                                ? Path.GetFileNameWithoutExtension(script.FileName)
+                                : Path.GetFileNameWithoutExtension(script.FilePath);
+
+                        if (string.IsNullOrWhiteSpace(script.Description) || script.Description.Equals("null", StringComparison.OrdinalIgnoreCase))
+                            script.Description = "No description provided.";
+
+                        if (script.Tags == null || script.Tags.Length == 0 || (script.Tags.Length == 1 && script.Tags[0] == "null"))
+                            script.Tags = new[] { "no-tags" };
+
+                        string localPath = Path.GetFullPath(script.LocalFile);
+                        bool downloaded = existingLocalFiles.TryGetValue(localPath, out long size) || (existingLocalFiles.Count == 0 && File.Exists(localPath));
+                        int localSize = downloaded ? (int)(size > 0 ? size : (File.Exists(localPath) ? new FileInfo(localPath).Length : 0)) : 0;
+                        script.CachedDownloaded = downloaded;
+                        script.CachedLocalSize = localSize;
+
+                        viewModels.Add(new ScriptInfoViewModel(script, null, false, downloaded, localSize, isPinned));
+                    }
+                }
+
+                // 2. Custom Folders and Custom Scripts (shown when FilterBy is "All", "Local", or "Pinned")
+                if (isAllFilter || isLocalFilter || isPinnedFilter)
+                {
+                    try
+                    {
+                        string? localFolder = settingsService?.Get<string>("UserCustomScriptsFolder");
+                        if (string.IsNullOrWhiteSpace(localFolder))
+                            localFolder = settingsService?.GetShared()?.UserCustomScriptsFolder;
+                        if (string.IsNullOrWhiteSpace(localFolder))
+                            localFolder = settingsService?.GetClient()?.UserCustomScriptsFolder;
+                        if (string.IsNullOrWhiteSpace(localFolder))
+                            localFolder = settingsService?.GetManager()?.UserCustomScriptsFolder;
+                        if (string.IsNullOrWhiteSpace(localFolder) && _customScripts != null)
+                        {
+                            var roots = _customScripts.GetSearchRoots();
+                            if (roots != null && roots.Count > 0)
+                                localFolder = roots[0];
+                        }
+
+                        if (!string.IsNullOrEmpty(localFolder) && Directory.Exists(localFolder))
+                        {
+                            foreach (string filePath in Directory.EnumerateFiles(localFolder, "*.cs", SearchOption.AllDirectories))
+                            {
+                                string customKey = Path.GetFullPath(filePath).Replace('\\', '/').Trim();
+                                bool isPinned = pinnedSet.Contains(customKey);
+                                if (isPinnedFilter && !isPinned) continue;
+
+                                FileInfo file = new(filePath);
+                                ScriptInfo info = new()
+                                {
+                                    Name = Path.GetFileNameWithoutExtension(file.Name),
+                                    FileName = file.Name,
+                                    FilePath = file.FullName,
+                                    Description = "Local Custom Script",
+                                    Tags = new[] { "Local" },
+                                    CreationDate = file.CreationTime,
+                                    Size = (int)file.Length,
+                                    Sha256 = null,
+                                    CachedDownloaded = true,
+                                    CachedLocalSize = (int)file.Length
+                                };
+                                viewModels.Add(new ScriptInfoViewModel(info, file.FullName, isCustom: true, isDownloaded: true, localSize: (int)file.Length, isPinned: isPinned));
+                            }
+                        }
+
+                        StringCollection? scriptList = settingsService?.Get<StringCollection>("UserCustomScriptsList");
+                        if (scriptList == null || scriptList.Count == 0)
+                            scriptList = settingsService?.GetShared()?.UserCustomScriptsList;
+                        if (scriptList == null || scriptList.Count == 0)
+                            scriptList = settingsService?.GetClient()?.UserCustomScriptsList;
+                        if (scriptList == null || scriptList.Count == 0)
+                            scriptList = settingsService?.GetManager()?.UserCustomScriptsList;
+
+                        if (scriptList != null && scriptList.Count > 0)
+                        {
+                            HashSet<string> seenPaths = new(viewModels.Select(v => v.LocalFile), StringComparer.OrdinalIgnoreCase);
+                            foreach (string? filePath in scriptList)
+                            {
+                                if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath)) continue;
+                                if (seenPaths.Contains(filePath)) continue;
+
+                                string singleKey = filePath.Replace('\\', '/').Trim();
+                                bool isPinned = pinnedSet.Contains(singleKey);
+                                if (isPinnedFilter && !isPinned) continue;
+
+                                FileInfo file = new(filePath);
+                                ScriptInfo info = new()
+                                {
+                                    Name = Path.GetFileNameWithoutExtension(file.Name),
+                                    FileName = file.Name,
+                                    FilePath = file.FullName,
+                                    Description = "Local Single Script",
+                                    Tags = new[] { "Local", "Single" },
+                                    CreationDate = file.CreationTime,
+                                    Size = (int)file.Length,
+                                    Sha256 = null,
+                                    CachedDownloaded = true,
+                                    CachedLocalSize = (int)file.Length
+                                };
+                                seenPaths.Add(filePath);
+                                viewModels.Add(new ScriptInfoViewModel(info, filePath, isCustom: true, isDownloaded: true, localSize: (int)file.Length, isPinned: isPinned));
+                            }
+                        }
+                    }
+                    catch { }
+                }
+
+                // 3. Fast in-place sorting
+                viewModels.Sort((a, b) =>
+                {
+                    if (a.IsPinned != b.IsPinned)
+                        return a.IsPinned ? -1 : 1;
+
+                    if (SortBy == "Date Created")
+                    {
+                        int cmp = (a.Info.CreationDate ?? DateTime.MinValue).CompareTo(b.Info.CreationDate ?? DateTime.MinValue);
+                        return SortDescending ? -cmp : cmp;
+                    }
+                    else
+                    {
+                        int cmp = string.Compare(a.FileName, b.FileName, StringComparison.OrdinalIgnoreCase);
+                        return SortDescending ? -cmp : cmp;
+                    }
+                });
+
+                return viewModels;
+            });
+
+            _scripts.ReplaceRange(scriptViewModels);
+
+            ApplySearchFilter();
+            OnPropertyChanged(nameof(Scripts));
+            OnPropertyChanged(nameof(DownloadedQuantity));
+            OnPropertyChanged(nameof(OutdatedQuantity));
+            OnPropertyChanged(nameof(ScriptQuantity));
+            OnPropertyChanged(nameof(BotScriptQuantity));
+            OnPropertyChanged(nameof(PinnedQuantity));
+            if (_updateDatesCts == null || _updateDatesCts.IsCancellationRequested)
+                IsBusy = false;
+        }
+        finally
+        {
+            _refreshSemaphore.Release();
+        }
     }
 
     public void ProgressHandler(string message)

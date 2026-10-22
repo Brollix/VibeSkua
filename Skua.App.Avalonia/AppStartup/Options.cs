@@ -73,17 +73,21 @@ internal class Options
             CreateSettingOptionItem<bool>("Check for AdvanceSkill Sets Updates", "Whether to check for scripts updates when launching the Manager", "CheckAdvanceSkillSetsUpdates"),
             CreateSettingOptionItem<bool>("Auto Update Junk Items", "Whether to auto update junk items when launching the Manager, needs \"Check for Junk Items Updates\" to be true", "AutoUpdateJunkItems"),
             CreateSettingOptionItem<bool>("Check for Junk Items Updates", "Whether to check for junk items updates when launching the Manager", "CheckJunkItemsUpdates"),
-            CreateSettingOptionItem<string>("Discord Webhook URL", "URL to send Discord notifications when scripts start, stop, or crash", "DiscordWebhookUrl"),
+            CreateSettingOptionItem<string>("Discord Webhook URL", "URL to send Discord notifications and live statistics when scripts start, stop, or crash", "DiscordWebhookUrl"),
             new CommandOptionItemViewModel<IRelayCommand>("Test Discord Webhook", new AsyncRelayCommand(async () => {
                 await Ioc.Default.GetRequiredService<IDiscordWebhookService>().TestWebhookAsync();
             })),
-            CreateSettingOptionItem<bool>("Webhook: Notify on Script Started", "Ping Discord when a script starts running", "WebhookNotifyStarted"),
-            CreateSettingOptionItem<bool>("Webhook: Notify on Script Stopped", "Ping Discord when a script finishes or stops", "WebhookNotifyStopped"),
-            CreateSettingOptionItem<bool>("Webhook: Notify on Script Crashed", "Ping Discord when a script crashes with an error", "WebhookNotifyCrashed"),
-            CreateSettingOptionItem<bool>("Webhook: Notify on Relog", "Ping Discord when Skua disconnects and relogs", "WebhookNotifyRelogged"),
-            CreateSettingOptionItem<bool>("Webhook: Notify on Item Drop", "Send a Discord message (and screenshot) when a specific item drops", "WebhookNotifyItemDrops"),
+            CreateSettingOptionItem<string>("Skua Nexus Webhook URL", "URL to send Skua Nexus notifications and live bot statistics", "NexusWebhookUrl"),
+            new CommandOptionItemViewModel<IRelayCommand>("Test Skua Nexus Webhook", new AsyncRelayCommand(async () => {
+                await Ioc.Default.GetRequiredService<IDiscordWebhookService>().TestNexusWebhookAsync();
+            })),
+            CreateSettingOptionItem<bool>("Webhook: Notify on Script Started", "Send alerts and initial statistics when a script starts running", "WebhookNotifyStarted"),
+            CreateSettingOptionItem<bool>("Webhook: Notify on Script Stopped", "Send session summary and statistics when a script finishes or stops", "WebhookNotifyStopped"),
+            CreateSettingOptionItem<bool>("Webhook: Notify on Script Crashed", "Send alerts when a script crashes with an error", "WebhookNotifyCrashed"),
+            CreateSettingOptionItem<bool>("Webhook: Notify on Relog", "Send alerts when Skua disconnects and relogs", "WebhookNotifyRelogged"),
+            CreateSettingOptionItem<bool>("Webhook: Notify on Item Drop", "Send webhook notifications (and screenshot) when a specific item drops", "WebhookNotifyItemDrops"),
             CreateSettingOptionItem<string>("Webhook: Drop List", "Comma-separated list of items to notify on drop", "WebhookNotifyItemDropsList"),
-            new CommandOptionItemViewModel<int>("Webhook: Ping Interval (Mins)", "Ping Discord every X minutes while running to show it is alive", "WebhookPingInterval", "Min", new RelayCommand<string>(value =>
+            new CommandOptionItemViewModel<int>("Webhook: Ping Interval (Mins)", "Send live health and bot statistics snapshots every X minutes while running", "WebhookPingInterval", "Min", new RelayCommand<string>(value =>
             {
                 if (!int.TryParse(value, out int result) || result < 0) return;
                 Ioc.Default.GetRequiredService<ISettingsService>().Set("WebhookPingInterval", result);
