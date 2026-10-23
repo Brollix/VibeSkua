@@ -116,7 +116,10 @@ public class Main extends MovieClip {
         this.stopPacketCapture();
         if (this.game) {
             this.game.removeEventListener(Event.REMOVED_FROM_STAGE, this.onGameRemoved);
-            this.game.sfc.removeEventListener(SFSEvent.onExtensionResponse, this.onExtensionResponse);
+            if (this.game.sfc) {
+                this.game.sfc.removeEventListener(SFSEvent.onExtensionResponse, this.onExtensionResponse);
+                this.game.sfc.removeEventListener(SFSEvent.onConnectionLost, this.onConnectionLost);
+            }
         }
 
         this.stg = stage;
@@ -139,6 +142,7 @@ public class Main extends MovieClip {
         this.game.addEventListener(MouseEvent.CLICK,this.onGameClick);
         this.game.addEventListener(Event.REMOVED_FROM_STAGE, this.onGameRemoved);
         this.game.sfc.addEventListener(SFSEvent.onExtensionResponse, this.onExtensionResponse);
+        this.game.sfc.addEventListener(SFSEvent.onConnectionLost, this.onConnectionLost);
         this.gameDomain = LoaderInfo(event.target).applicationDomain;
         catchPackets();
 
@@ -160,6 +164,10 @@ public class Main extends MovieClip {
 
     public function onExtensionResponse(packet:*):void {
         this.external.call('pext', JSON.stringify(packet));
+    }
+
+    public function onConnectionLost(event:*):void {
+        this.external.call('connectionLost');
     }
 
     private function onGameClick(event:MouseEvent) : void
@@ -459,6 +467,10 @@ public class Main extends MovieClip {
         if (event.target == this.game) {
             this._policyFilesLoaded = false;
             this.stopPacketCapture();
+            if (this.game && this.game.sfc) {
+                this.game.sfc.removeEventListener(SFSEvent.onExtensionResponse, this.onExtensionResponse);
+                this.game.sfc.removeEventListener(SFSEvent.onConnectionLost, this.onConnectionLost);
+            }
         }
     }
 
