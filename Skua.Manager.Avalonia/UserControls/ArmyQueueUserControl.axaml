@@ -292,13 +292,13 @@
                     </StackPanel>
                 </Border>
 
-                <!-- 2d. Footer: Presets & Timing Options -->
+                <!-- 2d. Footer: Presets -->
                 <Border Background="{DynamicResource SkuaSurfaceBrush}"
                         BorderBrush="{DynamicResource SkuaBorderBrush}"
                         BorderThickness="1"
                         CornerRadius="6"
                         Padding="10,6">
-                    <Grid ColumnDefinitions="Auto,120,Auto,80,Auto,*,Auto,Auto,Auto" ColumnSpacing="6" VerticalAlignment="Center">
+                    <Grid ColumnDefinitions="Auto,160,Auto,*,140,Auto" ColumnSpacing="8" VerticalAlignment="Center">
                         <TextBlock Grid.Column="0" Text="Preset:" FontSize="11" FontWeight="Bold" VerticalAlignment="Center" />
 
                         <!-- Presets dropdown -->
@@ -308,39 +308,20 @@
                                   Height="28"
                                   HorizontalAlignment="Stretch" />
 
-                        <Button Grid.Column="2" Classes="skua-button" Padding="8,3" Command="{Binding LoadSelectedPresetCommand}">
-                            <TextBlock Text="Load" FontSize="10" />
+                        <Button Grid.Column="2" Classes="skua-button" Padding="10,4" Command="{Binding LoadSelectedPresetCommand}">
+                            <TextBlock Text="Load" FontSize="11" />
                         </Button>
 
                         <!-- Save Preset input -->
-                        <TextBox Grid.Column="3"
+                        <TextBox Grid.Column="4"
                                  Text="{Binding QueueName}"
                                  Watermark="Preset Name"
-                                 FontSize="10"
+                                 FontSize="11"
                                  Height="28" />
 
-                        <Button Grid.Column="4" Classes="skua-button" Padding="8,3" Command="{Binding SavePresetCommand}">
-                            <TextBlock Text="Save" FontSize="10" />
+                        <Button Grid.Column="5" Classes="skua-button" Padding="10,4" Command="{Binding SavePresetCommand}">
+                            <TextBlock Text="Save Preset" FontSize="11" />
                         </Button>
-
-                        <!-- Timing settings -->
-                        <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="Delay in seconds between launching each account">
-                            <TextBlock Text="Stagger:" FontSize="10" Foreground="{DynamicResource SkuaMutedTextBrush}" VerticalAlignment="Center" />
-                            <NumericUpDown Value="{Binding DelayBetweenLaunchesSeconds}" Minimum="0" Maximum="30" Width="55" Height="26" />
-                            <TextBlock Text="s" FontSize="10" Foreground="{DynamicResource SkuaMutedTextBrush}" VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="7" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="Cooldown in seconds between squads for ghost session clearance">
-                            <TextBlock Text="Cooldown:" FontSize="10" Foreground="{DynamicResource SkuaMutedTextBrush}" VerticalAlignment="Center" />
-                            <NumericUpDown Value="{Binding DelayBetweenStepsSeconds}" Minimum="1" Maximum="60" Width="55" Height="26" />
-                            <TextBlock Text="s" FontSize="10" Foreground="{DynamicResource SkuaMutedTextBrush}" VerticalAlignment="Center" />
-                        </StackPanel>
-
-                        <StackPanel Grid.Column="8" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center" ToolTip.Tip="Maximum squad runtime in minutes before aborting">
-                            <TextBlock Text="Timeout:" FontSize="10" Foreground="{DynamicResource SkuaMutedTextBrush}" VerticalAlignment="Center" />
-                            <NumericUpDown Value="{Binding TimeoutMinutes}" Minimum="5" Maximum="180" Width="55" Height="26" />
-                            <TextBlock Text="m" FontSize="10" Foreground="{DynamicResource SkuaMutedTextBrush}" VerticalAlignment="Center" />
-                        </StackPanel>
                     </Grid>
                 </Border>
             </StackPanel>

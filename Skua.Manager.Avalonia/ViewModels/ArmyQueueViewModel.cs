@@ -186,7 +186,7 @@ public partial class ArmyQueueViewModel : ObservableRecipient
     private int _delayBetweenLaunchesSeconds = 3;
 
     [ObservableProperty]
-    private int _timeoutMinutes = 25;
+    private int _timeoutMinutes = 30;
 
     [ObservableProperty]
     private bool _isRunning;
@@ -673,9 +673,9 @@ public partial class ArmyQueueViewModel : ObservableRecipient
             }
 
             QueueName = config.Name;
-            DelayBetweenStepsSeconds = config.DelayBetweenStepsSeconds;
-            DelayBetweenLaunchesSeconds = config.DelayBetweenLaunchesSeconds;
-            TimeoutMinutes = config.TimeoutMinutes;
+            DelayBetweenStepsSeconds = config.DelayBetweenStepsSeconds > 0 ? config.DelayBetweenStepsSeconds : 5;
+            DelayBetweenLaunchesSeconds = config.DelayBetweenLaunchesSeconds > 0 ? config.DelayBetweenLaunchesSeconds : 3;
+            TimeoutMinutes = config.TimeoutMinutes > 0 ? config.TimeoutMinutes : 30;
 
             Steps.Clear();
             foreach (ArmyQueueStep s in config.Steps)
