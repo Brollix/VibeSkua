@@ -301,6 +301,8 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
                 {
                     wasPlaying = true;
                     Servers.LastIP = Player.ServerIP ?? Servers.LastIP;
+                    if (Servers.IsIntentionalLogout)
+                        Servers.IsIntentionalLogout = false;
 
                     if (!catching)
                     {
@@ -480,6 +482,35 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
                 if (!_waitForLogin && !Servers.IsIntentionalLogout && Options.AutoRelogin)
                 {
                     BeginLogout();
+                }
+                break;
+
+            case "userIntentionalAction":
+                if (args is { Length: > 0 } && args[0] is string action)
+                {
+                    switch (action)
+                    {
+                        case "logout":
+                            Log("Intentional logout button clicked by user in game. Auto re-login disarmed.");
+                            Servers.IsIntentionalLogout = true;
+                            CancelRelogin();
+                            if (Manager.ScriptRunning)
+                                _ = Manager.StopScript();
+                            break;
+
+                        case "changeServer":
+                            Log("Intentional 'Change Server' button clicked by user in game. Auto re-login disarmed.");
+                            Servers.IsIntentionalLogout = true;
+                            CancelRelogin();
+                            if (Manager.ScriptRunning)
+                                _ = Manager.StopScript();
+                            break;
+
+                        case "selectServer":
+                            Log("Server chosen by user on server list. Watchdog armed.");
+                            Servers.IsIntentionalLogout = false;
+                            break;
+                    }
                 }
                 break;
 
@@ -679,6 +710,24 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
                 string[] parts = ((string)args[0]).Split('%', StringSplitOptions.RemoveEmptyEntries);
                 switch (parts[2])
                 {
+                    case "eLO":
+                    case "eLO2":
+                        Log("In-game exit logout packet (eLO) detected. Disarming auto re-login.");
+                        Servers.IsIntentionalLogout = true;
+                        CancelRelogin();
+                        if (Manager.ScriptRunning)
+                            _ = Manager.StopScript();
+                        break;
+
+                    case "eSL":
+                    case "eSL2":
+                        Log("In-game exit to server list packet (eSL) detected. Disarming auto re-login.");
+                        Servers.IsIntentionalLogout = true;
+                        CancelRelogin();
+                        if (Manager.ScriptRunning)
+                            _ = Manager.StopScript();
+                        break;
+
                     case "moveToCell":
                         Messenger.Send<CellChangedMessage, int>(new(Map.Name, parts[4], parts[5]), (int)MessageChannels.GameEvents);
                         break;

@@ -172,9 +172,32 @@ public class Main extends MovieClip {
 
     private function onGameClick(event:MouseEvent) : void
     {
-        if (event == null)
+        if (event == null || event.target == null)
                 return;
-        var className:String = getQualifiedClassName(event.target.parent);
+        var targetName:String = (event.target.name != null) ? String(event.target.name) : "";
+        var parentName:String = (event.target.parent != null && event.target.parent.name != null) ? String(event.target.parent.name) : "";
+        var className:String = (event.target.parent != null) ? getQualifiedClassName(event.target.parent) : "";
+
+        if (targetName == "btnLogout" || targetName == "btnLogoutFB") {
+            this.external.call("userIntentionalAction", "logout");
+            return;
+        }
+
+        if (targetName == "btnChange" && (className.indexOf("mcOption") > -1 || parentName == "mcOption")) {
+            this.external.call("userIntentionalAction", "changeServer");
+            return;
+        }
+
+        var p:* = event.target.parent;
+        while (p != null) {
+            if (p.name == "iList") {
+                this.external.call("userIntentionalAction", "selectServer");
+                break;
+            }
+            if (p == this.game || p == this.stg) break;
+            p = p.parent;
+        }
+
         switch(event.target.name)
         {
             case "btCharPage":
