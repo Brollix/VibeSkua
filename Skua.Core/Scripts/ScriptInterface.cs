@@ -760,8 +760,14 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
             Messenger.Send<ReloginTriggeredMessage, int>(new(kicked), (int)MessageChannels.GameEvents);
 
             int delay = Options.ReloginTryDelay;
-            if (Options.SafeRelogin && kicked)
-                delay = 70000;
+            if (Options.SafeRelogin)
+            {
+                delay = kicked ? 70000 : Math.Max(10000, Options.ReloginTryDelay);
+            }
+            else
+            {
+                delay = Math.Max(3000, Options.ReloginTryDelay);
+            }
             Relogin(delay, wasRunning, reloginCts);
         }
         catch

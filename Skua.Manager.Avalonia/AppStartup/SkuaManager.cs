@@ -22,6 +22,7 @@ internal class SkuaManager
         List<TabItemViewModel> tabs = new()
         {
             new((string)"Accounts", s.GetRequiredService<AccountManagerViewModel>()),
+            new((string)"Army Queue", s.GetRequiredService<ArmyQueueViewModel>()),
             new((string)"Launcher", s.GetRequiredService<LauncherViewModel>()),
             new((string)"Updater", s.GetRequiredService<AppUpdaterViewModel>()),
             new((string)"Scripts", s.GetRequiredService<ScriptUpdaterViewModel>()),
