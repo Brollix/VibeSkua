@@ -9,6 +9,7 @@ using Skua.Manager.Avalonia.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -51,6 +52,8 @@ public partial class ArmyQueueMemberViewModel : ObservableObject
     private string _displayName;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayScriptName))]
+    [NotifyPropertyChangedFor(nameof(HasCustomScript))]
     private string? _scriptPath;
 
     [ObservableProperty]
@@ -61,9 +64,11 @@ public partial class ArmyQueueMemberViewModel : ObservableObject
 
     public string DisplayOrUsername => string.IsNullOrWhiteSpace(DisplayName) ? Username : DisplayName;
 
-    public string DisplayScriptName => string.IsNullOrWhiteSpace(ScriptPath)
-        ? "(Uses Squad Script)"
-        : Path.GetFileName(ScriptPath);
+    public bool HasCustomScript => !string.IsNullOrWhiteSpace(ScriptPath);
+
+    public string DisplayScriptName => HasCustomScript
+        ? Path.GetFileName(ScriptPath)
+        : "(Uses Squad Script)";
 
     [RelayCommand]
     private void BrowseScript()
@@ -81,11 +86,6 @@ public partial class ArmyQueueMemberViewModel : ObservableObject
     {
         ScriptPath = null;
     }
-
-    partial void OnScriptPathChanged(string? value)
-    {
-        OnPropertyChanged(nameof(DisplayScriptName));
-    }
 }
 
 public partial class ArmyQueueStepViewModel : ObservableObject
@@ -100,6 +100,8 @@ public partial class ArmyQueueStepViewModel : ObservableObject
     private string _name;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayStepScriptName))]
+    [NotifyPropertyChangedFor(nameof(HasStepScript))]
     private string? _stepScriptPath;
 
     [ObservableProperty]
@@ -107,9 +109,11 @@ public partial class ArmyQueueStepViewModel : ObservableObject
 
     public ObservableCollection<ArmyQueueMemberViewModel> Members { get; }
 
-    public string DisplayStepScriptName => string.IsNullOrWhiteSpace(StepScriptPath)
-        ? "No Default Script"
-        : Path.GetFileName(StepScriptPath);
+    public bool HasStepScript => !string.IsNullOrWhiteSpace(StepScriptPath);
+
+    public string DisplayStepScriptName => HasStepScript
+        ? Path.GetFileName(StepScriptPath)
+        : string.Empty;
 
     [RelayCommand]
     private void BrowseStepScript()
@@ -126,11 +130,6 @@ public partial class ArmyQueueStepViewModel : ObservableObject
     private void ClearStepScript()
     {
         StepScriptPath = null;
-    }
-
-    partial void OnStepScriptPathChanged(string? value)
-    {
-        OnPropertyChanged(nameof(DisplayStepScriptName));
     }
 }
 
@@ -160,10 +159,8 @@ public partial class ArmyQueueViewModel : ObservableRecipient
         _showHelpGuide = !_settingsService.Get("ArmyQueueHelpDismissed", false);
 
         LoadPresetsList();
-        if (Steps.Count == 0)
-        {
-            AddDefaultStep();
-        }
+        LoadActiveQueueOrDefaults();
+        EnsureSelection();
     }
 
     public ObservableCollection<ArmyQueueStepViewModel> Steps { get; }
@@ -172,6 +169,12 @@ public partial class ArmyQueueViewModel : ObservableRecipient
 
     [ObservableProperty]
     private ArmyQueueStepViewModel? _selectedStep;
+
+    partial void OnSelectedStepChanged(ArmyQueueStepViewModel? value)
+    {
+        if (value != null)
+            AutoSave();
+    }
 
     [ObservableProperty]
     private string _queueName = "Daily Ultras";
@@ -189,7 +192,19 @@ public partial class ArmyQueueViewModel : ObservableRecipient
     private int _timeoutMinutes = 30;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanPause))]
+    [NotifyPropertyChangedFor(nameof(CanResume))]
     private bool _isRunning;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanPause))]
+    [NotifyPropertyChangedFor(nameof(CanResume))]
+    private bool _isPaused;
+
+    public bool CanPause => IsRunning && !IsPaused;
+    public bool CanResume => IsRunning && IsPaused;
+
+    private TaskCompletionSource<bool>? _pauseTcs;
 
     [ObservableProperty]
     private string _statusText = "Ready to start queue.";
@@ -209,6 +224,14 @@ public partial class ArmyQueueViewModel : ObservableRecipient
     [ObservableProperty]
     private string _accountPickerSearchText = string.Empty;
 
+    public void EnsureSelection()
+    {
+        if (SelectedStep == null && Steps.Count > 0)
+        {
+            SelectedStep = Steps[0];
+        }
+    }
+
     [RelayCommand]
     public void ToggleHelpGuide()
     {
@@ -226,25 +249,43 @@ public partial class ArmyQueueViewModel : ObservableRecipient
     public void AddStep()
     {
         ArmyQueueStepViewModel step = new($"Squad {Steps.Count + 1}");
+        AttachStepEvents(step);
         Steps.Add(step);
         SelectedStep = step;
+        AutoSave();
     }
 
     [RelayCommand]
     public void RemoveStep(ArmyQueueStepViewModel? step)
     {
+        RemoveStepSpecific(step ?? SelectedStep);
+    }
+
+    [RelayCommand]
+    public void RemoveStepSpecific(ArmyQueueStepViewModel? step)
+    {
         step ??= SelectedStep;
         if (step is null)
             return;
+
+        if (Steps.Count <= 1)
+        {
+            step.Name = "Squad 1";
+            step.StepScriptPath = null;
+            step.Members.Clear();
+            SelectedStep = step;
+            AutoSave();
+            return;
+        }
 
         int index = Steps.IndexOf(step);
         Steps.Remove(step);
         if (SelectedStep == step)
         {
-            SelectedStep = Steps.Count > 0
-                ? (index < Steps.Count ? Steps[index] : Steps.Last())
-                : null;
+            int newIndex = Math.Clamp(index, 0, Steps.Count - 1);
+            SelectedStep = Steps[newIndex];
         }
+        AutoSave();
     }
 
     [RelayCommand]
@@ -258,6 +299,7 @@ public partial class ArmyQueueViewModel : ObservableRecipient
         {
             Steps.Move(index, index - 1);
             SelectedStep = step;
+            AutoSave();
         }
     }
 
@@ -268,11 +310,34 @@ public partial class ArmyQueueViewModel : ObservableRecipient
         if (step is null) return;
 
         int index = Steps.IndexOf(step);
-        if (index >= 0 && index < Steps.Count - 1)
+        if (index < Steps.Count - 1)
         {
             Steps.Move(index, index + 1);
             SelectedStep = step;
+            AutoSave();
         }
+    }
+
+    [RelayCommand]
+    public void PauseQueue()
+    {
+        if (!IsRunning || IsPaused)
+            return;
+
+        IsPaused = true;
+        _pauseTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        StatusText = "Queue PAUSED. Current squad will finish, but won't start next squad until resumed.";
+    }
+
+    [RelayCommand]
+    public void ResumeQueue()
+    {
+        if (!IsRunning || !IsPaused)
+            return;
+
+        IsPaused = false;
+        _pauseTcs?.TrySetResult(true);
+        StatusText = "Queue resumed. Proceeding...";
     }
 
     [RelayCommand]
@@ -326,11 +391,14 @@ public partial class ArmyQueueViewModel : ObservableRecipient
         {
             if (!SelectedStep.Members.Any(m => m.Username.Equals(item.Username, StringComparison.OrdinalIgnoreCase)))
             {
-                SelectedStep.Members.Add(new ArmyQueueMemberViewModel(item.Username, item.DisplayName));
+                var newMember = new ArmyQueueMemberViewModel(item.Username, item.DisplayName);
+                newMember.PropertyChanged += OnMemberPropertyChanged;
+                SelectedStep.Members.Add(newMember);
             }
         }
 
         ShowAccountPicker = false;
+        AutoSave();
     }
 
     [RelayCommand]
@@ -358,7 +426,9 @@ public partial class ArmyQueueViewModel : ObservableRecipient
     {
         if (SelectedStep != null && member != null)
         {
+            member.PropertyChanged -= OnMemberPropertyChanged;
             SelectedStep.Members.Remove(member);
+            AutoSave();
         }
     }
 
@@ -373,8 +443,10 @@ public partial class ArmyQueueViewModel : ObservableRecipient
             {
                 step.Members.Add(new ArmyQueueMemberViewModel(acc.Username, acc.DisplayOrUsername));
             }
+            AttachStepEvents(step);
             Steps.Add(step);
             SelectedStep = step;
+            AutoSave();
         }
     }
 
@@ -410,8 +482,10 @@ public partial class ArmyQueueViewModel : ObservableRecipient
         finally
         {
             IsRunning = false;
+            IsPaused = false;
             _queueCts?.Dispose();
             _queueCts = null;
+            _pauseTcs = null;
         }
     }
 
@@ -423,7 +497,9 @@ public partial class ArmyQueueViewModel : ObservableRecipient
 
         if (_dialogService.ShowMessageBox("Are you sure you want to stop the running Army Queue?", "Stop Queue", true) == true)
         {
+            _pauseTcs?.TrySetCanceled();
             _queueCts?.Cancel();
+            IsPaused = false;
             StatusText = "Stopping Army Queue...";
         }
     }
@@ -533,13 +609,44 @@ public partial class ArmyQueueViewModel : ObservableRecipient
 
             ProgressValue = ((i + 1) * 100.0) / totalSteps;
 
-            // 3. Ghost session cooldown before next squad
+            // 3. Pause & Ghost session cooldown before next squad
             if (i < Steps.Count - 1)
             {
+                if (IsPaused && _pauseTcs != null)
+                {
+                    string nextSquad = Steps[i + 1].Name;
+                    StatusText = $"Squad '{currentStep.Name}' completed. Queue is PAUSED. Click 'Resume Queue' to start {nextSquad}.";
+                    using var reg = token.Register(() => _pauseTcs.TrySetCanceled());
+                    try
+                    {
+                        await _pauseTcs.Task;
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        break;
+                    }
+                }
+
                 int cooldown = Math.Max(1, DelayBetweenStepsSeconds);
                 for (int c = cooldown; c > 0; c--)
                 {
                     token.ThrowIfCancellationRequested();
+
+                    if (IsPaused && _pauseTcs != null)
+                    {
+                        string nextSquad = Steps[i + 1].Name;
+                        StatusText = $"Squad '{currentStep.Name}' completed. Queue is PAUSED. Click 'Resume Queue' to start {nextSquad}.";
+                        using var reg = token.Register(() => _pauseTcs.TrySetCanceled());
+                        try
+                        {
+                            await _pauseTcs.Task;
+                        }
+                        catch (TaskCanceledException)
+                        {
+                            break;
+                        }
+                    }
+
                     StatusText = $"Squad '{currentStep.Name}' completed! Waiting {c}s ghost session cooldown before next squad...";
                     await Task.Delay(1000, token);
                 }
@@ -681,11 +788,13 @@ public partial class ArmyQueueViewModel : ObservableRecipient
                 {
                     stepVm.Members.Add(new ArmyQueueMemberViewModel(a.Username, a.DisplayName, a.ScriptPath));
                 }
+                AttachStepEvents(stepVm);
                 Steps.Add(stepVm);
             }
 
             SelectedStep = Steps.FirstOrDefault();
             StatusText = $"Loaded preset '{config.Name}'.";
+            AutoSave();
         }
         catch (Exception ex)
         {
@@ -747,10 +856,126 @@ public partial class ArmyQueueViewModel : ObservableRecipient
             SelectedPreset = Presets[0];
     }
 
+    private void AttachStepEvents(ArmyQueueStepViewModel step)
+    {
+        step.PropertyChanged -= OnStepPropertyChanged;
+        step.PropertyChanged += OnStepPropertyChanged;
+        step.Members.CollectionChanged -= OnMembersCollectionChanged;
+        step.Members.CollectionChanged += OnMembersCollectionChanged;
+        foreach (var m in step.Members)
+        {
+            m.PropertyChanged -= OnMemberPropertyChanged;
+            m.PropertyChanged += OnMemberPropertyChanged;
+        }
+    }
+
+    private void OnStepPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        AutoSave();
+    }
+
+    private void OnMembersCollectionChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems != null)
+        {
+            foreach (ArmyQueueMemberViewModel m in e.NewItems)
+            {
+                m.PropertyChanged -= OnMemberPropertyChanged;
+                m.PropertyChanged += OnMemberPropertyChanged;
+            }
+        }
+        AutoSave();
+    }
+
+    private void OnMemberPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        AutoSave();
+    }
+
+    public void AutoSave()
+    {
+        if (IsRunning)
+            return;
+
+        try
+        {
+            string configDir = ClientFileSources.SkuaDIR;
+            Directory.CreateDirectory(configDir);
+            string filePath = Path.Combine(configDir, "ArmyQueueActive.json");
+
+            ArmyQueueConfig config = new()
+            {
+                Name = string.IsNullOrWhiteSpace(QueueName) ? "Daily Ultras" : QueueName.Trim(),
+                DelayBetweenStepsSeconds = DelayBetweenStepsSeconds,
+                DelayBetweenLaunchesSeconds = DelayBetweenLaunchesSeconds,
+                Steps = Steps.Select(s => new ArmyQueueStep
+                {
+                    Name = s.Name,
+                    StepScriptPath = s.StepScriptPath,
+                    Accounts = s.Members.Select(m => new ArmyQueueAccount
+                    {
+                        Username = m.Username,
+                        DisplayName = m.DisplayName,
+                        ScriptPath = m.ScriptPath
+                    }).ToList()
+                }).ToList()
+            };
+
+            File.WriteAllText(filePath, JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"Error auto-saving Army Queue: {ex.Message}");
+        }
+    }
+
+    private void LoadActiveQueueOrDefaults()
+    {
+        try
+        {
+            string configDir = ClientFileSources.SkuaDIR;
+            string filePath = Path.Combine(configDir, "ArmyQueueActive.json");
+
+            if (File.Exists(filePath))
+            {
+                string json = File.ReadAllText(filePath);
+                ArmyQueueConfig? config = JsonSerializer.Deserialize<ArmyQueueConfig>(json);
+                if (config != null && config.Steps.Count > 0)
+                {
+                    QueueName = string.IsNullOrWhiteSpace(config.Name) ? "Daily Ultras" : config.Name;
+                    Steps.Clear();
+                    foreach (ArmyQueueStep s in config.Steps)
+                    {
+                        ArmyQueueStepViewModel stepVm = new(s.Name)
+                        {
+                            StepScriptPath = s.StepScriptPath
+                        };
+                        foreach (ArmyQueueAccount a in s.Accounts)
+                        {
+                            stepVm.Members.Add(new ArmyQueueMemberViewModel(a.Username, a.DisplayName, a.ScriptPath));
+                        }
+                        AttachStepEvents(stepVm);
+                        Steps.Add(stepVm);
+                    }
+                    SelectedStep = Steps.FirstOrDefault();
+                    return;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"Error loading active Army Queue: {ex.Message}");
+        }
+
+        AddDefaultStep();
+    }
+
     private void AddDefaultStep()
     {
         ArmyQueueStepViewModel step1 = new("Squad 1");
+        AttachStepEvents(step1);
         Steps.Add(step1);
         SelectedStep = step1;
+        AutoSave();
     }
 }

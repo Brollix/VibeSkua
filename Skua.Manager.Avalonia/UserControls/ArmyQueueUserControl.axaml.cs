@@ -14,6 +14,7 @@ public partial class ArmyQueueUserControl : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        Loaded += (s, e) => (DataContext as ArmyQueueViewModel)?.EnsureSelection();
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -28,6 +29,7 @@ public partial class ArmyQueueUserControl : UserControl
         if (_currentVm != null)
         {
             _currentVm.PropertyChanged += OnViewModelPropertyChanged;
+            _currentVm.EnsureSelection();
         }
     }
 
