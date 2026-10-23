@@ -494,8 +494,7 @@ public partial class ArmyQueueViewModel : ObservableRecipient
                 }
             }
 
-            // 2. Monitor processes until all exit or timeout occurs
-            int timeoutSeconds = Math.Max(1, TimeoutMinutes) * 60;
+            // 2. Monitor processes until all accounts finish naturally (no time limit)
             DateTime startTime = DateTime.UtcNow;
 
             while (activeProcesses.Any(p => !p.HasExited))
@@ -506,16 +505,6 @@ public partial class ArmyQueueViewModel : ObservableRecipient
                 int totalCount = activeProcesses.Count;
                 TimeSpan elapsed = DateTime.UtcNow - startTime;
 
-                if (elapsed.TotalSeconds >= timeoutSeconds)
-                {
-                    StatusText = $"Squad '{currentStep.Name}' timed out after {TimeoutMinutes} mins. Proceeding to next step...";
-                    foreach (Process p in activeProcesses.Where(p => !p.HasExited))
-                    {
-                        try { p.Kill(); } catch { }
-                    }
-                    break;
-                }
-
                 foreach (Process p in activeProcesses)
                 {
                     if (p.HasExited && pidToMember.TryGetValue(p.Id, out ArmyQueueMemberViewModel? m))
@@ -525,7 +514,11 @@ public partial class ArmyQueueViewModel : ObservableRecipient
                     }
                 }
 
-                StatusText = $"Squad {ActiveStepIndex}/{totalSteps} '{currentStep.Name}': {completedCount}/{totalCount} accounts finished ({Math.Round((timeoutSeconds - elapsed.TotalSeconds) / 60.0)}m remaining)";
+                string elapsedStr = elapsed.TotalHours >= 1
+                    ? $"{(int)elapsed.TotalHours}h {elapsed.Minutes:D2}m"
+                    : $"{elapsed.Minutes}m {elapsed.Seconds:D2}s";
+
+                StatusText = $"Squad {ActiveStepIndex}/{totalSteps} '{currentStep.Name}': {completedCount}/{totalCount} accounts finished (Runtime: {elapsedStr})";
                 ProgressValue = ((i * 100.0) / totalSteps) + ((completedCount * 100.0) / (totalSteps * Math.Max(1, totalCount)));
 
                 await Task.Delay(1000, token);
