@@ -15,7 +15,10 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 using System.Threading;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.DependencyInjection;
+using Skua.Shared.Avalonia.ViewModels.ScriptRepo;
 
 namespace Skua.Manager.Avalonia.ViewModels;
 
@@ -139,18 +142,28 @@ public partial class ArmyQueueViewModel : ObservableRecipient
     private readonly ISettingsService _settingsService;
     private readonly IDialogService _dialogService;
     private readonly IFileDialogService _fileService;
+    private readonly IWindowService _windowService;
+    private readonly IScriptManager _scriptManager;
     private CancellationTokenSource? _queueCts;
+
+    private ArmyQueueStepViewModel? _pendingScriptTargetStep;
+    private ArmyQueueMemberViewModel? _pendingScriptTargetMember;
+    public bool HasPendingScriptTarget => _pendingScriptTargetStep != null || _pendingScriptTargetMember != null;
 
     public ArmyQueueViewModel(
         AccountManagerViewModel accountManager,
         ISettingsService settingsService,
         IDialogService dialogService,
-        IFileDialogService fileService)
+        IFileDialogService fileService,
+        IWindowService windowService,
+        IScriptManager scriptManager)
     {
         _accountManager = accountManager;
         _settingsService = settingsService;
         _dialogService = dialogService;
         _fileService = fileService;
+        _windowService = windowService;
+        _scriptManager = scriptManager;
 
         Steps = new ObservableCollection<ArmyQueueStepViewModel>();
         Presets = new ObservableCollection<string>();
@@ -158,9 +171,145 @@ public partial class ArmyQueueViewModel : ObservableRecipient
 
         _showHelpGuide = !_settingsService.Get("ArmyQueueHelpDismissed", false);
 
+        StrongReferenceMessenger.Default.Register<ArmyQueueViewModel, LoadScriptMessage, int>(this,
+            (int)MessageChannels.ScriptStatus, (r, m) => r.HandleLoadScript(m));
+
         LoadPresetsList();
         LoadActiveQueueOrDefaults();
         EnsureSelection();
+    }
+
+    private void OpenScriptRepo()
+    {
+        var scriptRepo = Ioc.Default.GetService<ScriptRepoViewModel>();
+        if (scriptRepo != null)
+        {
+            _windowService.RegisterManagedWindow("Script Repo", scriptRepo);
+        }
+        _windowService.ShowManagedWindow("Script Repo");
+    }
+
+    [RelayCommand]
+    public void OpenScriptRepoForStep(ArmyQueueStepViewModel? step)
+    {
+        _pendingScriptTargetStep = step ?? SelectedStep;
+        _pendingScriptTargetMember = null;
+        OpenScriptRepo();
+    }
+
+    [RelayCommand]
+    public void OpenScriptRepoForMember(ArmyQueueMemberViewModel? member)
+    {
+        if (member == null) return;
+        _pendingScriptTargetMember = member;
+        _pendingScriptTargetStep = null;
+        OpenScriptRepo();
+    }
+
+    private void HandleLoadScript(LoadScriptMessage message)
+    {
+        if (string.IsNullOrWhiteSpace(message.Path))
+            return;
+
+        if (_pendingScriptTargetMember != null)
+        {
+            _pendingScriptTargetMember.ScriptPath = message.Path;
+            _pendingScriptTargetMember = null;
+            AutoSave();
+        }
+        else if (_pendingScriptTargetStep != null)
+        {
+            _pendingScriptTargetStep.StepScriptPath = message.Path;
+            _pendingScriptTargetStep = null;
+            AutoSave();
+        }
+    }
+
+    public static string GetStepStorageName(ArmyQueueStepViewModel step)
+    {
+        string safeSquad = Regex.Replace(step?.Name ?? "Squad", @"[^\w\.-]", "_");
+        string scriptBase = Path.GetFileNameWithoutExtension(step?.StepScriptPath ?? "Script");
+        return $"ArmyQueue_{safeSquad}_{scriptBase}";
+    }
+
+    public static string GetMemberStorageName(ArmyQueueStepViewModel? step, ArmyQueueMemberViewModel member)
+    {
+        string safeSquad = Regex.Replace(step?.Name ?? "Squad", @"[^\w\.-]", "_");
+        string safeUser = Regex.Replace(member?.Username ?? "Player", @"[^\w\.-]", "_");
+        string scriptBase = Path.GetFileNameWithoutExtension(member?.ScriptPath ?? "Script");
+        return $"ArmyQueue_{safeSquad}_{safeUser}_{scriptBase}";
+    }
+
+    [RelayCommand]
+    public async Task EditStepScriptConfig(ArmyQueueStepViewModel? step)
+    {
+        step ??= SelectedStep;
+        if (step == null || string.IsNullOrWhiteSpace(step.StepScriptPath))
+        {
+            _dialogService.ShowMessageBox("Please select a script for this squad first.", "No Script Selected");
+            return;
+        }
+
+        if (!File.Exists(step.StepScriptPath))
+        {
+            _dialogService.ShowMessageBox($"Script file not found:\n{step.StepScriptPath}", "Script Not Found");
+            return;
+        }
+
+        string storageName = GetStepStorageName(step);
+        await ConfigureScriptInternal(step.StepScriptPath, storageName);
+    }
+
+    [RelayCommand]
+    public async Task EditMemberScriptConfig(ArmyQueueMemberViewModel? member)
+    {
+        if (member == null || string.IsNullOrWhiteSpace(member.ScriptPath))
+        {
+            _dialogService.ShowMessageBox("Please assign a role script for this player first.", "No Script Selected");
+            return;
+        }
+
+        if (!File.Exists(member.ScriptPath))
+        {
+            _dialogService.ShowMessageBox($"Script file not found:\n{member.ScriptPath}", "Script Not Found");
+            return;
+        }
+
+        string storageName = GetMemberStorageName(SelectedStep, member);
+        await ConfigureScriptInternal(member.ScriptPath, storageName);
+    }
+
+    private async Task ConfigureScriptInternal(string scriptPath, string storageName)
+    {
+        try
+        {
+            _scriptManager.SetLoadedScript(scriptPath);
+            object? compiled = await Task.Run(() => _scriptManager.Compile(File.ReadAllText(scriptPath)));
+            if (compiled == null)
+            {
+                _dialogService.ShowMessageBox("Failed to compile script for configuration.", "Script Error");
+                return;
+            }
+
+            _scriptManager.OverrideStorage = storageName;
+            _scriptManager.LoadScriptConfig(compiled);
+            if (_scriptManager.Config != null && (_scriptManager.Config.Options.Count > 0 || _scriptManager.Config.MultipleOptions.Count > 0))
+            {
+                _scriptManager.Config.Configure();
+            }
+            else
+            {
+                _dialogService.ShowMessageBox("The loaded script has no options to configure.", "No Options");
+            }
+        }
+        catch (Exception ex)
+        {
+            _dialogService.ShowMessageBox($"Script cannot be configured as it has compilation errors:\n{ex.Message}", "Script Error");
+        }
+        finally
+        {
+            _scriptManager.OverrideStorage = null;
+        }
     }
 
     public ObservableCollection<ArmyQueueStepViewModel> Steps { get; }
@@ -551,7 +700,15 @@ public partial class ArmyQueueViewModel : ObservableRecipient
                     ? member.ScriptPath
                     : (currentStep.StepScriptPath ?? string.Empty);
 
-                Process? proc = LaunchMemberProcess(acc, targetScript);
+                string? optionsStorage = null;
+                if (!string.IsNullOrWhiteSpace(targetScript))
+                {
+                    optionsStorage = !string.IsNullOrWhiteSpace(member.ScriptPath)
+                        ? GetMemberStorageName(currentStep, member)
+                        : GetStepStorageName(currentStep);
+                }
+
+                Process? proc = LaunchMemberProcess(acc, targetScript, optionsStorage);
                 if (proc != null)
                 {
                     member.ProcessId = proc.Id;
@@ -658,7 +815,7 @@ public partial class ArmyQueueViewModel : ObservableRecipient
         _dialogService.ShowMessageBox("All scheduled Army Queue squads have completed their runs!", "Army Queue Finished");
     }
 
-    private Process? LaunchMemberProcess(IAccountItemViewModel acc, string scriptPath)
+    private Process? LaunchMemberProcess(IAccountItemViewModel acc, string scriptPath, string? optionsStorage = null)
     {
         try
         {
@@ -689,6 +846,12 @@ public partial class ArmyQueueViewModel : ObservableRecipient
             {
                 psi.ArgumentList.Add("--run-script");
                 psi.ArgumentList.Add(scriptPath);
+
+                if (!string.IsNullOrWhiteSpace(optionsStorage))
+                {
+                    psi.ArgumentList.Add("--script-options-storage");
+                    psi.ArgumentList.Add(optionsStorage);
+                }
             }
 
             psi.ArgumentList.Add("--exit-on-script-stop");

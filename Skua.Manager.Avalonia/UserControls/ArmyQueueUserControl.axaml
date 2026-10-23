@@ -236,7 +236,7 @@
                                         BorderThickness="1"
                                         CornerRadius="6"
                                         Padding="10,0">
-                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8" VerticalAlignment="Center">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto" ColumnSpacing="6" VerticalAlignment="Center">
                                         <materialIcons:MaterialIcon Grid.Column="0"
                                                                     Kind="FileCodeOutline"
                                                                     Width="16"
@@ -260,22 +260,51 @@
                                                        IsVisible="{Binding SelectedStep.HasStepScript}" />
                                         </Panel>
 
-                                        <!-- Browse Button -->
+                                        <!-- Browse Repo Button -->
                                         <Button Grid.Column="2"
                                                 Classes="skua-button"
                                                 Height="24"
-                                                Padding="10,0"
+                                                Padding="8,0"
                                                 VerticalAlignment="Center"
-                                                ToolTip.Tip="Select default script for this squad"
-                                                Command="{Binding SelectedStep.BrowseStepScriptCommand}">
+                                                ToolTip.Tip="Browse and download scripts from repository"
+                                                Command="{Binding OpenScriptRepoForStepCommand}"
+                                                CommandParameter="{Binding SelectedStep}">
                                             <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                                <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="13" Height="13" />
+                                                <materialIcons:MaterialIcon Kind="Magnify" Width="13" Height="13" />
                                                 <TextBlock Text="Browse" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" />
                                             </StackPanel>
                                         </Button>
 
-                                        <!-- Clear Button (Only visible when script is set!) -->
+                                        <!-- Select from disk (Folder) Button -->
                                         <Button Grid.Column="3"
+                                                Classes="skua-button"
+                                                Height="24"
+                                                Width="24"
+                                                Padding="0"
+                                                VerticalAlignment="Center"
+                                                ToolTip.Tip="Select script file from folder"
+                                                Command="{Binding SelectedStep.BrowseStepScriptCommand}">
+                                            <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="13" Height="13" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        </Button>
+
+                                        <!-- Configure Options Button (Only visible when script is set!) -->
+                                        <Button Grid.Column="4"
+                                                Classes="skua-button"
+                                                Height="24"
+                                                Padding="8,0"
+                                                VerticalAlignment="Center"
+                                                ToolTip.Tip="Configure options for this squad's script"
+                                                IsVisible="{Binding SelectedStep.HasStepScript}"
+                                                Command="{Binding EditStepScriptConfigCommand}"
+                                                CommandParameter="{Binding SelectedStep}">
+                                            <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                <materialIcons:MaterialIcon Kind="TuneVertical" Width="13" Height="13" />
+                                                <TextBlock Text="Options" FontSize="10" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- Clear Button (Only visible when script is set!) -->
+                                        <Button Grid.Column="5"
                                                 Classes="skua-button"
                                                 Height="20"
                                                 Width="20"
@@ -350,15 +379,42 @@
 
                                                 <!-- Role Script Override -->
                                                 <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                    <!-- Browse Repo for Role -->
                                                     <Button Classes="skua-button"
-                                                            Padding="8,3"
-                                                            ToolTip.Tip="Assign custom role script for this player"
-                                                            Command="{Binding BrowseScriptCommand}">
-                                                        <StackPanel Orientation="Horizontal" Spacing="4">
-                                                            <materialIcons:MaterialIcon Kind="FileEditOutline" Width="12" Height="12" />
-                                                            <TextBlock Text="Role Script" FontSize="10" />
+                                                            Height="24"
+                                                            Padding="6,0"
+                                                            ToolTip.Tip="Browse scripts repo for this player's role script"
+                                                            Command="{Binding $parent[UserControl].((vm:ArmyQueueViewModel)DataContext).OpenScriptRepoForMemberCommand}"
+                                                            CommandParameter="{Binding}">
+                                                        <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                            <materialIcons:MaterialIcon Kind="Magnify" Width="12" Height="12" />
+                                                            <TextBlock Text="Role" FontSize="10" VerticalAlignment="Center" />
                                                         </StackPanel>
                                                     </Button>
+
+                                                    <!-- Select from disk (Folder) -->
+                                                    <Button Classes="skua-button"
+                                                            Height="24"
+                                                            Width="24"
+                                                            Padding="0"
+                                                            ToolTip.Tip="Select role script from disk"
+                                                            Command="{Binding BrowseScriptCommand}">
+                                                        <materialIcons:MaterialIcon Kind="FolderOpenOutline" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Button>
+
+                                                    <!-- Configure Options Button (Only visible when custom script is set!) -->
+                                                    <Button Classes="skua-button"
+                                                            Height="24"
+                                                            Width="24"
+                                                            Padding="0"
+                                                            ToolTip.Tip="Configure options for this player's role script"
+                                                            IsVisible="{Binding HasCustomScript}"
+                                                            Command="{Binding $parent[UserControl].((vm:ArmyQueueViewModel)DataContext).EditMemberScriptConfigCommand}"
+                                                            CommandParameter="{Binding}">
+                                                        <materialIcons:MaterialIcon Kind="TuneVertical" Width="12" Height="12" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                    </Button>
+
+                                                    <!-- Clear Custom Script -->
                                                     <Button Classes="skua-button"
                                                             Height="20"
                                                             Width="20"

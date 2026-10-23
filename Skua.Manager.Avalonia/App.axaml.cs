@@ -8,6 +8,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Skua.Core.AppStartup;
 using Skua.Core.Interfaces;
 using Skua.Core.Messaging;
+using Skua.Core.Interfaces.Services;
+using Skua.Core.Options;
+using Skua.Core.Scripts;
 using Skua.Core.Services;
 using Skua.Manager.Avalonia.AppStartup;
 using Skua.Manager.Avalonia.Services;
@@ -30,6 +33,17 @@ public partial class App : Application
         var services = new ServiceCollection();
 
         services.AddCommonServices();
+        services.AddTransient(Skua.Core.AppStartup.Services.CreateCompiler);
+        services.AddSingleton<ILogService, LogService>();
+        services.AddSingleton(new Lazy<IScriptInterface>(() => null!));
+        services.AddSingleton(new Lazy<IScriptHandlers>(() => null!));
+        services.AddSingleton(new Lazy<IScriptSkill>(() => null!));
+        services.AddSingleton(new Lazy<IScriptDrop>(() => null!));
+        services.AddSingleton(new Lazy<IScriptWait>(() => null!));
+        services.AddSingleton(new Lazy<IAuraMonitorService>(() => null!));
+        services.AddSingleton<IScriptManager, ScriptManager>();
+        services.AddTransient<IScriptOptionContainer, ScriptOptionContainer>();
+        services.AddTransient<IOptionContainer, OptionContainer>();
         services.AddSingleton<ISettingsService, SettingsService>();
         services.AddSingleton<IDispatcherService, DispatcherService>();
         services.AddSingleton<IDialogService, DialogService>();

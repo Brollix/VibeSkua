@@ -120,6 +120,11 @@ public sealed class SkuaStartupHandler : IDisposable
                     try
                     {
                         var scriptLoader = Ioc.Default.GetRequiredService<ScriptLoaderViewModel>();
+                        if (!string.IsNullOrWhiteSpace(_options.ScriptOptionsStorage))
+                        {
+                            scriptLoader.ScriptManager.OverrideStorage = _options.ScriptOptionsStorage;
+                            scriptLoader.ScriptManager.SilentConfig = true;
+                        }
                         scriptLoader.LoadScript(_options.Script);
                         await scriptLoader.StartScriptAsync(_options.Script);
                     }
@@ -159,6 +164,7 @@ public sealed class SkuaStartupHandler : IDisposable
         public string? Password { get; private set; }
         public string? Server { get; private set; } = "Twilly";
         public string? Script { get; private set; }
+        public string? ScriptOptionsStorage { get; private set; }
         public string? LoadScript { get; private set; }
         public string? UseTheme { get; private set; }
         public string? GitHubToken { get; private set; }
@@ -200,6 +206,9 @@ public sealed class SkuaStartupHandler : IDisposable
                         break;
                     case "--run-script":
                         options.Script = NextValue();
+                        break;
+                    case "--script-options-storage":
+                        options.ScriptOptionsStorage = NextValue();
                         break;
                     case "--load-script":
                         options.LoadScript = NextValue();

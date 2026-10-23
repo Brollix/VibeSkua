@@ -1077,6 +1077,10 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         if (string.IsNullOrEmpty(message.Path))
             return;
 
+        var armyQueue = Ioc.Default.GetService<ArmyQueueViewModel>();
+        if (armyQueue != null && armyQueue.HasPendingScriptTarget)
+            return;
+
         ScriptPath = message.Path;
 
         _dialogService.ShowMessageBox($"Script loaded: {Path.GetFileName(message.Path)}", "Script Loaded");
