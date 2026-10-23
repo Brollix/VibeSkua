@@ -112,6 +112,17 @@ public interface IScriptServers : INotifyPropertyChanged
     void Logout();
 
     /// <summary>
+    /// Disconnects and returns to the login screen without sending an intentional logout request.
+    /// Used by reconnect operations.
+    /// </summary>
+    /// <remarks>Older adapters fall back to their existing logout implementation.</remarks>
+    void DisconnectForRelogin()
+    {
+        Logout();
+        IsIntentionalLogout = false;
+    }
+
+    /// <summary>
     /// Logs in and connects to the server with specified <paramref name="name"/>.
     /// </summary>
     /// <param name="serverName">Name of the server to connect to.</param>

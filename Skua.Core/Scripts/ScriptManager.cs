@@ -800,18 +800,20 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
             List<string> normalizedDeps = new();
             foreach (string dep in deps)
             {
-                bool containsDep;
+                string? matchingFile;
                 _includedFilesLock.EnterReadLock();
                 try
                 {
-                    containsDep = _includedFiles.Contains(dep);
+                    matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.Ordinal));
+                    if (matchingFile is null && OperatingSystem.IsWindows())
+                        matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.OrdinalIgnoreCase));
                 }
                 finally
                 {
                     _includedFilesLock.ExitReadLock();
                 }
-                if (containsDep)
-                    normalizedDeps.Add(dep);
+                if (matchingFile is not null)
+                    normalizedDeps.Add(matchingFile);
             }
             dependencyGraph[includedFile] = normalizedDeps;
         });
@@ -861,18 +863,20 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
                 List<string> normalizedDeps = new();
                 foreach (string dep in deps)
                 {
-                    bool containsDep;
+                    string? matchingFile;
                     _includedFilesLock.EnterReadLock();
                     try
                     {
-                        containsDep = _includedFiles.Contains(dep);
+                        matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.Ordinal));
+                        if (matchingFile is null && OperatingSystem.IsWindows())
+                            matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.OrdinalIgnoreCase));
                     }
                     finally
                     {
                         _includedFilesLock.ExitReadLock();
                     }
-                    if (containsDep)
-                        normalizedDeps.Add(dep);
+                    if (matchingFile is not null)
+                        normalizedDeps.Add(matchingFile);
                 }
                 dependencyGraph[newFile] = normalizedDeps;
             }
