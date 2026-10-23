@@ -132,14 +132,24 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
             EnqueueAction(async () => await SendEmbedAsync("Script Started", $"**{GetBotName()}** has begun execution of **{scriptName}**.", 0x00FF00)); // Green
         }
 
-        // Send an initial dashboard snapshot immediately. WebhookPingInterval defaults to 0,
-        // which disables the periodic timer, so relying on the timer alone leaves the dashboard
-        // without character, equipment, and quest data after Script Started.
-        EnqueueAction(async () =>
+        // Send an initial dashboard snapshot to Skua Nexus if configured
+        if (settings != null && !string.IsNullOrWhiteSpace(settings.NexusWebhookUrl))
         {
-            List<object> fields = BuildDashboardSnapshotFields();
-            await SendEmbedAsync("Health Ping", $"**{GetBotName()}** is running.", 0x808080, fields);
-        });
+            EnqueueAction(async () =>
+            {
+                List<object> fields = BuildDashboardSnapshotFields();
+                await SendEmbedToUrlAsync(settings.NexusWebhookUrl.Trim(), "Health Ping", $"**{GetBotName()}** is running.", 0x808080, fields);
+            });
+        }
+        else if (settings != null && settings.WebhookNotifyHealthPing && !string.IsNullOrWhiteSpace(settings.DiscordWebhookUrl))
+        {
+            // Only send initial Health Ping to Discord if user explicitly enabled Health Pings
+            EnqueueAction(async () =>
+            {
+                List<object> fields = BuildDashboardSnapshotFields();
+                await SendEmbedToUrlAsync(settings.DiscordWebhookUrl.Trim(), "Health Ping", $"**{GetBotName()}** is running.", 0x808080, fields);
+            });
+        }
 
         StartPingTimer();
     }
@@ -151,11 +161,15 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         {
             _scriptStartTime = null;
             StopPingTimer();
-            EnqueueAction(async () =>
+
+            if (settings != null && !string.IsNullOrWhiteSpace(settings.NexusWebhookUrl))
             {
-                List<object> fields = BuildDashboardSnapshotFields();
-                await SendEmbedAsync("Health Ping", $"**{GetBotName()}** has stopped.", 0x808080, fields);
-            });
+                EnqueueAction(async () =>
+                {
+                    List<object> fields = BuildDashboardSnapshotFields();
+                    await SendEmbedToUrlAsync(settings.NexusWebhookUrl.Trim(), "Health Ping", $"**{GetBotName()}** has stopped.", 0x808080, fields);
+                });
+            }
             return;
         }
 
@@ -186,11 +200,14 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
             }
         }
 
-        EnqueueAction(async () =>
+        if (!string.IsNullOrWhiteSpace(settings.NexusWebhookUrl))
         {
-            List<object> fields = BuildDashboardSnapshotFields();
-            await SendEmbedAsync("Health Ping", $"**{GetBotName()}** has stopped.", 0x808080, fields);
-        });
+            EnqueueAction(async () =>
+            {
+                List<object> fields = BuildDashboardSnapshotFields();
+                await SendEmbedToUrlAsync(settings.NexusWebhookUrl.Trim(), "Health Ping", $"**{GetBotName()}** has stopped.", 0x808080, fields);
+            });
+        }
 
         _scriptStartTime = null;
         StopPingTimer();
@@ -212,11 +229,14 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
             EnqueueAction(async () => await SendEmbedAsync("Script Error", $"**{GetBotName()}** crashed unexpectedly.", 0xFF0000, fields)); // Red
         }
 
-        EnqueueAction(async () =>
+        if (settings != null && !string.IsNullOrWhiteSpace(settings.NexusWebhookUrl))
         {
-            List<object> fields = BuildDashboardSnapshotFields();
-            await SendEmbedAsync("Health Ping", $"**{GetBotName()}** crashed.", 0xFF0000, fields);
-        });
+            EnqueueAction(async () =>
+            {
+                List<object> fields = BuildDashboardSnapshotFields();
+                await SendEmbedToUrlAsync(settings.NexusWebhookUrl.Trim(), "Health Ping", $"**{GetBotName()}** crashed.", 0xFF0000, fields);
+            });
+        }
 
         StopPingTimer();
     }
@@ -236,9 +256,19 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         var settings = _settingsService.GetClient();
         if (settings == null) return;
 
-        // Keep dashboard counters live even when optional webhook pings are disabled.
-        // Respect a configured interval; otherwise refresh dashboard snapshots every minute.
-        int intervalMinutes = settings.WebhookPingInterval > 0 ? settings.WebhookPingInterval : 1;
+        bool hasNexus = !string.IsNullOrWhiteSpace(settings.NexusWebhookUrl);
+        bool sendDiscord = !string.IsNullOrWhiteSpace(settings.DiscordWebhookUrl) && settings.WebhookNotifyHealthPing;
+
+        if (!hasNexus && !sendDiscord)
+        {
+            StopPingTimer();
+            return;
+        }
+
+        int intervalMinutes = settings.WebhookPingInterval > 0 
+            ? settings.WebhookPingInterval 
+            : (sendDiscord ? 10 : 1);
+
         _pingTimer?.Dispose();
         int intervalMs = (int)TimeSpan.FromMinutes(intervalMinutes).TotalMilliseconds;
         _pingTimer = new System.Threading.Timer(OnPingTimerElapsed, null, intervalMs, intervalMs);
@@ -258,10 +288,28 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
             return;
         }
 
+        bool hasNexus = !string.IsNullOrWhiteSpace(settings.NexusWebhookUrl);
+        bool sendDiscord = !string.IsNullOrWhiteSpace(settings.DiscordWebhookUrl) && settings.WebhookNotifyHealthPing;
+
+        if (!hasNexus && !sendDiscord)
+        {
+            StopPingTimer();
+            return;
+        }
+
         EnqueueAction(async () =>
         {
             List<object> fields = BuildDashboardSnapshotFields();
-            await SendEmbedAsync("Health Ping", $"**{GetBotName()}** is running flawlessly.", 0x808080, fields);
+
+            if (sendDiscord && !string.IsNullOrWhiteSpace(settings.DiscordWebhookUrl))
+            {
+                await SendEmbedToUrlAsync(settings.DiscordWebhookUrl.Trim(), "Health Ping", $"**{GetBotName()}** is running flawlessly.", 0x808080, fields);
+            }
+
+            if (hasNexus && !string.IsNullOrWhiteSpace(settings.NexusWebhookUrl))
+            {
+                await SendEmbedToUrlAsync(settings.NexusWebhookUrl.Trim(), "Health Ping", $"**{GetBotName()}** is running flawlessly.", 0x808080, fields);
+            }
         });
     }
 

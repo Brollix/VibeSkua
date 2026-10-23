@@ -87,9 +87,10 @@ internal class Options
             CreateSettingOptionItem<bool>("Webhook: Notify on Relog", "Send alerts when Skua disconnects and relogs", "WebhookNotifyRelogged"),
             CreateSettingOptionItem<bool>("Webhook: Notify on Item Drop", "Send webhook notifications (and screenshot) when a specific item drops", "WebhookNotifyItemDrops"),
             CreateSettingOptionItem<string>("Webhook: Drop List", "Comma-separated list of items to notify on drop", "WebhookNotifyItemDropsList"),
-            new CommandOptionItemViewModel<int>("Webhook: Ping Interval (Mins)", "Send live health and bot statistics snapshots every X minutes while running", "WebhookPingInterval", "Min", new RelayCommand<string>(value =>
+            CreateSettingOptionItem<bool>("Webhook: Enable Health Pings", "Whether to send periodic health and bot statistics pings to Discord", "WebhookNotifyHealthPing"),
+            new CommandOptionItemViewModel<int>("Webhook: Health Ping Interval (Mins)", "Minutes between health pings (e.g. 5, 10, 30)", "WebhookPingInterval", "Min", new RelayCommand<string>(value =>
             {
-                if (!int.TryParse(value, out int result) || result < 0) return;
+                if (!int.TryParse(value, out int result) || result < 1) return;
                 Ioc.Default.GetRequiredService<ISettingsService>().Set("WebhookPingInterval", result);
             }), s.GetRequiredService<ISettingsService>().Get<int>("WebhookPingInterval")),
             new CommandOptionItemViewModel<int>("* Client Animation Frame-rate", "Client side animation frame-rate setting", "ClientAnim", "FPS", new RelayCommand<string>(value =>

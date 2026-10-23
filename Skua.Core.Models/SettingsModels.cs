@@ -265,8 +265,11 @@ public class ClientSettings
     [JsonPropertyName("WebhookNotifyItemDropsList")]
     public string WebhookNotifyItemDropsList { get; set; } = "Unidentified 34, Void Aura";
 
+    [JsonPropertyName("WebhookNotifyHealthPing")]
+    public bool WebhookNotifyHealthPing { get; set; } = false;
+
     [JsonPropertyName("WebhookPingInterval")]
-    public int WebhookPingInterval { get; set; } = 0;
+    public int WebhookPingInterval { get; set; } = 10;
 
     [JsonPropertyName("CheckAdvanceSkillSetsUpdates")]
     public bool CheckAdvanceSkillSetsUpdates { get; set; } = true;

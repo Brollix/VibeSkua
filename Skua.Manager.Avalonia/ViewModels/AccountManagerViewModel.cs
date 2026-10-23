@@ -288,17 +288,25 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     [RelayCommand]
     public async Task RemoveAccounts()
     {
-        List<IAccountItemViewModel> toRemove = new();
-        foreach (IAccountItemViewModel acc in Accounts)
+        List<IAccountItemViewModel> toRemove = Accounts.Where(acc => acc.UseCheck).ToList();
+        if (toRemove.Count == 0)
         {
-            if (acc.UseCheck)
-                toRemove.Add(acc);
+            _dialogService.ShowMessageBox("No accounts selected to remove.", "Remove Accounts");
+            return;
         }
 
+        string message = toRemove.Count == 1
+            ? $"Are you sure you want to remove account '{toRemove[0].Username}'?"
+            : $"Are you sure you want to remove all {toRemove.Count} selected accounts?";
+
+        if (_dialogService.ShowMessageBox(message, "Confirm Account Removal", true) != true)
+            return;
+
         foreach (IAccountItemViewModel acc in toRemove)
-            _RemoveAccount(acc);
+            _RemoveAccountInternal(acc);
 
         _SaveAccounts();
+        _SaveGroups();
     }
 
     [RelayCommand]
@@ -366,6 +374,17 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
     private void _RemoveAccount(IAccountItemViewModel account)
     {
+        string message = $"Are you sure you want to remove account '{account.Username}'?";
+        if (_dialogService.ShowMessageBox(message, "Confirm Account Removal", true) != true)
+            return;
+
+        _RemoveAccountInternal(account);
+        _SaveAccounts();
+        _SaveGroups();
+    }
+
+    private void _RemoveAccountInternal(IAccountItemViewModel account)
+    {
         if (account.UseCheck)
             SelectedAccountQuant--;
 
@@ -381,9 +400,6 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         Accounts.Remove(account);
         FilteredAccounts.Remove(account);
         ReindexAccounts();
-
-        _SaveAccounts();
-        _SaveGroups();
     }
 
     private void AccountSelected(AccountManagerViewModel recipient, AccountSelectedMessage message)
@@ -526,6 +542,9 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     {
         if (Groups.Contains(group))
         {
+            if (_dialogService.ShowMessageBox($"Are you sure you want to delete group '{group.Name}'?", "Confirm Delete Group", true) != true)
+                return;
+
             Groups.Remove(group);
             _SaveGroups();
         }
