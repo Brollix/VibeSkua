@@ -6,7 +6,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Class="Skua.Manager.Avalonia.UserControls.ArmyQueueUserControl"
              x:DataType="vm:ArmyQueueViewModel"
-             d:DesignWidth="700"
+             d:DesignWidth="850"
              d:DesignHeight="500"
              mc:Ignorable="d">
 
