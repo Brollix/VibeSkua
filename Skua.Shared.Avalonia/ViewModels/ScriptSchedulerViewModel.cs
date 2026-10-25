@@ -1,3 +1,4 @@
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using CommunityToolkit.Mvvm.Messaging;
@@ -33,7 +34,7 @@ public partial class ScriptSchedulerViewModel : BotControlViewModelBase
         _windowService = windowService;
         _dialogService = dialogService;
         
-        StrongReferenceMessenger.Default.Register<ScriptSchedulerViewModel, ScriptStoppedMessage, int>(this, (int)MessageChannels.ScriptStatus, (r, m) => r.OnScriptStopped());
+        StrongReferenceMessenger.Default.Register<ScriptSchedulerViewModel, ScriptStoppedMessage, int>(this, (int)MessageChannels.ScriptStatus, (r, m) => Dispatcher.UIThread.Post(r.OnScriptStopped));
         StrongReferenceMessenger.Default.Register<ScriptSchedulerViewModel, QueueScriptMessage, int>(this, (int)MessageChannels.ScriptStatus, (r, m) => r.OnQueueScript(m));
     }
 
@@ -456,14 +457,18 @@ public partial class ScriptSchedulerViewModel : BotControlViewModelBase
             }
         }
 
-        Task.Run(async () => 
+        System.Threading.CancellationToken queueToken = _queueCts?.Token ?? System.Threading.CancellationToken.None;
+        _ = Task.Run(async () =>
         {
             try
             {
-                await Task.Delay(2000, _queueCts!.Token);
-                RunNextScript();
+                await Task.Delay(2000, queueToken);
+                Dispatcher.UIThread.Post(RunNextScript);
             }
-            catch (TaskCanceledException) { }
+            catch (TaskCanceledException)
+            {
+                // The queue was stopped while waiting to start the next script.
+            }
         });
     }
 
