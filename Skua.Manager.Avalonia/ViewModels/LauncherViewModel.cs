@@ -173,10 +173,22 @@ public partial class LauncherViewModel : BotControlViewModelBase, IDisposable
         if (procInfo == null)
             return;
 
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
-            procInfo.Process.Kill();
-            _dispatcherService.Invoke(() => SkuaProcesses.Remove(procInfo));
+            try
+            {
+                if (!procInfo.Process.HasExited)
+                {
+                    procInfo.Process.Kill();
+                    await procInfo.Process.WaitForExitAsync();
+                }
+
+                _dispatcherService.Invoke(() => SkuaProcesses.Remove(procInfo));
+            }
+            catch (Exception ex)
+            {
+                Trace.WriteLine($"Failed to stop process: {ex}");
+            }
         });
     }
 
