@@ -110,8 +110,23 @@ public partial class ScriptQuest : ObservableRecipient, IScriptQuest
     private Dictionary<int, int> _questCompleteCooldowns = new();
     private Dictionary<int, int> _questAcceptCooldowns = new();
     private readonly object _registeredLock = new();
-    public IEnumerable<int> Registered => _registered.Items;
-    public IReadOnlyDictionary<int, int> RegisteredRewards => _registeredRewards;
+    public IEnumerable<int> Registered
+    {
+        get
+        {
+            lock (_registeredLock)
+                return _registered.Items.ToArray();
+        }
+    }
+
+    public IReadOnlyDictionary<int, int> RegisteredRewards
+    {
+        get
+        {
+            lock (_registeredLock)
+                return new Dictionary<int, int>(_registeredRewards);
+        }
+    }
 
     public void Load(params int[] ids)
     {
@@ -599,7 +614,8 @@ public partial class ScriptQuest : ObservableRecipient, IScriptQuest
             {
                 Wait.ForActionCooldown(GameActions.AcceptQuest);
                 Accept(quest);
-                _questAcceptCooldowns[quest] = Environment.TickCount;
+                lock (_registeredLock)
+                    _questAcceptCooldowns[quest] = Environment.TickCount;
 
                 // Invalidate cache to force fresh read
                 _cachedTree = null;
