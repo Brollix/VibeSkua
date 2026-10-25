@@ -36,6 +36,7 @@ public partial class AppUpdaterViewModel : ObservableObject
 
     public async Task CheckForUpdateAsync()
     {
+        _updateInfo = null;
         _dispatcherService.Invoke(() =>
         {
             IsChecking = true;
