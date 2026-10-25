@@ -586,6 +586,15 @@ public class DialogService : IDialogService
     {
         Window dialog = CreateBaseDialog(title);
         dialog.Width = (message.Length > 200 || message.Contains('\n')) ? 560 : 460;
+        dialog.SizeToContent = SizeToContent.Manual;
+        dialog.CanResize = true;
+
+        double maxScreenHeight = 720;
+        var screen = Skua.Shared.Avalonia.Services.WindowPlacementHelper.GetTargetScreen(dialog);
+        if (screen != null)
+            maxScreenHeight = Math.Max(160, screen.WorkingArea.Height * 0.85);
+        dialog.MinHeight = 160;
+        dialog.MaxHeight = maxScreenHeight;
 
         SelectableTextBlock label = new()
         {
@@ -594,11 +603,12 @@ public class DialogService : IDialogService
             FontSize = 13,
             LineHeight = 20
         };
+        label.Measure(new Size(dialog.Width - 34, double.PositiveInfinity));
+        dialog.Height = Math.Min(maxScreenHeight, Math.Max(dialog.MinHeight, label.DesiredSize.Height + 112));
 
         ScrollViewer scrollViewer = new()
         {
             Content = label,
-            MaxHeight = 360,
             HorizontalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled,
             VerticalScrollBarVisibility = global::Avalonia.Controls.Primitives.ScrollBarVisibility.Auto
         };
@@ -663,16 +673,16 @@ public class DialogService : IDialogService
         footerPanel.Children.Add(copyButton);
         footerPanel.Children.Add(buttonPanel);
 
-        StackPanel content = new()
+        Grid content = new()
         {
             Margin = new Thickness(16),
-            Spacing = 16,
-            Children =
-            {
-                scrollViewer,
-                footerPanel
-            }
+            RowDefinitions = new RowDefinitions("*,Auto"),
+            RowSpacing = 16
         };
+        Grid.SetRow(scrollViewer, 0);
+        Grid.SetRow(footerPanel, 1);
+        content.Children.Add(scrollViewer);
+        content.Children.Add(footerPanel);
 
         dialog.Content = WrapWithShell(title, content);
         Show(dialog);
