@@ -114,7 +114,7 @@ public partial class ClientUpdatesViewModel : BotControlViewModelBase
     [RelayCommand]
     public async Task Update()
     {
-        if (!UpdateVisible || IsBusy)
+        if (!UpdateVisible)
             return;
 
         IsBusy = true;
