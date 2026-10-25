@@ -299,10 +299,13 @@ public partial class LoaderViewModel : BotControlViewModelBase, IManagedWindow
             IsLoading = false;
             ProgressReport = string.Empty;
         }
-        catch (Exception)
+        catch (Exception ex)
+        {
+            ProgressReport = $"Failed to update quest: {ex.Message}";
+        }
+        finally
         {
             IsLoading = false;
-            ProgressReport = string.Empty;
         }
     }
 
