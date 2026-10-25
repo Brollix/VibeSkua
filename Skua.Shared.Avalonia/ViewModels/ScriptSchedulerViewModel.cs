@@ -168,12 +168,14 @@ public partial class ScriptSchedulerViewModel : BotControlViewModelBase
                 _manager.Config.Configure();
             else
                 _dialogService.ShowMessageBox("The loaded script has no options to configure.", "No Options");
-            
-            _manager.OverrideStorage = null;
         }
         catch (Exception ex)
         {
             _dialogService.ShowMessageBox($"Script cannot be configured as it has compilation errors:\r\n{ex}", "Script Error");
+        }
+        finally
+        {
+            _manager.OverrideStorage = null;
         }
     }
 
