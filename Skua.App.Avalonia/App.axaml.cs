@@ -11,6 +11,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Skua.App.Avalonia.Flash;
 using Skua.App.Avalonia.AppStartup;
 using Skua.App.Avalonia.Services;
+using Skua.App.Avalonia.Views;
 using Skua.Shared.Avalonia.Services;
 using Skua.Shared.Avalonia.Controls.Theming;
 using Skua.Core.AppStartup;
