@@ -508,9 +508,9 @@ public partial class App : Application
     {
         if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop || desktop.MainWindow is null)
             return;
-        // Minimize the owner instead of hiding it directly. The embedded game HWNDs
-        // are separate top-level windows owned by the host; Windows hides owned windows
-        // with the owner while preserving the Flash renderer for a clean restore.
+        if (desktop.MainWindow is TabbedHostWindow hostWindow)
+            hostWindow.HideEmbeddedClients();
+
         desktop.MainWindow.WindowState = WindowState.Minimized;
     }
 
@@ -579,6 +579,10 @@ public partial class App : Application
             desktop.MainWindow.Show();
         if (desktop.MainWindow.WindowState == WindowState.Minimized)
             desktop.MainWindow.WindowState = WindowState.Normal;
+
+        if (desktop.MainWindow is TabbedHostWindow hostWindow)
+            hostWindow.ShowEmbeddedClients();
+
         desktop.MainWindow.Activate();
     }
 
