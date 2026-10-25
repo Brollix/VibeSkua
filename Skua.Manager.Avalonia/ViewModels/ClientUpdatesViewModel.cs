@@ -199,7 +199,7 @@ public partial class ClientUpdatesViewModel : BotControlViewModelBase
         try
         {
             await _scriptsService.RefreshScriptsAsync(_progress, token);
-            int count = await _scriptsService.DownloadAllWhereAsync(s => !s.Downloaded || s.Outdated, token);
+            int count = await _scriptsService.DownloadAllWhereAsync(s => !s.Downloaded || s.Outdated);
             ProgressStatus = $"Downloaded {count} scripts.";
             Status = "Scripts are up to date.";
         }
