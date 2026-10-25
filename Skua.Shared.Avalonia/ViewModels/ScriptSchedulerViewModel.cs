@@ -272,11 +272,18 @@ public partial class ScriptSchedulerViewModel : BotControlViewModelBase
         }
 
         string? path = _fileDialog.Save("JSON Files (*.json)|*.json|All files (*.*)|*.*");
-        if (path != null)
+        if (path == null)
+            return;
+
+        try
         {
             var data = ScriptQueue.Select(x => new SavedScriptItem { Path = x.Path, Id = x.Id, Name = x.Name }).ToList();
             File.WriteAllText(path, System.Text.Json.JsonSerializer.Serialize(data, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
             _dialogService.ShowMessageBox("Playlist saved successfully.", "Save Playlist");
+        }
+        catch (Exception ex)
+        {
+            _dialogService.ShowMessageBox($"Failed to save playlist: {ex.Message}", "Save Error");
         }
     }
 
