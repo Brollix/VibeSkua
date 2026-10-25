@@ -1,6 +1,7 @@
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
+using Avalonia.Controls.Templates;
 using Avalonia.Layout;
 using System;
 using System.Collections;
@@ -124,7 +125,14 @@ public partial class PropertyGridControl : UserControl
         ListBox entriesList = new()
         {
             ItemsSource = row.CollectionItems,
-            SelectedIndex = 0
+            SelectedIndex = 0,
+            ItemTemplate = new FuncDataTemplate<object>((item, _) =>
+                new TextBlock
+                {
+                    Text = FormatCollectionEntry(item),
+                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                    Margin = new Thickness(6, 3)
+                })
         };
 
         PropertyGridControl selectedItemProperties = new();
@@ -189,6 +197,30 @@ public partial class PropertyGridControl : UserControl
             editor.Show(owner);
         else
             editor.Show();
+    }
+
+    private static string FormatCollectionEntry(object? item)
+    {
+        if (item == null)
+            return "(null)";
+
+        try
+        {
+            Type itemType = item.GetType();
+            PropertyInfo? nameProperty = itemType.GetProperty("Name", BindingFlags.Public | BindingFlags.Instance);
+            PropertyInfo? idProperty = itemType.GetProperty("ID", BindingFlags.Public | BindingFlags.Instance);
+
+            string name = nameProperty?.GetValue(item)?.ToString()
+                ?? item.ToString()
+                ?? itemType.Name;
+            string? id = idProperty?.GetValue(item)?.ToString();
+
+            return !string.IsNullOrWhiteSpace(id) ? $"[{id}] {name}" : name;
+        }
+        catch
+        {
+            return item.ToString() ?? item.GetType().Name;
+        }
     }
 
     private void UpdateVisibility()
