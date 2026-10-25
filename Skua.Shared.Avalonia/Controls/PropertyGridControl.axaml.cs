@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Controls.Templates;
 using Avalonia.Layout;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -117,7 +119,7 @@ public partial class PropertyGridControl : UserControl
         UpdateVisibility();
     }
 
-    private void OpenCollection_Click(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
+    private void OpenCollection_Click(object? sender, RoutedEventArgs e)
     {
         if (sender is not Button { DataContext: PropertyItemRow row } || row.CollectionItems.Count == 0)
             return;
@@ -130,7 +132,7 @@ public partial class PropertyGridControl : UserControl
                 new TextBlock
                 {
                     Text = FormatCollectionEntry(item),
-                    VerticalAlignment = Avalonia.Layout.VerticalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
                     Margin = new Thickness(6, 3)
                 })
         };
@@ -188,7 +190,7 @@ public partial class PropertyGridControl : UserControl
         closeButton.Click += (_, _) => editor.Close();
         editor.KeyDown += (_, args) =>
         {
-            if (args.Key == Avalonia.Input.Key.Escape)
+            if (args.Key == Key.Escape)
                 editor.Close();
         };
 
