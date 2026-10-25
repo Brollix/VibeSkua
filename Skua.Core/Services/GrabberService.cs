@@ -138,9 +138,9 @@ public class GrabberService : IGrabberService
         catch (Exception ex)
         {
             if (token.IsCancellationRequested)
-                    progress.Report("Task cancelled.");
+                progress.Report("Task cancelled.");
             else
-                    progress.Report($"Operation failed: {ex.Message}");
+                progress.Report($"Operation failed: {ex.Message}");
         }
     }
 
@@ -161,9 +161,9 @@ public class GrabberService : IGrabberService
         catch (Exception ex)
         {
             if (token.IsCancellationRequested)
-                    progress.Report("Task cancelled.");
+                progress.Report("Task cancelled.");
             else
-                    progress.Report($"Operation failed: {ex.Message}");
+                progress.Report($"Operation failed: {ex.Message}");
         }
     }
 
@@ -200,9 +200,9 @@ public class GrabberService : IGrabberService
         catch (Exception ex)
         {
             if (token.IsCancellationRequested)
-                    progress.Report("Task cancelled.");
+                progress.Report("Task cancelled.");
             else
-                    progress.Report($"Operation failed: {ex.Message}");
+                progress.Report($"Operation failed: {ex.Message}");
         }
 
         return;
@@ -284,7 +284,7 @@ public class GrabberService : IGrabberService
         catch
         {
             if (token.IsCancellationRequested)
-                progress.Report("Task cancelled.");
+            progress.Report("Task cancelled.");
             else
                 progress.Report("Failed to complete quest.");
         }
@@ -317,9 +317,9 @@ public class GrabberService : IGrabberService
         catch (Exception ex)
         {
             if (token.IsCancellationRequested)
-                    progress.Report("Task cancelled.");
+                progress.Report("Task cancelled.");
             else
-                    progress.Report($"Operation failed: {ex.Message}");
+                progress.Report($"Operation failed: {ex.Message}");
         }
     }
 
@@ -340,9 +340,9 @@ public class GrabberService : IGrabberService
         catch (Exception ex)
         {
             if (token.IsCancellationRequested)
-                    progress.Report("Task cancelled.");
+                progress.Report("Task cancelled.");
             else
-                    progress.Report($"Operation failed: {ex.Message}");
+                progress.Report($"Operation failed: {ex.Message}");
         }
     }
 
@@ -408,9 +408,9 @@ public class GrabberService : IGrabberService
             catch (Exception ex)
             {
                 if (token.IsCancellationRequested)
-                        progress.Report("Task cancelled.");
+                    progress.Report("Task cancelled.");
                 else
-                        progress.Report($"Operation failed: {ex.Message}");
+                    progress.Report($"Operation failed: {ex.Message}");
             }
 
             return;
@@ -446,9 +446,9 @@ public class GrabberService : IGrabberService
         catch (Exception ex)
         {
             if (token.IsCancellationRequested)
-                    progress.Report("Task cancelled.");
+                progress.Report("Task cancelled.");
             else
-                    progress.Report($"Operation failed: {ex.Message}");
+                progress.Report($"Operation failed: {ex.Message}");
         }
     }
 
@@ -497,9 +497,9 @@ public class GrabberService : IGrabberService
         catch (Exception ex)
         {
             if (token.IsCancellationRequested)
-                    progress.Report("Task cancelled.");
+                progress.Report("Task cancelled.");
             else
-                    progress.Report($"Operation failed: {ex.Message}");
+                progress.Report($"Operation failed: {ex.Message}");
         }
     }
 
@@ -558,9 +558,9 @@ public class GrabberService : IGrabberService
             catch (Exception ex)
             {
                 if (token.IsCancellationRequested)
-                        progress.Report("Task cancelled.");
+                    progress.Report("Task cancelled.");
                 else
-                        progress.Report($"Operation failed: {ex.Message}");
+                    progress.Report($"Operation failed: {ex.Message}");
             }
         }
 
@@ -599,9 +599,9 @@ public class GrabberService : IGrabberService
         catch (Exception ex)
         {
             if (token.IsCancellationRequested)
-                    progress.Report("Task cancelled.");
+                progress.Report("Task cancelled.");
             else
-                    progress.Report($"Operation failed: {ex.Message}");
+                progress.Report($"Operation failed: {ex.Message}");
         }
 
         return;
@@ -653,9 +653,9 @@ public class GrabberService : IGrabberService
         catch (Exception ex)
         {
             if (token.IsCancellationRequested)
-                    progress.Report("Task cancelled.");
+                progress.Report("Task cancelled.");
             else
-                    progress.Report($"Operation failed: {ex.Message}");
+                progress.Report($"Operation failed: {ex.Message}");
         }
     }*/
 
@@ -690,9 +690,9 @@ public class GrabberService : IGrabberService
         catch (Exception ex)
         {
             if (token.IsCancellationRequested)
-                    progress.Report("Task cancelled.");
+                progress.Report("Task cancelled.");
             else
-                    progress.Report($"Operation failed: {ex.Message}");
+                progress.Report($"Operation failed: {ex.Message}");
         }
     }
 
@@ -735,9 +735,9 @@ public class GrabberService : IGrabberService
         catch (Exception ex)
         {
             if (token.IsCancellationRequested)
-                    progress.Report("Task cancelled.");
+                progress.Report("Task cancelled.");
             else
-                    progress.Report($"Operation failed: {ex.Message}");
+                progress.Report($"Operation failed: {ex.Message}");
         }
     }
 }
