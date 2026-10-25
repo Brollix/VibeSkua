@@ -120,7 +120,7 @@ public partial class AppUpdaterViewModel : ObservableObject
             await _updateManager.DownloadUpdatesAsync(_updateInfo, progressObj);
 
             _dispatcherService.Invoke(() => UpdateStatus = "Installing update and restarting...");
-            Task.Run(() => _updateManager.ApplyUpdatesAndRestart(_updateInfo));
+            await Task.Run(() => _updateManager.ApplyUpdatesAndRestart(_updateInfo));
         }
         catch (Exception ex)
         {
