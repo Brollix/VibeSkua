@@ -237,7 +237,21 @@ public partial class ScriptSchedulerViewModel : BotControlViewModelBase
             ScriptQueue[CurrentIndex].Status = "Stopped";
             ScriptQueue[CurrentIndex].Duration = GetFormattedDuration();
         }
-        await _manager.StopScript();
+
+        try
+        {
+            await _manager.StopScript();
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Failed to stop the current scheduler script: {ex}");
+        }
+        finally
+        {
+            _queueCts?.Dispose();
+            _queueCts = null;
+        }
+
         _ = _discord.SendEmbedAsync("Scheduler Stopped", "**Scheduler** playlist execution manually halted.", 0xFF0000);
     }
 
@@ -332,7 +346,10 @@ public partial class ScriptSchedulerViewModel : BotControlViewModelBase
         if (CurrentIndex >= ScriptQueue.Count)
         {
             IsRunningQueue = false;
+            QueueStartedTime = string.Empty;
             _discord.SuppressDefaultNotifications = false;
+            _queueCts?.Dispose();
+            _queueCts = null;
             _ = _discord.SendEmbedAsync("Scheduler Finished", "All scripts in the **Scheduler** playlist have completed!", 0x00FF00);
             return;
         }
