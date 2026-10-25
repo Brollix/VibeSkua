@@ -1882,30 +1882,42 @@ public partial class TabbedHostWindow : Window
             int pid = p.Id;
             Task.Run(async () =>
             {
+                bool childWindowFound = false;
+
                 for (int attempt = 0; attempt < 120 && !p.HasExited && info.ChildHwnd == IntPtr.Zero && !_isClosing; attempt++)
                 {
                     await Task.Delay(50);
-                    if (info.ChildHwnd != IntPtr.Zero) break;
+
+                    if (info.ChildHwnd != IntPtr.Zero)
+                    {
+                        childWindowFound = true;
+                        break;
+                    }
+
                     IntPtr childHwnd = FindWindowByProcessId(pid);
                     if (childHwnd != IntPtr.Zero)
                     {
+                        childWindowFound = true;
                         Dispatcher.UIThread.Post(() =>
                         {
                             if (!_isClosing && info.ChildHwnd == IntPtr.Zero)
-                            {
                                 AttachChildWindow(info, childHwnd);
-                            }
                         });
                         break;
                     }
                 }
 
-                if (info.ChildHwnd == IntPtr.Zero)
+                // AttachChildWindow advances the spawn queue itself. Do not advance it again
+                // when a window was found but its UI-thread attachment has not run yet.
+                if (!childWindowFound && info.ChildHwnd == IntPtr.Zero)
                 {
                     Dispatcher.UIThread.Post(() =>
                     {
-                        _isSpawning = false;
-                        ProcessNextSpawn();
+                        if (info.ChildHwnd == IntPtr.Zero)
+                        {
+                            _isSpawning = false;
+                            ProcessNextSpawn();
+                        }
                     });
                 }
             });
