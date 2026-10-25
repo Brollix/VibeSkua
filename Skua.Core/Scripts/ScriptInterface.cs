@@ -295,14 +295,14 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
             {
                 sw.Restart();
 
-                bool currentPlaying = Flash.IsWorldLoaded && Player.Playing;
-                if (currentPlaying)
+                bool currentInGame = Flash.IsWorldLoaded && Player.LoggedIn;
+                bool currentPlaying = currentInGame && Player.Alive;
+                if (currentInGame)
                 {
                     wasPlaying = true;
                     Servers.LastIP = Player.ServerIP ?? Servers.LastIP;
-
-                    if (Options.RestPackets && !Player.InCombat)
-                        _limit.LimitedRun("rest", 1200, () => Send.Packet("%xt%zm%restRequest%1%%"));
+                    if (Servers.IsIntentionalLogout)
+                        Servers.IsIntentionalLogout = false;
 
                     if (!catching)
                     {
@@ -310,17 +310,24 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
                         catching = true;
                     }
 
-                    _limit.LimitedRun("opts", 250, CheckOptions);
+                    if (currentPlaying)
+                    {
+                        if (Options.RestPackets && !Player.InCombat)
+                            _limit.LimitedRun("rest", 1200, () => Send.Packet("%xt%zm%restRequest%1%%"));
+
+                        _limit.LimitedRun("opts", 250, CheckOptions);
+                    }
                 }
                 else
                 {
-                    if (wasPlaying && !Servers.IsConnected && !_waitForLogin && !Servers.IsIntentionalLogout)
+                    catching = false;
+                    if ((wasPlaying || Manager.ScriptRunning) && !_waitForLogin && !Servers.IsIntentionalLogout && Options.AutoRelogin)
                     {
                         wasPlaying = false;
-                        Log("Unexpected disconnection detected. Triggering auto re-login.");
+                        Log("Unexpected disconnection detected by watchdog. Triggering auto re-login.");
                         BeginLogout();
                     }
-                    else if (!currentPlaying)
+                    else
                     {
                         wasPlaying = false;
                     }
@@ -328,7 +335,7 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
 
                 _limit.LimitedRun("kicked", 1000, () =>
                 {
-                    if (Player.Kicked && !_waitForLogin && !Servers.IsIntentionalLogout)
+                    if (Player.Kicked && !_waitForLogin && !Servers.IsIntentionalLogout && Options.AutoRelogin)
                     {
                         Log("Player kick detected. Triggering auto re-login.");
                         BeginLogout();
@@ -405,7 +412,10 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
                 {
                     if (Flash.GetGameObject("mcConnDetail.txtDetail.text") == "loading map")
                     {
-                        Servers.Logout();
+                        if (Options.AutoRelogin)
+                            BeginLogout();
+                        else
+                            Servers.Logout();
                         return;
                     }
                     Map.Join(Map.LastMap);
@@ -413,7 +423,10 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
             }
             else
             {
-                Servers.Logout();
+                if (Options.AutoRelogin)
+                    BeginLogout();
+                else
+                    Servers.Logout();
             }
         }
         if (connDetail == lastConnDetail)
@@ -462,6 +475,43 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
 
             case "loaded":
                 Initialize();
+                break;
+
+            case "connectionLost":
+                Log("Flash socket connection lost event received.");
+                if (!_waitForLogin && !Servers.IsIntentionalLogout && Options.AutoRelogin)
+                {
+                    BeginLogout();
+                }
+                break;
+
+            case "userIntentionalAction":
+                if (args is { Length: > 0 } && args[0] is string action)
+                {
+                    switch (action)
+                    {
+                        case "logout":
+                            Log("Intentional logout button clicked by user in game. Auto re-login disarmed.");
+                            Servers.IsIntentionalLogout = true;
+                            CancelRelogin();
+                            if (Manager.ScriptRunning)
+                                _ = Manager.StopScript();
+                            break;
+
+                        case "changeServer":
+                            Log("Intentional 'Change Server' button clicked by user in game. Auto re-login disarmed.");
+                            Servers.IsIntentionalLogout = true;
+                            CancelRelogin();
+                            if (Manager.ScriptRunning)
+                                _ = Manager.StopScript();
+                            break;
+
+                        case "selectServer":
+                            Log("Server chosen by user on server list. Watchdog armed.");
+                            Servers.IsIntentionalLogout = false;
+                            break;
+                    }
+                }
                 break;
 
             case "openWebsite":
@@ -660,6 +710,24 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
                 string[] parts = ((string)args[0]).Split('%', StringSplitOptions.RemoveEmptyEntries);
                 switch (parts[2])
                 {
+                    case "eLO":
+                    case "eLO2":
+                        Log("In-game exit logout packet (eLO) detected. Disarming auto re-login.");
+                        Servers.IsIntentionalLogout = true;
+                        CancelRelogin();
+                        if (Manager.ScriptRunning)
+                            _ = Manager.StopScript();
+                        break;
+
+                    case "eSL":
+                    case "eSL2":
+                        Log("In-game exit to server list packet (eSL) detected. Disarming auto re-login.");
+                        Servers.IsIntentionalLogout = true;
+                        CancelRelogin();
+                        if (Manager.ScriptRunning)
+                            _ = Manager.StopScript();
+                        break;
+
                     case "moveToCell":
                         Messenger.Send<CellChangedMessage, int>(new(Map.Name, parts[4], parts[5]), (int)MessageChannels.GameEvents);
                         break;
@@ -677,29 +745,21 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
                     case "cmd":
                         if (parts.Length >= 5 && parts[4] == "logout")
                         {
-                            Messenger.Send<LogoutMessage, int>((int)MessageChannels.GameEvents);
                             if (_waitForLogin)
                             {
                                 break;
                             }
 
-                            if (Player.Kicked)
-                            {
-                                Log("Kick logout detected. Triggering auto re-login.");
-                                BeginLogout();
-                            }
-                            else if (Servers.IsIntentionalLogout)
+                            Messenger.Send<LogoutMessage, int>((int)MessageChannels.GameEvents);
+                            if (Servers.IsIntentionalLogout)
                             {
                                 Log("Intentional logout confirmed. Auto re-login skipped.");
                                 CancelRelogin();
                             }
                             else
                             {
-                                Log("Normal in-game logout detected. Auto re-login skipped.");
-                                Servers.IsIntentionalLogout = true;
-                                CancelRelogin();
-                                if (Manager.ScriptRunning)
-                                    _ = Manager.StopScript();
+                                Log($"Server logout command detected (Kicked: {Player.Kicked}). Triggering auto re-login.");
+                                BeginLogout(logoutNotified: true);
                             }
                         }
                         break;
@@ -728,7 +788,7 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
         _waitForLogin = false;
     }
 
-    private async Task OnLogout()
+    private async Task OnLogout(bool logoutNotified)
     {
         if (!Options.AutoRelogin || _waitForLogin || Servers.IsIntentionalLogout)
             return;
@@ -741,20 +801,50 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
 
         Log("Auto re-login triggered.");
         bool wasRunning = Manager.ScriptRunning;
-        await Manager.StopScript();
-        bool kicked = Player.Kicked;
+        CancellationTokenSource reloginCts = new();
+        _reloginCTS = reloginCts;
         _waitForLogin = true;
-        Messenger.Send<ReloginTriggeredMessage, int>(new(kicked), (int)MessageChannels.GameEvents);
+        try
+        {
+            if (!logoutNotified)
+                Messenger.Send<LogoutMessage, int>((int)MessageChannels.GameEvents);
+            await Manager.StopScript();
+            reloginCts.Token.ThrowIfCancellationRequested();
+            bool kicked = Player.Kicked;
+            Messenger.Send<ReloginTriggeredMessage, int>(new(kicked), (int)MessageChannels.GameEvents);
 
-        int delay = (Options.SafeRelogin && kicked) ? 70000 : Options.ReloginTryDelay;
-        Relogin(delay, wasRunning);
+            int delay = Options.ReloginTryDelay;
+            if (Options.SafeRelogin)
+            {
+                delay = kicked ? 20000 : Math.Max(10000, Options.ReloginTryDelay);
+            }
+            else
+            {
+                delay = Math.Max(800, Options.ReloginTryDelay);
+            }
+            Relogin(delay, wasRunning, reloginCts);
+        }
+        catch
+        {
+            if (ReferenceEquals(_reloginCTS, reloginCts))
+            {
+                _reloginCTS = null;
+                _waitForLogin = false;
+            }
+            reloginCts.Dispose();
+            throw;
+        }
     }
 
-    private async void BeginLogout()
+    private async void BeginLogout(bool logoutNotified = false)
     {
         try
         {
-            await OnLogout();
+            await OnLogout(logoutNotified);
+        }
+        catch (OperationCanceledException)
+        {
+            Log("Auto re-login cancelled.");
         }
         catch (Exception ex)
         {
@@ -763,18 +853,19 @@ public class ScriptInterface : IScriptInterface, IScriptInterfaceManager, IDispo
         }
     }
 
-    private void Relogin(int delay, bool startScript)
+    private void Relogin(int delay, bool startScript, CancellationTokenSource reloginCts)
     {
-        Servers.Logout();
+        reloginCts.Token.ThrowIfCancellationRequested();
+        Servers.DisconnectForRelogin();
         Log($"Waiting {delay}ms for re-login.");
-        CancellationTokenSource reloginCts = new();
-        _reloginCTS = reloginCts;
         _reloginTask = Schedule(delay, async _ =>
         {
             try
             {
+                reloginCts.Token.ThrowIfCancellationRequested();
                 Stats.Relogins++;
                 bool relogged = await Servers.EnsureRelogin(reloginCts.Token);
+                reloginCts.Token.ThrowIfCancellationRequested();
                 if (startScript && relogged)
                     await Ioc.Default.GetService<IScriptManager>()!.StartScript();
                 else if (startScript && !relogged)

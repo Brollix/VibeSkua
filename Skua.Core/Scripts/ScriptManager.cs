@@ -700,8 +700,7 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
         }
         if (optsField is not null)
             opts.Options.AddRange((List<IOption>)optsField.GetValue(script)!);
-        if (storageField is not null)
-            opts.Storage = (string)storageField.GetValue(script)!;
+        if (!string.IsNullOrWhiteSpace(OverrideStorage)) opts.Storage = OverrideStorage; else if (storageField is not null) opts.Storage = (string)storageField.GetValue(script)!;
         lock (_configuredLock)
         {
             if (dontPreconfField is not null)
@@ -800,18 +799,20 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
             List<string> normalizedDeps = new();
             foreach (string dep in deps)
             {
-                bool containsDep;
+                string? matchingFile;
                 _includedFilesLock.EnterReadLock();
                 try
                 {
-                    containsDep = _includedFiles.Contains(dep);
+                    matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.Ordinal));
+                    if (matchingFile is null && OperatingSystem.IsWindows())
+                        matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.OrdinalIgnoreCase));
                 }
                 finally
                 {
                     _includedFilesLock.ExitReadLock();
                 }
-                if (containsDep)
-                    normalizedDeps.Add(dep);
+                if (matchingFile is not null)
+                    normalizedDeps.Add(matchingFile);
             }
             dependencyGraph[includedFile] = normalizedDeps;
         });
@@ -861,18 +862,20 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
                 List<string> normalizedDeps = new();
                 foreach (string dep in deps)
                 {
-                    bool containsDep;
+                    string? matchingFile;
                     _includedFilesLock.EnterReadLock();
                     try
                     {
-                        containsDep = _includedFiles.Contains(dep);
+                        matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.Ordinal));
+                        if (matchingFile is null && OperatingSystem.IsWindows())
+                            matchingFile = _includedFiles.FirstOrDefault(path => path.Equals(dep, StringComparison.OrdinalIgnoreCase));
                     }
                     finally
                     {
                         _includedFilesLock.ExitReadLock();
                     }
-                    if (containsDep)
-                        normalizedDeps.Add(dep);
+                    if (matchingFile is not null)
+                        normalizedDeps.Add(matchingFile);
                 }
                 dependencyGraph[newFile] = normalizedDeps;
             }

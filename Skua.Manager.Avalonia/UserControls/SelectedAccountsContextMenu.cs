@@ -35,6 +35,8 @@ public class SelectedAccountsContextMenu : ContextMenu
         Items.Add(new Separator());
         Items.Add(addTags);
         Items.Add(addToGroup);
+        Items.Add(new Separator());
+        Items.Add(CreateBoundMenuItem("Remove Selected", "RemoveAccountsCommand", MaterialIconKind.DeleteOutline));
     }
 
     private AccountManagerUserControl? FindOwner()

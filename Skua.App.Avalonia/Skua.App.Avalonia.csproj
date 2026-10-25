@@ -14,6 +14,10 @@
         <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     </PropertyGroup>
 
+    <ItemGroup>
+        <AssemblyMetadata Include="Skua.ClientId" Value="VibeSkuaAvalonia" />
+    </ItemGroup>
+
     <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
         <UseWindowsForms>true</UseWindowsForms>
         <DefineConstants>$(DefineConstants);IS_WINDOWS</DefineConstants>

@@ -65,6 +65,17 @@ public sealed class SkuaStartupHandler : IDisposable
             if (!string.IsNullOrWhiteSpace(_options.Password))
                 _bot.Flash.FlashCall += Login;
         }
+
+        if (_options.ExitOnScriptStop)
+        {
+            StrongReferenceMessenger.Default.Register<SkuaStartupHandler, ScriptStoppedMessage, int>(this, (int)MessageChannels.ScriptStatus, async (r, m) =>
+            {
+                await Task.Delay(2000);
+                try { _bot.Servers.Logout(); } catch { }
+                await Task.Delay(1000);
+                Environment.Exit(0);
+            });
+        }
     }
 
     private void LoadGame(string function, params object[] args)
@@ -109,6 +120,11 @@ public sealed class SkuaStartupHandler : IDisposable
                     try
                     {
                         var scriptLoader = Ioc.Default.GetRequiredService<ScriptLoaderViewModel>();
+                        if (!string.IsNullOrWhiteSpace(_options.ScriptOptionsStorage))
+                        {
+                            scriptLoader.ScriptManager.OverrideStorage = _options.ScriptOptionsStorage;
+                            scriptLoader.ScriptManager.SilentConfig = true;
+                        }
                         scriptLoader.LoadScript(_options.Script);
                         await scriptLoader.StartScriptAsync(_options.Script);
                     }
@@ -138,6 +154,7 @@ public sealed class SkuaStartupHandler : IDisposable
         _disposed = true;
         _bot.Flash.FlashCall -= LoadGame;
         _bot.Flash.FlashCall -= Login;
+        StrongReferenceMessenger.Default.Unregister<ScriptStoppedMessage, int>(this, (int)MessageChannels.ScriptStatus);
         GC.SuppressFinalize(this);
     }
 
@@ -147,9 +164,11 @@ public sealed class SkuaStartupHandler : IDisposable
         public string? Password { get; private set; }
         public string? Server { get; private set; } = "Twilly";
         public string? Script { get; private set; }
+        public string? ScriptOptionsStorage { get; private set; }
         public string? LoadScript { get; private set; }
         public string? UseTheme { get; private set; }
         public string? GitHubToken { get; private set; }
+        public bool ExitOnScriptStop { get; private set; }
 
         public static (bool Parsed, StartupOptions Options) Parse(string[] args)
         {
@@ -188,6 +207,9 @@ public sealed class SkuaStartupHandler : IDisposable
                     case "--run-script":
                         options.Script = NextValue();
                         break;
+                    case "--script-options-storage":
+                        options.ScriptOptionsStorage = NextValue();
+                        break;
                     case "--load-script":
                         options.LoadScript = NextValue();
                         break;
@@ -196,6 +218,10 @@ public sealed class SkuaStartupHandler : IDisposable
                         break;
                     case "--gh-token":
                         options.GitHubToken = NextValue();
+                        break;
+                    case "--exit-on-script-stop":
+                    case "--exit-on-finish":
+                        options.ExitOnScriptStop = true;
                         break;
                     case "--embed":
                     case "--host-pid":

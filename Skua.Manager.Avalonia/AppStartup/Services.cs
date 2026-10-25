@@ -18,6 +18,7 @@ public static class Services
         services.AddSingleton<BackgroundThemeViewModel>();
         
         services.AddSingleton<AccountManagerViewModel>();
+        services.AddSingleton<ArmyQueueViewModel>();
         services.AddSingleton<LauncherViewModel>();
         services.AddSingleton<AppUpdaterViewModel>();
         services.AddSingleton<ScriptUpdaterViewModel>();

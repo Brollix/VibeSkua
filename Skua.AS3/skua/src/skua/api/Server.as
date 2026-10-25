@@ -11,6 +11,8 @@ import skua.module.ModalMC;
 
 public class Server {
 
+    private static var _connectionServerTimer:Timer = null;
+
     public function Server() {
         super();
     }
@@ -66,7 +68,32 @@ public class Server {
         }
     }
 
+    public static function resetConnectionState():void {
+        try {
+            if (_connectionServerTimer != null) {
+                _connectionServerTimer.stop();
+                _connectionServerTimer = null;
+            }
+            killLoginModals();
+            if (Main.instance.game != null) {
+                try {
+                    if (Main.instance.game.sfc != null && "disconnect" in Main.instance.game.sfc) {
+                        Main.instance.game.sfc.disconnect();
+                    }
+                } catch (e:Error) {}
+                try {
+                    if ("connectingServer" in Main.instance.game) {
+                        Main.instance.game.connectingServer = false;
+                    }
+                } catch (e:Error) {}
+            }
+        } catch (e:Error) {
+            Main.instance.external.debug("Error in resetConnectionState: " + e);
+        }
+    }
+
     public static function clickServer(serverName:String):String {
+        killLoginModals();
         loadPolicyFiles();
         var source:* = Main.instance.game.mcLogin.sl.iList;
         for (var i:int = 0; i < source.numChildren; i++) {
@@ -87,6 +114,8 @@ public class Server {
     }
 
     public static function connectToServer(server:String):String {
+        resetConnectionState();
+
         var serverData:Object = JSON.parse(server);
         if (serverData != null && serverData.sIP != null && serverData.iPort != null) {
             try {
@@ -101,19 +130,22 @@ public class Server {
             return true.toString();
         }
 
-        var connectionServerTimer:Timer = new Timer(100, 50);
-        connectionServerTimer.addEventListener(TimerEvent.TIMER, connectingServer);
-        connectionServerTimer.start();
-
-        function connectingServer(e:Event):void {
+        _connectionServerTimer = new Timer(100, 50);
+        _connectionServerTimer.addEventListener(TimerEvent.TIMER, function(e:Event):void {
             objLoginStr = Main.getGameObjectS("objLogin");
             objLogin = (objLoginStr != null && objLoginStr.length > 0) ? JSON.parse(objLoginStr) : null;
             if (objLogin != null) {
+                if (_connectionServerTimer != null) {
+                    _connectionServerTimer.stop();
+                    _connectionServerTimer = null;
+                }
                 connectServer(serverData, objLogin);
-                connectionServerTimer.stop();
-                connectionServerTimer.removeEventListener(TimerEvent.TIMER, connectingServer);
             }
-        }
+        });
+        _connectionServerTimer.addEventListener(TimerEvent.TIMER_COMPLETE, function(e:Event):void {
+            _connectionServerTimer = null;
+        });
+        _connectionServerTimer.start();
 
         return true.toString();
     }
@@ -163,14 +195,129 @@ public class Server {
         modal.init(params);
     }
 
-    private static function killLoginModals():void {
-        var modalStack:MovieClip = Main.instance.game.mcLogin.ModalStack;
-        for (var i:int = 0; i < modalStack.numChildren; i++) {
-            var modal:MovieClip = modalStack.getChildAt(i) as MovieClip;
-            if (modal && "fClose" in modal) {
-                modal.fClose();
+    public static function killLoginModals():void {
+        try {
+            if (Main.instance.game == null) return;
+
+            // 1. Clear mcLogin.ModalStack
+            if (Main.instance.game.mcLogin != null && Main.instance.game.mcLogin.ModalStack != null) {
+                cleanModalStack(Main.instance.game.mcLogin.ModalStack);
             }
+
+            // 2. Clear mcO.ModalStack (root overlay modal stack)
+            if (Main.instance.game.mcO != null) {
+                if (Main.instance.game.mcO.ModalStack != null) {
+                    cleanModalStack(Main.instance.game.mcO.ModalStack);
+                }
+                // Disarm invisible blocker hitmask
+                try {
+                    if (Main.instance.game.mcO.cnt != null && Main.instance.game.mcO.cnt.hit != null) {
+                        Main.instance.game.mcO.cnt.hit.visible = false;
+                    }
+                } catch (e:Error) {}
+            }
+
+            // 3. Clear ui.ModalStack if present
+            if (Main.instance.game.ui != null && Main.instance.game.ui.ModalStack != null) {
+                cleanModalStack(Main.instance.game.ui.ModalStack);
+            }
+
+            // 4. Close any MsgBox popup
+            try {
+                if (Main.instance.game.MsgBox != null && "fClose" in Main.instance.game.MsgBox) {
+                    Main.instance.game.MsgBox.fClose();
+                }
+            } catch (e:Error) {}
+
+            // 5. Hide mcLogin.warning (kick / ban alert frame)
+            try {
+                if (Main.instance.game.mcLogin != null && Main.instance.game.mcLogin.warning != null) {
+                    Main.instance.game.mcLogin.warning.visible = false;
+                }
+            } catch (e:Error) {}
+
+            // 6. Clear in-game popups (ui.mcPopup)
+            try {
+                if (Main.instance.game.ui != null && Main.instance.game.ui.mcPopup != null) {
+                    cleanModalStack(Main.instance.game.ui.mcPopup);
+                }
+            } catch (e:Error) {}
+
+            // 7. Reset internal Flash state flags
+            try {
+                if ("serialCmdMode" in Main.instance.game) Main.instance.game.serialCmdMode = false;
+                if ("connectingServer" in Main.instance.game) Main.instance.game.connectingServer = false;
+            } catch (e:Error) {}
+        } catch (e:Error) {
+            Main.instance.external.debug("Error in killLoginModals: " + e);
         }
+    }
+
+    private static function cleanModalStack(stack:*):void {
+        if (stack == null) return;
+        try {
+            var count:int = stack.numChildren;
+            for (var i:int = count - 1; i >= 0; i--) {
+                var child:* = stack.getChildAt(i);
+                if (child != null) {
+                    try {
+                        if ("fClose" in child && typeof(child.fClose) == "function") {
+                            child.fClose();
+                        }
+                    } catch (e:Error) {}
+                    try {
+                        if (stack.contains(child)) {
+                            stack.removeChild(child);
+                        }
+                    } catch (e:Error) {}
+                }
+            }
+        } catch (e:Error) {}
+    }
+
+    public static function getActiveModalMessage():String {
+        try {
+            if (Main.instance.game == null) return "";
+
+            // 1. Check mcO.ModalStack (overlay)
+            if (Main.instance.game.mcO != null && Main.instance.game.mcO.ModalStack != null) {
+                var stack:* = Main.instance.game.mcO.ModalStack;
+                if (stack.numChildren > 0) {
+                    var m:* = stack.getChildAt(0);
+                    if (m != null) {
+                        if (m.cnt != null && m.cnt.strBody != null && m.cnt.strBody.text != null) return String(m.cnt.strBody.text);
+                        if (m.strBody != null) return String(m.strBody);
+                    }
+                }
+            }
+
+            // 2. Check mcLogin.ModalStack
+            if (Main.instance.game.mcLogin != null && Main.instance.game.mcLogin.ModalStack != null) {
+                var lStack:* = Main.instance.game.mcLogin.ModalStack;
+                if (lStack.numChildren > 0) {
+                    var lm:* = lStack.getChildAt(0);
+                    if (lm != null) {
+                        if (lm.cnt != null && lm.cnt.strBody != null && lm.cnt.strBody.text != null) return String(lm.cnt.strBody.text);
+                        if (lm.strBody != null) return String(lm.strBody);
+                    }
+                }
+            }
+
+            // 3. Check MsgBox
+            if (Main.instance.game.MsgBox != null && Main.instance.game.MsgBox.stage != null) {
+                if (Main.instance.game.MsgBox.cnt != null && Main.instance.game.MsgBox.cnt.strBody != null) {
+                    return String(Main.instance.game.MsgBox.cnt.strBody.text);
+                }
+            }
+
+            // 4. Check mcLogin.warning (kick / ban alert message)
+            if (Main.instance.game.mcLogin != null && Main.instance.game.mcLogin.warning != null && Main.instance.game.mcLogin.warning.visible) {
+                if (Main.instance.game.mcLogin.warning.strMessage != null && Main.instance.game.mcLogin.warning.strMessage.text != null) {
+                    return String(Main.instance.game.mcLogin.warning.strMessage.text);
+                }
+            }
+        } catch (e:Error) {}
+        return "";
     }
 }
 }
