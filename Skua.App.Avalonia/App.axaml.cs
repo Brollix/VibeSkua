@@ -424,9 +424,9 @@ public partial class App : Application
         if (RequestedThemeVariant != targetVariant)
             RequestedThemeVariant = targetVariant;
 
-        ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
         if (themeService is AvaloniaThemeService ats)
         {
+            ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme, ats.PrimaryColor, ats.PrimaryForegroundColor);
             ThemeResourceApplicator.ApplyAccentBrushes(
                 this,
                 ats.PrimaryColor,
@@ -477,9 +477,9 @@ public partial class App : Application
     {
         bool isDark = themeService.IsDarkTheme;
         RequestedThemeVariant = isDark ? ThemeVariant.Dark : ThemeVariant.Light;
-        ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark);
         if (themeService is AvaloniaThemeService ats)
         {
+            ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark, ats.PrimaryColor, ats.PrimaryForegroundColor);
             ThemeResourceApplicator.ApplyAccentBrushes(
                 this,
                 ats.PrimaryColor,
