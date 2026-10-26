@@ -22,7 +22,7 @@ public partial class JumpUserControl : UserControl
 
     private void Cells_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (!Cells.IsFocused || Cells.IsDropDownOpen || Cells.ItemCount == 0)
+        if (!Cells.IsFocused || Cells.ItemCount == 0)
             return;
 
         int direction = e.Key switch
@@ -40,9 +40,15 @@ public partial class JumpUserControl : UserControl
             selectedIndex = direction > 0 ? -1 : Cells.ItemCount;
 
         int nextIndex = System.Math.Clamp(selectedIndex + direction, 0, Cells.ItemCount - 1);
+
+        // ComboBox treats arrow keys in an open dropdown as preview navigation and
+        // waits for Enter/click to commit. Close it before applying the selection so
+        // SelectedCell changes immediately and triggers the existing auto-jump.
+        Cells.IsDropDownOpen = false;
         if (nextIndex != Cells.SelectedIndex)
             Cells.SelectedIndex = nextIndex;
 
+        Cells.Focus();
         e.Handled = true;
     }
 }
