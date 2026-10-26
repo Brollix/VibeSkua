@@ -31,6 +31,9 @@ namespace Skua.App.Avalonia;
 public partial class App : Application
 {
     private static int _exceptionDialogShown;
+    private int _parentHostProcessId;
+    private DispatcherTimer? _hostThemeSyncTimer;
+    private AvaloniaThemeService? _pendingHostThemeSync;
 
     public override void Initialize()
     {
@@ -131,6 +134,10 @@ public partial class App : Application
                 int.TryParse(args[i + 1], out hostPid);
             }
         }
+
+        _parentHostProcessId = hasEmbedFlag ? hostPid : 0;
+        if (_parentHostProcessId > 0 && themeService is AvaloniaThemeService initialTheme)
+            QueueHostThemeSync(initialTheme);
 
         if (!hasEmbedFlag)
         {
@@ -438,6 +445,7 @@ public partial class App : Application
                 ats.SecondaryColor,
                 ats.SecondaryForegroundColor,
                 isDarkTheme: themeService.IsDarkTheme);
+            QueueHostThemeSync(ats);
         }
         else
         {
@@ -468,6 +476,7 @@ public partial class App : Application
                 ats.SecondaryColor,
                 ats.SecondaryForegroundColor,
                 isDarkTheme: isDark);
+            QueueHostThemeSync(ats);
             return;
         }
 
@@ -499,6 +508,85 @@ public partial class App : Application
 
         string? accentHex = themeService.SelectedColor?.ToString();
         ThemeResourceApplicator.ApplyAccentBrushes(this, accentHex, isDarkTheme: isDark);
+    }
+
+    /// <summary>
+    /// Debounces live palette changes and sends the latest display colors to the parent tab host.
+    /// Embedded clients run in separate processes, so their theme events cannot reach the host directly.
+    /// </summary>
+    private void QueueHostThemeSync(AvaloniaThemeService themeService)
+    {
+        if (_parentHostProcessId <= 0 || !OperatingSystem.IsWindows())
+            return;
+
+        _pendingHostThemeSync = themeService;
+        if (_hostThemeSyncTimer is null)
+        {
+            _hostThemeSyncTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+            _hostThemeSyncTimer.Tick += (_, _) =>
+            {
+                _hostThemeSyncTimer.Stop();
+                AvaloniaThemeService? latestTheme = _pendingHostThemeSync;
+                _pendingHostThemeSync = null;
+                if (latestTheme is not null)
+                    SendHostThemeSnapshot(latestTheme);
+            };
+        }
+
+        _hostThemeSyncTimer.Stop();
+        _hostThemeSyncTimer.Start();
+    }
+
+    /// <summary>
+    /// Sends the live, already-adjusted theme through the existing local tab-host pipe.
+    /// The snapshot is display-only and is not persisted by the host process.
+    /// </summary>
+    private void SendHostThemeSnapshot(AvaloniaThemeService themeService)
+    {
+        try
+        {
+            ISettingsService settingsService = Ioc.Default.GetRequiredService<ISettingsService>();
+            ThemeItem? savedTheme = ThemeItem.FromString(settingsService.Get<string>("CurrentTheme"));
+            ThemeItem displaySnapshot = new()
+            {
+                Name = savedTheme?.Name ?? "Skua",
+                IsDarkTheme = themeService.IsDarkTheme,
+                PrimaryColor = themeService.PrimaryColor,
+                SecondaryColor = themeService.SecondaryColor,
+                PrimaryForegroundColor = themeService.PrimaryForegroundColor,
+                SecondaryForegroundColor = themeService.SecondaryForegroundColor,
+                UseColorAdjustment = false,
+                DesiredContrastRatio = themeService.DesiredContrastRatio,
+                ContrastValue = themeService.ContrastValue?.ToString() ?? "Medium",
+                ColorSelectionValue = themeService.ColorSelectionValue?.ToString() ?? "All"
+            };
+
+            string message = "THEME|" + displaySnapshot.ConvertToString();
+            _ = Task.Run(() =>
+            {
+                for (int attempt = 0; attempt < 5; attempt++)
+                {
+                    try
+                    {
+                        using System.IO.Pipes.NamedPipeClientStream pipe = new(".", "VibeSkuaTabHostPipe", System.IO.Pipes.PipeDirection.Out);
+                        pipe.Connect(500);
+                        using System.IO.StreamWriter writer = new(pipe);
+                        writer.WriteLine(message);
+                        writer.Flush();
+                        return;
+                    }
+                    catch
+                    {
+                        if (attempt < 4)
+                            System.Threading.Thread.Sleep(100);
+                    }
+                }
+            });
+        }
+        catch
+        {
+            // Theme synchronization is best effort; the embedded client remains usable if the host is closing.
+        }
     }
 
     private void TrayIcon_Clicked(object? sender, EventArgs e)
