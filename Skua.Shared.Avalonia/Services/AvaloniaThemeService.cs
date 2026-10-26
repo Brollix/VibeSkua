@@ -451,6 +451,7 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
             _useAccentOnMainTitleBar = useAccentOnMainTitleBar;
             OnPropertyChanged(nameof(UseAccentOnMainTitleBar));
         }
+        SetUseAccentOnMainTitleBarSettingInMemory(useAccentOnMainTitleBar);
 
         ThemeItem displaySnapshot = new()
         {
@@ -491,13 +492,19 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         return true;
     }
 
+    private void SetUseAccentOnMainTitleBarSettingInMemory(bool enabled)
+    {
+        Skua.Core.Models.SharedSettings sharedSettings = _settingsService.GetShared();
+        sharedSettings.ExtensionData ??= new System.Collections.Generic.Dictionary<string, object>();
+        sharedSettings.ExtensionData["UseAccentOnMainTitleBar"] = enabled;
+    }
+
     private void PersistUseAccentOnMainTitleBarSetting(bool enabled)
     {
         try
         {
+            SetUseAccentOnMainTitleBarSettingInMemory(enabled);
             Skua.Core.Models.SharedSettings sharedSettings = _settingsService.GetShared();
-            sharedSettings.ExtensionData ??= new System.Collections.Generic.Dictionary<string, object>();
-            sharedSettings.ExtensionData["UseAccentOnMainTitleBar"] = enabled;
 
             // Set a known property to invoke the existing settings persistence path.
             _settingsService.Set("TitleBarArtworkPath", sharedSettings.TitleBarArtworkPath);
