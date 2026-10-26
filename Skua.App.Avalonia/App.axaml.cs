@@ -141,8 +141,6 @@ public partial class App : Application
                 clientFiles.CreateDirectories();
                 clientFiles.CreateFiles();
             });
-
-            SetupTrayIcon();
         }
         else
         {
@@ -265,7 +263,9 @@ public partial class App : Application
                     catch { }
                 }
 
-                // Master instance
+                // Master instance. The tray icon is created only here: an instance that forwards to an
+                // existing host exits through Environment.Exit, which never removes it (ghost icon).
+                SetupTrayIcon();
                 Views.TabbedHostWindow masterWindow = new(clientArgs) { WindowStartupLocation = global::Avalonia.Controls.WindowStartupLocation.CenterScreen };
                 desktop.MainWindow = masterWindow;
             }
