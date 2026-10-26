@@ -55,11 +55,17 @@ public partial class WindowTitleBar : UserControl
     public WindowTitleBar()
     {
         InitializeComponent();
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == UseAccentBackgroundProperty)
+                ApplyAccentForeground();
+        };
         Loaded += (_, _) =>
         {
             ArtworkPathChanged -= ApplyArtworkPath;
             ArtworkPathChanged += ApplyArtworkPath;
             ApplyArtworkPath(_artworkPath);
+            ApplyAccentForeground();
         };
         Unloaded += (_, _) => ArtworkPathChanged -= ApplyArtworkPath;
         PointerPressed += OnTitleBarPointerPressed;
@@ -100,6 +106,18 @@ public partial class WindowTitleBar : UserControl
             Height = 12
         };
         ToolTip.SetTip(MaximizeButton, maximized ? "Restore" : "Maximize");
+    }
+
+    private void ApplyAccentForeground()
+    {
+        string resourceKey = UseAccentBackground ? "SkuaAccentForegroundBrush" : "SkuaAccentBrush";
+        if (!TryFindResource(resourceKey, out object? resource) || resource is not IBrush brush)
+            return;
+
+        TitleTextBlock.Foreground = brush;
+        MinimizeButton.Foreground = brush;
+        MaximizeButton.Foreground = brush;
+        CloseButton.Foreground = brush;
     }
 
     private void ApplyArtworkPath(string? path)
