@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -81,7 +82,14 @@ public partial class JumpViewModel : BotControlViewModelBase
         if (string.IsNullOrWhiteSpace(cell) || string.IsNullOrWhiteSpace(pad))
             return;
 
-        await Task.Run(() => _mapService.Jump(cell, pad));
+        try
+        {
+            await Task.Run(() => _mapService.Jump(cell, pad));
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"Jump menu jump failed: {ex}");
+        }
     }
 
     [RelayCommand]
