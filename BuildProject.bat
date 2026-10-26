@@ -1,27 +1,26 @@
 @echo off
 setlocal EnableExtensions
 
-rem Use a temporary copy so git pull can safely update this script on disk.
-if /i not "%~1"=="__BUILD_RUNNING__" (
+rem Run a temporary copy so git pull can safely update this script on disk.
+if not defined BUILDPROJECT_RUNNING (
+    set "BUILDPROJECT_ROOT=%~dp0"
+    if "%~1"=="" set "BUILDPROJECT_PAUSE=1"
+    set "BUILDPROJECT_RUNNING=1"
     set "BUILDPROJECT_TEMP=%TEMP%\BuildProject-%RANDOM%-%RANDOM%.bat"
+
     copy /Y "%~f0" "%BUILDPROJECT_TEMP%" >nul
     if errorlevel 1 (
         echo Failed to create a temporary copy of the build script.
         pause
         exit /b 1
     )
-    if "%~1"=="" (
-        call "%BUILDPROJECT_TEMP%" __BUILD_RUNNING__ "%~dp0" __PAUSE__
-    ) else (
-        call "%BUILDPROJECT_TEMP%" __BUILD_RUNNING__ "%~dp0" %*
-    )
+
+    call "%BUILDPROJECT_TEMP%"
     set "BUILDPROJECT_EXIT=%ERRORLEVEL%"
     del "%BUILDPROJECT_TEMP%" >nul 2>&1
     exit /b %BUILDPROJECT_EXIT%
 )
 
-set "BUILDPROJECT_ROOT=%~2"
-if /i "%~3"=="__PAUSE__" set "BUILDPROJECT_PAUSE=1"
 pushd "%BUILDPROJECT_ROOT%" || goto :Failure
 
 echo Updating repository...
