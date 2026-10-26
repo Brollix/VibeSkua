@@ -1079,7 +1079,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
         if (!File.Exists(scriptPath))
         {
-            _dialogService.ShowMessageBox($"Script file not found:\\n{scriptPath}", "Script Not Found");
+            _dialogService.ShowMessageBox($"Script file not found:\n{scriptPath}", "Script Not Found");
             return;
         }
 
@@ -1106,7 +1106,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         }
         catch (Exception ex)
         {
-            _dialogService.ShowMessageBox($"Script cannot be configured as it has compilation errors:\\n{ex.Message}", "Script Error");
+            _dialogService.ShowMessageBox($"Script cannot be configured as it has compilation errors:\n{ex.Message}", "Script Error");
         }
         finally
         {
