@@ -3,8 +3,13 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Name="Root"
              x:Class="Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar">
-  <Grid Height="32"
+  <Grid x:Name="TitleBarRoot"
+        Height="32"
         Background="{DynamicResource SkuaSurfaceAltBrush}">
+    <Border Grid.ColumnSpan="3"
+            Background="{DynamicResource SkuaAccentBrush}"
+            IsVisible="{Binding UseAccentBackground, ElementName=Root}"
+            IsHitTestVisible="False" />
     <Image x:Name="ArtworkImage" Grid.ColumnSpan="3" Stretch="UniformToFill" Opacity="0.62" IsHitTestVisible="False" />
     <Border Grid.ColumnSpan="3" Background="{DynamicResource SkuaTitleBarOverlayBrush}" IsHitTestVisible="False" />
     <Grid.ColumnDefinitions>
