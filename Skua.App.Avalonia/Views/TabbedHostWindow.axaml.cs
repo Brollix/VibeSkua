@@ -446,13 +446,18 @@ public partial class TabbedHostWindow : Window
             var themeService = Ioc.Default.GetService<IThemeService>();
             if (themeService != null)
             {
-                themeService.ThemeChanged += _ => Dispatcher.UIThread.Post(() =>
+                void RefreshNativeTitleBar()
                 {
-                    if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
-                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme, avaloniaTheme.PrimaryColor, avaloniaTheme.PrimaryForegroundColor);
+                    if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService currentTheme)
+                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme, currentTheme.PrimaryColor, currentTheme.PrimaryForegroundColor);
                     else
                         Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
-                });
+                }
+
+                // Preset changes and single-scheme edits use separate events. Listen to both so
+                // changing a custom primary/foreground color cannot leave the native caption stale.
+                themeService.ThemeChanged += _ => Dispatcher.UIThread.Post(RefreshNativeTitleBar, DispatcherPriority.Background);
+                themeService.SchemeChanged += (_, _) => Dispatcher.UIThread.Post(RefreshNativeTitleBar, DispatcherPriority.Background);
                 if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
                     Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme, avaloniaTheme.PrimaryColor, avaloniaTheme.PrimaryForegroundColor);
                 else
