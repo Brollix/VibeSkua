@@ -415,41 +415,51 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         return list;
     }
 
-    public async Task TestWebhookAsync()
+    public Task TestWebhookAsync()
     {
-        var url = _settingsService.GetClient()?.DiscordWebhookUrl;
-        if (string.IsNullOrWhiteSpace(url)) return;
+        string? url = _settingsService.GetClient()?.DiscordWebhookUrl;
+        if (string.IsNullOrWhiteSpace(url))
+            return Task.CompletedTask;
+
         EnqueueAction(async () =>
         {
             List<object> fields = BuildDashboardSnapshotFields();
             await SendEmbedToUrlAsync(url, "Discord Webhook Test Successful!", "Your VibeSkua Discord Webhooks are perfectly configured.", 0x00FF00, fields);
         });
+
+        return Task.CompletedTask;
     }
 
-    public async Task TestNexusWebhookAsync()
+    public Task TestNexusWebhookAsync()
     {
-        var url = _settingsService.GetClient()?.NexusWebhookUrl;
-        if (string.IsNullOrWhiteSpace(url)) return;
+        string? url = _settingsService.GetClient()?.NexusWebhookUrl;
+        if (string.IsNullOrWhiteSpace(url))
+            return Task.CompletedTask;
+
         EnqueueAction(async () =>
         {
             List<object> fields = BuildDashboardSnapshotFields();
             await SendEmbedToUrlAsync(url, "Skua Nexus Webhook Test Successful!", "Your VibeSkua Nexus Webhooks are perfectly configured.", 0x00FF00, fields);
         });
+
+        return Task.CompletedTask;
     }
 
-    public async Task SendMessageAsync(string message)
+    public Task SendMessageAsync(string message)
     {
-        EnqueueAction(async () => await PostWebhookAsync(new { content = message }));
+        EnqueueAction(() => PostWebhookAsync(new { content = message }));
+        return Task.CompletedTask;
     }
 
-    public async Task SendScreenshotAsync(string message)
+    public Task SendScreenshotAsync(string message)
     {
         EnqueueAction(async () =>
         {
             try
             {
-                var urls = GetConfiguredWebhookUrls();
-                if (urls.Count == 0) return;
+                List<string> urls = GetConfiguredWebhookUrls();
+                if (urls.Count == 0)
+                    return;
 
                 byte[] screenshotBytes = await _screenshotService.TakeScreenshotAsync();
 
@@ -460,18 +470,18 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
                     image = new { url = "attachment://screenshot.png" }
                 };
 
-                var payloadJson = JsonSerializer.Serialize(new { embeds = new[] { embed } });
+                string payloadJson = JsonSerializer.Serialize(new { embeds = new[] { embed } });
 
-                foreach (var url in urls)
-                {
+                foreach (string url in urls)
                     await PostMultipartToUrlAsync(url, payloadJson, screenshotBytes);
-                }
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Trace.WriteLine($"SendScreenshotAsync failed: {ex.Message}");
             }
         });
+
+        return Task.CompletedTask;
     }
 
     public async Task SendEmbedAsync(string title, string description, int color, List<object>? fields = null)
