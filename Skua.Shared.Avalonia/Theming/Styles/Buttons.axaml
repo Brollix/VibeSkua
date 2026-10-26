@@ -328,7 +328,7 @@
         <Setter Property="CornerRadius" Value="0" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="Foreground" Value="{DynamicResource SkuaAccentBrush}" />
+        <Setter Property="Foreground" Value="{DynamicResource SkuaAccentForegroundBrush}" />
     </Style>
     <Style Selector="Button.titlebar:pointerover">
         <Setter Property="Background" Value="{DynamicResource SkuaNavHoverBrush}" />
@@ -336,7 +336,7 @@
     <Style Selector="Button.titlebar:pointerover /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource SkuaNavHoverBrush}" />
         <Setter Property="BorderBrush" Value="Transparent" />
-        <Setter Property="TextBlock.Foreground" Value="{DynamicResource SkuaAccentBrush}" />
+        <Setter Property="TextBlock.Foreground" Value="{DynamicResource SkuaAccentForegroundBrush}" />
     </Style>
     <Style Selector="Button.titlebar:pressed">
         <Setter Property="Background" Value="{DynamicResource SkuaSelectionBrush}" />
