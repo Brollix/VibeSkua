@@ -63,8 +63,8 @@ public partial class JumpViewModel : BotControlViewModelBase
             // view-model value already; the selector may not have applied its initial selection.
             SelectedCell = string.Empty;
             SelectedPad = string.Empty;
-            SelectedCell = cell;
-            SelectedPad = pad;
+            SelectedCell = cell ?? string.Empty;
+            SelectedPad = pad ?? string.Empty;
         }
         finally
         {
