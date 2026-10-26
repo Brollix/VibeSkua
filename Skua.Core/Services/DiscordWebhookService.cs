@@ -71,7 +71,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
             while (true)
             {
                 await _queueSemaphore.WaitAsync(_cts.Token);
-                if (!_messageQueue.TryDequeue(out Func<Task>? action))
+                if (!_messageQueue.TryDequeue(out Func<Task>? action) || action is null)
                     continue;
 
                 try
@@ -626,6 +626,10 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         try
         {
             await _queueProcessorTask.ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Webhook queue shutdown failed: {ex}");
         }
         finally
         {
