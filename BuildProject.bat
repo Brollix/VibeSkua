@@ -76,12 +76,19 @@ call :BuildProject "Skua.Plugin.Cosmetics\Skua.Plugin.Cosmetics.csproj" "Cosmeti
 echo Packaging and organizing output to match WPF release structure...
 powershell -NoProfile -ExecutionPolicy Bypass -File "package-build.ps1"
 if errorlevel 1 goto :Failure
+if not exist "Build\VibeSkua.exe" (
+    echo Build completed without producing Build\VibeSkua.exe.
+    goto :Failure
+)
 
 echo.
 echo ==========================================================
 echo Fast Build complete! The application is located in the Build folder.
 echo You can run VibeSkua.Manager.exe or VibeSkua.exe from there.
 echo ==========================================================
+echo Launching VibeSkua...
+start "" "Build\VibeSkua.exe"
+if errorlevel 1 goto :Failure
 set "BUILD_EXIT_CODE=0"
 goto :Finish
 
