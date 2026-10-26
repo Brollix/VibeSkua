@@ -44,8 +44,12 @@ public partial class WindowTitleBar : UserControl
     public WindowTitleBar()
     {
         InitializeComponent();
-        ArtworkPathChanged += ApplyArtworkPath;
-        Loaded += (_, _) => ApplyArtworkPath(_artworkPath);
+        Loaded += (_, _) =>
+        {
+            ArtworkPathChanged -= ApplyArtworkPath;
+            ArtworkPathChanged += ApplyArtworkPath;
+            ApplyArtworkPath(_artworkPath);
+        };
         Unloaded += (_, _) => ArtworkPathChanged -= ApplyArtworkPath;
         PointerPressed += OnTitleBarPointerPressed;
         MinimizeButton.Click += OnMinimizeClicked;
