@@ -1,3 +1,4 @@
+using AnimatedImage.Avalonia;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -137,22 +138,36 @@ public partial class WindowTitleBar : UserControl
 
     private void LoadArtworkPath(string? path)
     {
+        ArtworkImage.ClearValue(ImageBehavior.AnimatedSourceProperty);
         _artworkBitmap?.Dispose();
         _artworkBitmap = null;
 
-        if (!string.IsNullOrWhiteSpace(path) && System.IO.File.Exists(path))
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
         {
-            try
-            {
-                _artworkBitmap = new Bitmap(path);
-            }
-            catch (Exception)
-            {
-                // Keep the normal themed title bar if the selected image cannot be loaded.
-            }
+            ArtworkImage.Source = null;
+            return;
         }
 
-        ArtworkImage.Source = _artworkBitmap;
+        try
+        {
+            if (string.Equals(System.IO.Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase))
+            {
+                ArtworkImage.Source = null;
+                ImageBehavior.SetAnimatedSource(ArtworkImage, new Uri(path, UriKind.Absolute));
+                return;
+            }
+
+            _artworkBitmap = new Bitmap(path);
+            ArtworkImage.Source = _artworkBitmap;
+        }
+        catch (Exception)
+        {
+            ArtworkImage.ClearValue(ImageBehavior.AnimatedSourceProperty);
+            _artworkBitmap?.Dispose();
+            _artworkBitmap = null;
+            ArtworkImage.Source = null;
+            // Keep the normal themed title bar if the selected image cannot be loaded.
+        }
     }
 
     private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
