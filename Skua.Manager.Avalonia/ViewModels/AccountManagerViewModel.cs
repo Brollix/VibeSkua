@@ -662,20 +662,33 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
     public void ApplyTagFilter()
     {
-        FilteredAccounts.Clear();
+        // Filter uses OR logic: shows accounts that have ANY of the selected tags
+        List<IAccountItemViewModel> target = _selectedTagFilters.Count == 0
+            ? Accounts.ToList()
+            : Accounts.Where(a => a.Tags.Any(t => _selectedTagFilters.Contains(t))).ToList();
 
-        if (_selectedTagFilters.Count == 0)
-        {
-            FilteredAccounts.AddRange(Accounts);
+        // Update in place: clearing and refilling rebuilt every row and threw the list back to the top
+        // each time the Manager got focus or a client saved settings.
+        if (FilteredAccounts.SequenceEqual(target))
             return;
+
+        for (int i = FilteredAccounts.Count - 1; i >= 0; i--)
+        {
+            if (!target.Contains(FilteredAccounts[i]))
+                FilteredAccounts.RemoveAt(i);
         }
 
-        // Filter uses OR logic: shows accounts that have ANY of the selected tags
-        IEnumerable<IAccountItemViewModel> filtered = Accounts.Where(a =>
-            a.Tags.Any(t => _selectedTagFilters.Contains(t))
-        );
+        for (int i = 0; i < target.Count; i++)
+        {
+            if (i < FilteredAccounts.Count && ReferenceEquals(FilteredAccounts[i], target[i]))
+                continue;
 
-        FilteredAccounts.AddRange(filtered);
+            int current = FilteredAccounts.IndexOf(target[i]);
+            if (current >= 0)
+                FilteredAccounts.Move(current, i);
+            else
+                FilteredAccounts.Insert(i, target[i]);
+        }
     }
 
     private void _UpdateFilteredTags()

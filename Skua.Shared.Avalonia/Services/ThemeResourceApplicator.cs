@@ -158,10 +158,18 @@ public static class ThemeResourceApplicator
         SetOrUpdateBrush(app.Resources, "SkuaAccentHoverBrush", Lighten(primary, 0.1));
         SetOrUpdateBrush(app.Resources, "SkuaAccentPressedBrush", Darken(primary, 0.12));
 
+        // Fluent controls (CheckBox, RadioButton, ToggleSwitch, Slider, ProgressBar, checked
+        // ToggleButton, TabItem pipe, TextBox focus) read the OS accent unless these are set.
+        ApplyFluentAccent(app, primary, primaryForeground);
+
         Color selectionLight = Color.FromArgb(0x33, primary.R, primary.G, primary.B);
         Color selectionDark = Color.FromArgb(0x66, primary.R, primary.G, primary.B);
         bool useDarkSelection = isDarkTheme ?? false;
         SetOrUpdateBrush(app.Resources, "SkuaSelectionBrush", useDarkSelection ? selectionDark : selectionLight);
+
+        // Selected/on fill for tabs, toggles, rows, cards and chips; the strong one is its hover.
+        SetOrUpdateBrush(app.Resources, "SkuaAccentTintBrush", Color.FromArgb(0x24, primary.R, primary.G, primary.B));
+        SetOrUpdateBrush(app.Resources, "SkuaAccentTintStrongBrush", Color.FromArgb(0x38, primary.R, primary.G, primary.B));
 
         Color tagBg = Color.FromArgb(0x22, primary.R, primary.G, primary.B);
         Color tagBgHover = Color.FromArgb(0x3B, primary.R, primary.G, primary.B);
@@ -218,6 +226,30 @@ public static class ThemeResourceApplicator
         Color secondaryForeground = ParseColorSafe(secondaryForegroundHex, primaryForeground);
 
         ApplyAccentBrushes(app, primary, primaryForeground, secondary, secondaryForeground, isDarkTheme);
+    }
+
+    private static readonly string[] FluentOnAccentBrushKeys =
+    [
+        "CheckBoxCheckGlyphForegroundChecked", "CheckBoxCheckGlyphForegroundCheckedPointerOver", "CheckBoxCheckGlyphForegroundCheckedPressed",
+        "CheckBoxCheckGlyphForegroundIndeterminate", "CheckBoxCheckGlyphForegroundIndeterminatePointerOver", "CheckBoxCheckGlyphForegroundIndeterminatePressed",
+        "RadioButtonCheckGlyphFill", "RadioButtonCheckGlyphFillPointerOver", "RadioButtonCheckGlyphFillPressed",
+        "ToggleButtonForegroundChecked", "ToggleButtonForegroundCheckedPointerOver", "ToggleButtonForegroundCheckedPressed",
+        "ToggleSwitchKnobFillOn", "ToggleSwitchKnobFillOnPointerOver", "ToggleSwitchKnobFillOnPressed"
+    ];
+
+    private static void ApplyFluentAccent(Application app, Color primary, Color primaryForeground)
+    {
+        // Glyphs drawn on an accent fill use the theme's text-on-accent colour, not Fluent's fixed white.
+        foreach (string key in FluentOnAccentBrushKeys)
+            SetOrUpdateBrush(app.Resources, key, primaryForeground);
+
+        SetOrUpdateColor(app.Resources, "SystemAccentColor", primary);
+        SetOrUpdateColor(app.Resources, "SystemAccentColorLight1", Lighten(primary, 0.1));
+        SetOrUpdateColor(app.Resources, "SystemAccentColorLight2", Lighten(primary, 0.2));
+        SetOrUpdateColor(app.Resources, "SystemAccentColorLight3", Lighten(primary, 0.3));
+        SetOrUpdateColor(app.Resources, "SystemAccentColorDark1", Darken(primary, 0.15));
+        SetOrUpdateColor(app.Resources, "SystemAccentColorDark2", Darken(primary, 0.3));
+        SetOrUpdateColor(app.Resources, "SystemAccentColorDark3", Darken(primary, 0.45));
     }
 
     private static void SetOrUpdateBrush(IResourceDictionary dict, string key, Color color)

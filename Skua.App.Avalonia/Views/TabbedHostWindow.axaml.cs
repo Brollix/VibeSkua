@@ -302,6 +302,15 @@ public partial class TabbedHostWindow : Window
         InitializeComponent();
         Title = $"VibeSkua V{Skua.Core.Models.ClientFileSources.DisplayVersion}";
 
+        // Theme the native title bar now, while the window is still hidden. Applied after it is shown (in Opened),
+        // Windows 10 repaints only the caption text in dark mode, leaving dark boxes on a light bar until the
+        // next activation change.
+        try
+        {
+            Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, Ioc.Default.GetService<IThemeService>()?.IsDarkTheme);
+        }
+        catch { }
+
         var options = Ioc.Default.GetRequiredService<IScriptOption>();
         MiscOptionsMenu.DataContext = options;
         options.PropertyChanged += Options_PropertyChanged;
