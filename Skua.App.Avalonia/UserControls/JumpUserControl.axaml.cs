@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Skua.App.Avalonia.ViewModels;
 
 namespace Skua.App.Avalonia.UserControls;
@@ -10,7 +11,7 @@ public partial class JumpUserControl : UserControl
     {
         InitializeComponent();
         Cells.DropDownOpened += Cells_DropDownOpened;
-        Cells.KeyDown += Cells_KeyDown;
+        AddHandler(InputElement.KeyDownEvent, Cells_KeyDown, RoutingStrategies.Tunnel);
     }
 
     private void Cells_DropDownOpened(object? sender, System.EventArgs e)
@@ -21,7 +22,7 @@ public partial class JumpUserControl : UserControl
 
     private void Cells_KeyDown(object? sender, KeyEventArgs e)
     {
-        if (Cells.IsDropDownOpen || Cells.ItemCount == 0)
+        if (!Cells.IsFocused || Cells.IsDropDownOpen || Cells.ItemCount == 0)
             return;
 
         int direction = e.Key switch
