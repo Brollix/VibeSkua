@@ -37,7 +37,7 @@ public class HotKeyService : IHotKeyService, IDisposable
     private readonly object _bindingsLock = new();
     private Window? _mainWindow;
     private bool _isMainWindowActive;
-    private bool _disposed;
+    private volatile bool _disposed;
 #if IS_WINDOWS
     private IntPtr _keyboardHook = IntPtr.Zero;
     private LowLevelKeyboardProc? _keyboardProc;
