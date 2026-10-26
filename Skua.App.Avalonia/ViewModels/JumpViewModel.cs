@@ -29,10 +29,6 @@ public partial class JumpViewModel : BotControlViewModelBase
     {
         if (!string.IsNullOrEmpty(value) && !_suppressAutoJump)
         {
-            (string? currentCell, _) = _mapService.GetCurrentCell();
-            if (string.Equals(value, currentCell, StringComparison.OrdinalIgnoreCase))
-                return;
-
             if (value == "Enter")
             {
                 SelectedPad = "Spawn";
@@ -72,16 +68,20 @@ public partial class JumpViewModel : BotControlViewModelBase
     [RelayCommand]
     private async Task JumpTo()
     {
-        await Task.Run(() => _mapService.Jump(SelectedCell, SelectedPad));
+        // Capture the selection before dispatching so rapid arrow-key navigation cannot
+        // make a queued jump use a later selection unexpectedly.
+        string cell = SelectedCell;
+        string pad = SelectedPad;
+        if (string.IsNullOrWhiteSpace(cell) || string.IsNullOrWhiteSpace(pad))
+            return;
+
+        await Task.Run(() => _mapService.Jump(cell, pad));
     }
 
     [RelayCommand]
     public void UpdateCells()
     {
         var newCells = _mapService.Cells;
-        if (newCells == null || newCells.Count == 0)
-            return;
-
         if (Cells.SequenceEqual(newCells))
             return;
 
@@ -89,6 +89,7 @@ public partial class JumpViewModel : BotControlViewModelBase
         try
         {
             string current = SelectedCell;
+            // ReplaceRange also clears stale entries when the map reports no cells.
             Cells.ReplaceRange(newCells);
             if (!string.IsNullOrEmpty(current) && Cells.Contains(current))
                 SelectedCell = current;
