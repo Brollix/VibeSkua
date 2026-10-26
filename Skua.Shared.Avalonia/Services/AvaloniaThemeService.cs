@@ -43,6 +43,7 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
     public AvaloniaThemeService(ISettingsService settingsService)
     {
         _settingsService = settingsService;
+        _useAccentOnMainTitleBar = _settingsService.Get("UseAccentOnMainTitleBar", true);
 
         _applyThrottleTimer = new DispatcherTimer
         {
@@ -276,6 +277,26 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         }
     }
 
+    private bool _useAccentOnMainTitleBar = true;
+
+    /// <summary>
+    /// Gets or sets whether the main VibeSkua host title bar follows the active theme's primary accent.
+    /// </summary>
+    public bool UseAccentOnMainTitleBar
+    {
+        get => _useAccentOnMainTitleBar;
+        set
+        {
+            if (_useAccentOnMainTitleBar == value)
+                return;
+
+            _useAccentOnMainTitleBar = value;
+            _settingsService.Set("UseAccentOnMainTitleBar", value);
+            OnPropertyChanged();
+            ThemeChanged?.Invoke(_primaryColor);
+        }
+    }
+
     public Color PrimaryColor => _primaryColor;
     public Color PrimaryForegroundColor => _primaryForegroundColor;
     public Color SecondaryColor => _secondaryColor;
@@ -420,10 +441,16 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
     /// Applies a live theme snapshot received from the tab host or an embedded client without
     /// writing it back to shared settings. Snapshot colors are already adjusted for display.
     /// </summary>
-    public void ApplyExternalThemeSnapshot(ThemeItem item)
+    public void ApplyExternalThemeSnapshot(ThemeItem item, bool useAccentOnMainTitleBar)
     {
         if (item is null)
             return;
+
+        if (_useAccentOnMainTitleBar != useAccentOnMainTitleBar)
+        {
+            _useAccentOnMainTitleBar = useAccentOnMainTitleBar;
+            OnPropertyChanged(nameof(UseAccentOnMainTitleBar));
+        }
 
         ThemeItem displaySnapshot = new()
         {
