@@ -52,14 +52,16 @@ public partial class JumpViewModel : BotControlViewModelBase
     [RelayCommand]
     private void GetCurrent()
     {
-        // Populate the cell list before selecting the player's current cell. Otherwise,
-        // the initial selection can be rejected by the bound selector until a cell changes.
         UpdateCells();
+        (string? cell, string? pad) = _mapService.GetCurrentCell();
 
         _suppressAutoJump = true;
         try
         {
-            (string? cell, string? pad) = _mapService.GetCurrentCell();
+            // Force a property notification even when the current cell matches the
+            // view-model value already; the selector may not have applied its initial selection.
+            SelectedCell = string.Empty;
+            SelectedPad = string.Empty;
             SelectedCell = cell;
             SelectedPad = pad;
         }
