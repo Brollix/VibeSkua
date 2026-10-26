@@ -234,7 +234,7 @@
             </Button>
             
             <Button Command="{Binding ToggleQueueCommand}"
-                    Classes="skua-button"
+                    Classes="skua-button w112"
                     Classes.skua-danger="{Binding IsRunningQueue}"
                     Classes.skua-primary="{Binding !IsRunningQueue}">
                 <StackPanel Orientation="Horizontal" Spacing="6">

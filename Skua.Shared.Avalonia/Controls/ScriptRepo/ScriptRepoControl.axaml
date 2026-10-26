@@ -65,8 +65,7 @@
                     <!-- Ascending / Descending Toggle -->
                     <ToggleButton Grid.Column="3"
                                   Height="32"
-                                  Padding="8,0"
-                                  Classes="app-toggle"
+                                  Classes="app-toggle w112"
                                   IsChecked="{Binding SortDescending, Mode=TwoWay}"
                                   ToolTip.Tip="Toggle Ascending / Descending sort order">
                         <StackPanel Orientation="Horizontal" Spacing="4">

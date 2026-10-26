@@ -30,7 +30,7 @@
         <Setter Property="MinHeight" Value="40" />
         <Setter Property="CornerRadius" Value="8" />
         <Setter Property="Foreground" Value="{DynamicResource SkuaTextBrush}" />
-        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="FontWeight" Value="SemiBold" />
         <Setter Property="FontSize" Value="13" />
         <Setter Property="HorizontalContentAlignment" Value="Stretch" />
         <Setter Property="Transitions">

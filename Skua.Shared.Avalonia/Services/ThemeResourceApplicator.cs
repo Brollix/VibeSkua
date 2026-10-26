@@ -167,6 +167,10 @@ public static class ThemeResourceApplicator
         bool useDarkSelection = isDarkTheme ?? false;
         SetOrUpdateBrush(app.Resources, "SkuaSelectionBrush", useDarkSelection ? selectionDark : selectionLight);
 
+        // Selected/on fill for tabs, toggles, rows, cards and chips; the strong one is its hover.
+        SetOrUpdateBrush(app.Resources, "SkuaAccentTintBrush", Color.FromArgb(0x24, primary.R, primary.G, primary.B));
+        SetOrUpdateBrush(app.Resources, "SkuaAccentTintStrongBrush", Color.FromArgb(0x38, primary.R, primary.G, primary.B));
+
         Color tagBg = Color.FromArgb(0x22, primary.R, primary.G, primary.B);
         Color tagBgHover = Color.FromArgb(0x3B, primary.R, primary.G, primary.B);
         Color tagBorder = Color.FromArgb(0x4D, primary.R, primary.G, primary.B);

@@ -606,8 +606,7 @@ public class DialogService : IDialogService
         Button copyButton = new()
         {
             Content = "Copy",
-            MinWidth = 74,
-            Classes = { "skua-button" }
+            Classes = { "skua-button", "w84" }
         };
         copyButton.Click += async (_, _) =>
         {
