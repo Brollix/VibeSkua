@@ -309,7 +309,9 @@ public partial class TabbedHostWindow : Window
         {
             IThemeService? themeService = Ioc.Default.GetService<IThemeService>();
             if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
-                Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme, avaloniaTheme.PrimaryColor, avaloniaTheme.PrimaryForegroundColor);
+                Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme,
+                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryColor : (Color?)null,
+                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryForegroundColor : (Color?)null);
             else
                 Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService?.IsDarkTheme);
         }
@@ -459,7 +461,9 @@ public partial class TabbedHostWindow : Window
                 themeService.ThemeChanged += _ => Dispatcher.UIThread.Post(RefreshNativeTitleBar, DispatcherPriority.Background);
                 themeService.SchemeChanged += (_, _) => Dispatcher.UIThread.Post(RefreshNativeTitleBar, DispatcherPriority.Background);
                 if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
-                    Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme, avaloniaTheme.PrimaryColor, avaloniaTheme.PrimaryForegroundColor);
+                    Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme,
+                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryColor : (Color?)null,
+                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryForegroundColor : (Color?)null);
                 else
                     Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
             }
@@ -521,7 +525,9 @@ public partial class TabbedHostWindow : Window
                     var themeService = Ioc.Default.GetService<IThemeService>();
                     bool isDark = themeService?.IsDarkTheme ?? true;
                     if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
-                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark, avaloniaTheme.PrimaryColor, avaloniaTheme.PrimaryForegroundColor);
+                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark,
+                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryColor : (Color?)null,
+                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryForegroundColor : (Color?)null);
                     else
                         Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark);
                 }
@@ -694,7 +700,17 @@ public partial class TabbedHostWindow : Window
                         {
                             if (line.StartsWith("THEME|", StringComparison.Ordinal))
                             {
-                                string themeCsv = line.Substring("THEME|".Length);
+                                string themePayload = line.Substring("THEME|".Length);
+                                bool useAccentOnMainTitleBar = true;
+                                string themeCsv = themePayload;
+                                int separatorIndex = themePayload.IndexOf('|');
+                                if (separatorIndex >= 0 &&
+                                    bool.TryParse(themePayload[..separatorIndex], out bool parsedAccentSetting))
+                                {
+                                    useAccentOnMainTitleBar = parsedAccentSetting;
+                                    themeCsv = themePayload[(separatorIndex + 1)..];
+                                }
+
                                 Dispatcher.UIThread.Post(() =>
                                 {
                                     try
@@ -704,7 +720,7 @@ public partial class TabbedHostWindow : Window
                                         if (themeItem is not null &&
                                             Ioc.Default.GetService<IThemeService>() is Skua.Shared.Avalonia.Services.AvaloniaThemeService themeService)
                                         {
-                                            themeService.ApplyExternalThemeSnapshot(themeItem);
+                                            themeService.ApplyExternalThemeSnapshot(themeItem, useAccentOnMainTitleBar);
                                         }
                                     }
                                     catch (Exception ex)
