@@ -80,7 +80,7 @@ public partial class MainWindow : Window
 
         if (OperatingSystem.IsWindows() && recipient.TryGetPlatformHandle() is { Handle: var handle } && handle != IntPtr.Zero)
         {
-            ShowWindow(handle, 9); // SW_RESTORE
+            ShowWindow(handle, 5); // SW_SHOW: un-minimizing is done above; SW_RESTORE would also un-maximize
             SetForegroundWindow(handle);
         }
     }

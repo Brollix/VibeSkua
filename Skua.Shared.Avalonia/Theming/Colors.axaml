@@ -12,8 +12,20 @@
     <SolidColorBrush x:Key="SkuaAccentForegroundBrush" Color="{StaticResource SkuaAccentForegroundColor}" />
     <SolidColorBrush x:Key="SkuaAccentHoverBrush" Color="#059669" />
     <SolidColorBrush x:Key="SkuaAccentPressedBrush" Color="#047857" />
-    <SolidColorBrush x:Key="SkuaDangerHoverBrush" Color="#EF4444" />
+    <SolidColorBrush x:Key="SkuaDangerBrush" Color="#EF4444" />
+    <SolidColorBrush x:Key="SkuaDangerHoverBrush" Color="#DC2626" />
+    <SolidColorBrush x:Key="SkuaDangerPressedBrush" Color="#B91C1C" />
     <SolidColorBrush x:Key="SkuaDangerForegroundBrush" Color="#FFFFFFFF" />
+
+    <!-- Fluent reads these for CheckBox, RadioButton, Slider, ProgressBar, TabItem pipe, TextBox focus.
+         ThemeResourceApplicator overwrites them with the user's primary colour at startup. -->
+    <Color x:Key="SystemAccentColor">#10B981</Color>
+    <Color x:Key="SystemAccentColorLight1">#28C08E</Color>
+    <Color x:Key="SystemAccentColorLight2">#40C79A</Color>
+    <Color x:Key="SystemAccentColorLight3">#58CEA7</Color>
+    <Color x:Key="SystemAccentColorDark1">#0E9D6E</Color>
+    <Color x:Key="SystemAccentColorDark2">#0B825A</Color>
+    <Color x:Key="SystemAccentColorDark3">#096647</Color>
     <SolidColorBrush x:Key="SkuaTagBackgroundBrush" Color="#2210B981" />
     <SolidColorBrush x:Key="SkuaTagBackgroundHoverBrush" Color="#3B10B981" />
     <SolidColorBrush x:Key="SkuaTagBorderBrush" Color="#4D10B981" />
@@ -36,8 +48,14 @@
             <SolidColorBrush x:Key="SkuaScrollThumbBrush" Color="#BDBDBD" />
             <SolidColorBrush x:Key="SkuaScrollThumbHoverBrush" Color="#9E9E9E" />
             <SolidColorBrush x:Key="SkuaScrollThumbPressedBrush" Color="#757575" />
+            <SolidColorBrush x:Key="SkuaSurfaceSubtleBrush" Color="#FFF0F0F0" />
+            <!-- Status colours (not the accent): darker variants so text stays readable on light surfaces -->
+            <SolidColorBrush x:Key="SkuaSuccessBrush" Color="#059669" />
+            <SolidColorBrush x:Key="SkuaWarningBrush" Color="#B45309" />
+            <SolidColorBrush x:Key="SkuaGoldBrush" Color="#A16207" />
+            <SolidColorBrush x:Key="SkuaInfoBrush" Color="#0277BD" />
         </ResourceDictionary>
-      
+
         <ResourceDictionary x:Key="Dark">
             <SolidColorBrush x:Key="SkuaPageBrush" Color="#0A0A0A" />
             <SolidColorBrush x:Key="SkuaSurfaceBrush" Color="#121212" />
@@ -53,6 +71,11 @@
             <SolidColorBrush x:Key="SkuaScrollThumbBrush" Color="#333333" />
             <SolidColorBrush x:Key="SkuaScrollThumbHoverBrush" Color="#555555" />
             <SolidColorBrush x:Key="SkuaScrollThumbPressedBrush" Color="#777777" />
+            <SolidColorBrush x:Key="SkuaSurfaceSubtleBrush" Color="#1E1E1E" />
+            <SolidColorBrush x:Key="SkuaSuccessBrush" Color="#34D399" />
+            <SolidColorBrush x:Key="SkuaWarningBrush" Color="#FBBF24" />
+            <SolidColorBrush x:Key="SkuaGoldBrush" Color="#FFD700" />
+            <SolidColorBrush x:Key="SkuaInfoBrush" Color="#29B6F6" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 </ResourceDictionary>

@@ -17,8 +17,8 @@
     <!-- Sleek Custom ControlTemplate for ComboBox following Pure Neutral Dark UI -->
     <Style Selector="ComboBox">
         <Setter Property="Height" Value="34" />
-        <Setter Property="MinHeight" Value="34" />
-        <Setter Property="MinWidth" Value="110" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="MinWidth" Value="56" />
         <Setter Property="Padding" Value="10,0" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
@@ -95,6 +95,10 @@
     <Style Selector="ComboBox:pointerover">
         <Setter Property="Background" Value="{DynamicResource SkuaNavHoverBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
+    </Style>
+
+    <Style Selector="ComboBox:disabled">
+        <Setter Property="Opacity" Value="0.45" />
     </Style>
 
     <Style Selector="ComboBox:focus, ComboBox:focus-within">

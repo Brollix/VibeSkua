@@ -257,6 +257,7 @@
                                              Watermark="Stacks"
                                              Text="{Binding UseRules.AuraUseValue}" />
                                     <ComboBox Grid.Column="3"
+                                              MinWidth="90"
                                               SelectedIndex="{Binding UseRules.AuraTargetIndex}"
                                               VerticalAlignment="Bottom">
                                         <ComboBoxItem Content="Self" />
@@ -277,6 +278,7 @@
                                                 <TextBox Grid.Column="2" Classes="bottom-line" Watermark="Stacks" 
                                                          Text="{Binding StackCount}" />
                                                 <ComboBox Grid.Column="3"
+                                                          MinWidth="90"
                                                           SelectedIndex="{Binding AuraTargetIndex}"
                                                           VerticalAlignment="Bottom">
                                                     <ComboBoxItem Content="Self" />

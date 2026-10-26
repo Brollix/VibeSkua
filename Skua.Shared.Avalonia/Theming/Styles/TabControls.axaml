@@ -22,13 +22,13 @@
         <Setter Property="Cursor" Value="Hand" />
     </Style>
 
-    <Style Selector="TabItem /template/ Border#PART_LayoutRoot, TabItem /template/ Border#PART_RootBorder">
+    <Style Selector="TabItem /template/ Border#PART_LayoutRoot">
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderBrush" Value="Transparent" />
         <Setter Property="CornerRadius" Value="6,6,0,0" />
     </Style>
 
-    <Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot, TabItem:pointerover /template/ Border#PART_RootBorder">
+    <Style Selector="TabItem:pointerover /template/ Border#PART_LayoutRoot">
         <Setter Property="Background" Value="{DynamicResource SkuaNavHoverBrush}" />
     </Style>
 
@@ -36,7 +36,7 @@
         <Setter Property="TextElement.Foreground" Value="{DynamicResource SkuaTextBrush}" />
     </Style>
 
-    <Style Selector="TabItem:selected /template/ Border#PART_LayoutRoot, TabItem:selected /template/ Border#PART_RootBorder">
+    <Style Selector="TabItem:selected /template/ Border#PART_LayoutRoot">
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
     </Style>
@@ -44,10 +44,6 @@
     <Style Selector="TabItem:selected /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="TextElement.Foreground" Value="{DynamicResource SkuaAccentBrush}" />
         <Setter Property="TextElement.FontWeight" Value="SemiBold" />
-    </Style>
-
-    <Style Selector="TabItem /template/ Border#PART_SelectedPipe">
-        <Setter Property="Background" Value="{DynamicResource SkuaAccentBrush}" />
     </Style>
 
     <!-- Account/Groups switcher inside Account Manager (Material TabControl). -->
@@ -70,15 +66,15 @@
         <Setter Property="Margin" Value="12,6" />
     </Style>
 
-    <Style Selector="TabControl.account-groups-switcher TabItem:selected /template/ Border#PART_LayoutRoot, TabControl.account-groups-switcher TabItem:selected /template/ Border#PART_RootBorder">
+    <Style Selector="TabControl.account-groups-switcher TabItem:selected /template/ Border#PART_LayoutRoot">
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
     </Style>
 
-    <Style Selector="TabControl.account-groups-switcher TabItem:pointerover /template/ Border#PART_LayoutRoot, TabControl.account-groups-switcher TabItem:pointerover /template/ Border#PART_RootBorder">
+    <Style Selector="TabControl.account-groups-switcher TabItem:pointerover /template/ Border#PART_LayoutRoot">
         <Setter Property="Background" Value="{DynamicResource SkuaHoverBrush}" />
     </Style>
 
-    <Style Selector="TabControl.account-groups-switcher TabItem:selected:pointerover /template/ Border#PART_LayoutRoot, TabControl.account-groups-switcher TabItem:selected:pointerover /template/ Border#PART_RootBorder">
+    <Style Selector="TabControl.account-groups-switcher TabItem:selected:pointerover /template/ Border#PART_LayoutRoot">
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
     </Style>
 </Styles>

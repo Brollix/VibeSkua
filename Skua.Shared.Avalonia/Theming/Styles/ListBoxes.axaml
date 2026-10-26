@@ -43,6 +43,33 @@
         <Setter Property="Foreground" Value="{DynamicResource SkuaTextBrush}" />
     </Style>
     
+    <!-- Card lists: ListBox Classes="card-list" whose item template root is Border Classes="list-card".
+         The card itself shows hover/selection; the ListBoxItem around it stays transparent. -->
+    <Style Selector="ListBox.card-list ListBoxItem">
+        <Setter Property="Padding" Value="0" />
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="ListBox.card-list ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                     ListBox.card-list ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter,
+                     ListBox.card-list ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter,
+                     ListBox.card-list ListBoxItem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Border.list-card">
+        <Setter Property="Background" Value="{DynamicResource SkuaSurfaceBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
+    </Style>
+    <Style Selector="Border.list-card.alt">
+        <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem:pointerover Border.list-card">
+        <Setter Property="Background" Value="{DynamicResource SkuaNavHoverBrush}" />
+    </Style>
+    <Style Selector="ListBoxItem:selected Border.list-card">
+        <Setter Property="Background" Value="{DynamicResource SkuaSelectionBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SkuaAccentBrush}" />
+    </Style>
+
     <Style Selector="ListBox.embedded">
         <Setter Property="BorderThickness" Value="0" />
         <Setter Property="Background" Value="Transparent" />

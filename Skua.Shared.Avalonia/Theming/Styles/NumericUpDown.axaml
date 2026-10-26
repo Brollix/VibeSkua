@@ -4,7 +4,7 @@
     <!-- Base Modern NumericUpDown Styling -->
     <Style Selector="NumericUpDown">
         <Setter Property="Height" Value="34" />
-        <Setter Property="MinHeight" Value="34" />
+        <Setter Property="MinHeight" Value="0" />
         <Setter Property="CornerRadius" Value="6" />
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
