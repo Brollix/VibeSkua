@@ -451,7 +451,9 @@ public partial class TabbedHostWindow : Window
                 void RefreshNativeTitleBar()
                 {
                     if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService currentTheme)
-                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme, currentTheme.PrimaryColor, currentTheme.PrimaryForegroundColor);
+                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme,
+                            currentTheme.UseAccentOnMainTitleBar ? currentTheme.PrimaryColor : (Color?)null,
+                            currentTheme.UseAccentOnMainTitleBar ? currentTheme.PrimaryForegroundColor : (Color?)null);
                     else
                         Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
                 }
