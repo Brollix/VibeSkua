@@ -50,7 +50,7 @@ public class ApplicationThemesViewModel : BotControlViewModelBase
 
     private void BrowseManagerTitleBarArtwork()
     {
-        string? path = _fileDialogService.OpenFile("Image Files (*.png;*.jpg;*.jpeg;*.bmp;*.webp)|*.png;*.jpg;*.jpeg;*.bmp;*.webp");
+        string? path = _fileDialogService.OpenFile("Image Files (*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.gif)|*.png;*.jpg;*.jpeg;*.bmp;*.webp;*.gif");
         if (!string.IsNullOrWhiteSpace(path))
             ManagerTitleBarArtworkPath = path;
     }
