@@ -5,8 +5,12 @@
              x:Class="Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar">
   <Grid Height="32"
         Background="{DynamicResource SkuaSurfaceAltBrush}">
-    <Image x:Name="ArtworkImage" Stretch="UniformToFill" Opacity="0.62" IsHitTestVisible="False" />
-    <Border Background="#9910141C" IsHitTestVisible="False" />
+    <Border Grid.ColumnSpan="3"
+            Background="{DynamicResource SkuaAccentBrush}"
+            IsVisible="{Binding UseAccentBackground, ElementName=Root}"
+            IsHitTestVisible="False" />
+    <Image x:Name="ArtworkImage" Grid.ColumnSpan="3" Stretch="UniformToFill" Opacity="0.62" IsHitTestVisible="False" />
+    <Border Grid.ColumnSpan="3" Background="{DynamicResource SkuaTitleBarOverlayBrush}" IsHitTestVisible="False" />
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="Auto" />
       <ColumnDefinition Width="*" />
@@ -30,7 +34,8 @@
              VerticalAlignment="Center" />
     </Grid>
 
-    <TextBlock Grid.Column="1"
+    <TextBlock x:Name="TitleTextBlock"
+               Grid.Column="1"
                Margin="6,0,8,0"
                VerticalAlignment="Center"
                Text="{Binding TitleText, ElementName=Root}"

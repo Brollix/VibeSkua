@@ -8,11 +8,17 @@
         x:Class="Skua.App.Avalonia.Views.TabbedHostWindow"
         Classes="skua"
         Title="VibeSkua" Icon="avares://Skua.Shared.Avalonia/Assets/SkuaIcon.ico" Height="700" Width="1100"
-        WindowStartupLocation="CenterScreen" Background="{DynamicResource SkuaPageBrush}">
-    <Grid RowDefinitions="Auto,*">
-        
+        WindowStartupLocation="CenterScreen"
+        Background="{DynamicResource SkuaPageBrush}"
+        SystemDecorations="BorderOnly"
+        ExtendClientAreaToDecorationsHint="True"
+        ExtendClientAreaChromeHints="NoChrome"
+        ExtendClientAreaTitleBarHeightHint="32">
+    <Grid RowDefinitions="32,Auto,*">
+        <sharedShell:WindowTitleBar x:Name="MainTitleBar" Grid.Row="0" TitleText="VibeSkua" />
+
         <!-- Top Tab Bar & Army Bar -->
-        <Border Grid.Row="0"
+        <Border Grid.Row="1"
                 Background="{DynamicResource SkuaSurfaceBrush}"
                 BorderBrush="{DynamicResource SkuaBorderBrush}"
                 BorderThickness="0,0,0,1"
@@ -277,7 +283,7 @@
         </Border>
         
         <!-- Game Instance Host Container -->
-        <Grid Grid.Row="1" Background="{DynamicResource SkuaPageBrush}">
+        <Grid Grid.Row="2" Background="{DynamicResource SkuaPageBrush}">
             <StackPanel x:Name="LoadingIndicator" HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7">
                 <TextBlock Text="Loading Game Instance..." Foreground="{DynamicResource SkuaTextBrush}" FontSize="20" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,6" />
                 <TextBlock Text="Please wait while the game client initializes" Foreground="{DynamicResource SkuaMutedTextBrush}" FontSize="12" HorizontalAlignment="Center" />

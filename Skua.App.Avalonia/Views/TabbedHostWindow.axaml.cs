@@ -301,13 +301,26 @@ public partial class TabbedHostWindow : Window
         _initialArgs = initialArgs ?? Array.Empty<string>();
         InitializeComponent();
         Title = $"VibeSkua V{Skua.Core.Models.ClientFileSources.DisplayVersion}";
+        MainTitleBar.TitleText = Title;
 
-        // Theme the native title bar now, while the window is still hidden. Applied after it is shown (in Opened),
-        // Windows 10 repaints only the caption text in dark mode, leaving dark boxes on a light bar until the
-        // next activation change.
         try
         {
-            Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, Ioc.Default.GetService<IThemeService>()?.IsDarkTheme);
+            IThemeService? themeService = Ioc.Default.GetService<IThemeService>();
+            Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar.SetArtworkPath(
+                Ioc.Default.GetRequiredService<ISettingsService>().GetShared().TitleBarArtworkPath);
+
+            if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
+            {
+                MainTitleBar.UseAccentBackground = avaloniaTheme.UseAccentOnMainTitleBar;
+                Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme,
+                    avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryColor : (Color?)null,
+                    avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryForegroundColor : (Color?)null);
+            }
+            else
+            {
+                MainTitleBar.UseAccentBackground = false;
+                Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService?.IsDarkTheme);
+            }
         }
         catch { }
 
@@ -442,11 +455,32 @@ public partial class TabbedHostWindow : Window
             var themeService = Ioc.Default.GetService<IThemeService>();
             if (themeService != null)
             {
-                themeService.ThemeChanged += _ => Dispatcher.UIThread.Post(() =>
+                void RefreshNativeTitleBar()
                 {
+                    if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService currentTheme)
+                    {
+                        MainTitleBar.UseAccentBackground = currentTheme.UseAccentOnMainTitleBar;
+                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme,
+                            currentTheme.UseAccentOnMainTitleBar ? currentTheme.PrimaryColor : (Color?)null,
+                            currentTheme.UseAccentOnMainTitleBar ? currentTheme.PrimaryForegroundColor : (Color?)null);
+                    }
+                    else
+                    {
+                        MainTitleBar.UseAccentBackground = false;
+                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
+                    }
+                }
+
+                // Preset changes and single-scheme edits use separate events. Listen to both so
+                // changing a custom primary/foreground color cannot leave the native caption stale.
+                themeService.ThemeChanged += _ => Dispatcher.UIThread.Post(RefreshNativeTitleBar, DispatcherPriority.Background);
+                themeService.SchemeChanged += (_, _) => Dispatcher.UIThread.Post(RefreshNativeTitleBar, DispatcherPriority.Background);
+                if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
+                    Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme,
+                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryColor : (Color?)null,
+                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryForegroundColor : (Color?)null);
+                else
                     Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
-                });
-                Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
             }
         }
         catch { }
@@ -505,7 +539,12 @@ public partial class TabbedHostWindow : Window
                 {
                     var themeService = Ioc.Default.GetService<IThemeService>();
                     bool isDark = themeService?.IsDarkTheme ?? true;
-                    Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark);
+                    if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
+                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark,
+                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryColor : (Color?)null,
+                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryForegroundColor : (Color?)null);
+                    else
+                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark);
                 }
                 catch { }
             });
@@ -674,18 +713,69 @@ public partial class TabbedHostWindow : Window
                         string? line = await sr.ReadLineAsync();
                         if (!string.IsNullOrWhiteSpace(line))
                         {
-                            string[]? parsedArgs = null;
-                            try
+                            if (line.StartsWith("ARTWORK|", StringComparison.Ordinal))
                             {
-                                if (line.TrimStart().StartsWith("["))
+                                string encodedPath = line.Substring("ARTWORK|".Length);
+                                Dispatcher.UIThread.Post(() =>
                                 {
-                                    parsedArgs = System.Text.Json.JsonSerializer.Deserialize<string[]>(line);
-                                }
+                                    try
+                                    {
+                                        string artworkPath = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encodedPath));
+                                        Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar.SetArtworkPath(
+                                            string.IsNullOrWhiteSpace(artworkPath) ? null : artworkPath);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Trace.WriteLine($"VibeSkua artwork sync failed: {ex.GetType().Name}: {ex.Message}");
+                                    }
+                                });
                             }
-                            catch { }
+                            else if (line.StartsWith("THEME|", StringComparison.Ordinal))
+                            {
+                                string themePayload = line.Substring("THEME|".Length);
+                                bool useAccentOnMainTitleBar = true;
+                                string themeCsv = themePayload;
+                                int separatorIndex = themePayload.IndexOf('|');
+                                if (separatorIndex >= 0 &&
+                                    bool.TryParse(themePayload[..separatorIndex], out bool parsedAccentSetting))
+                                {
+                                    useAccentOnMainTitleBar = parsedAccentSetting;
+                                    themeCsv = themePayload[(separatorIndex + 1)..];
+                                }
 
-                            parsedArgs ??= ParseRawCommandLine(line);
-                            Dispatcher.UIThread.Post(() => AddNewInstance(parsedArgs));
+                                Dispatcher.UIThread.Post(() =>
+                                {
+                                    try
+                                    {
+                                        Skua.Shared.Avalonia.Services.ThemeItem? themeItem =
+                                            Skua.Shared.Avalonia.Services.ThemeItem.FromString(themeCsv);
+                                        if (themeItem is not null &&
+                                            Ioc.Default.GetService<IThemeService>() is Skua.Shared.Avalonia.Services.AvaloniaThemeService themeService)
+                                        {
+                                            themeService.ApplyExternalThemeSnapshot(themeItem, useAccentOnMainTitleBar);
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Trace.WriteLine($"VibeSkua theme sync failed: {ex.GetType().Name}: {ex.Message}");
+                                    }
+                                });
+                            }
+                            else
+                            {
+                                string[]? parsedArgs = null;
+                                try
+                                {
+                                    if (line.TrimStart().StartsWith("["))
+                                    {
+                                        parsedArgs = System.Text.Json.JsonSerializer.Deserialize<string[]>(line);
+                                    }
+                                }
+                                catch { }
+
+                                parsedArgs ??= ParseRawCommandLine(line);
+                                Dispatcher.UIThread.Post(() => AddNewInstance(parsedArgs));
+                            }
                         }
                     }
                 }

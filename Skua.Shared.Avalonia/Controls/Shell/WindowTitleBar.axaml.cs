@@ -31,6 +31,15 @@ public partial class WindowTitleBar : UserControl
     public static readonly StyledProperty<IImage?> IconSourceProperty =
         AvaloniaProperty.Register<WindowTitleBar, IImage?>(nameof(IconSource), DefaultIconSource);
 
+    public static readonly StyledProperty<bool> UseAccentBackgroundProperty =
+        AvaloniaProperty.Register<WindowTitleBar, bool>(nameof(UseAccentBackground), false);
+
+    public bool UseAccentBackground
+    {
+        get => GetValue(UseAccentBackgroundProperty);
+        set => SetValue(UseAccentBackgroundProperty, value);
+    }
+
     public string TitleText
     {
         get => GetValue(TitleTextProperty);
@@ -46,11 +55,17 @@ public partial class WindowTitleBar : UserControl
     public WindowTitleBar()
     {
         InitializeComponent();
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == UseAccentBackgroundProperty)
+                ApplyAccentForeground();
+        };
         Loaded += (_, _) =>
         {
             ArtworkPathChanged -= ApplyArtworkPath;
             ArtworkPathChanged += ApplyArtworkPath;
             ApplyArtworkPath(_artworkPath);
+            ApplyAccentForeground();
         };
         Unloaded += (_, _) => ArtworkPathChanged -= ApplyArtworkPath;
         PointerPressed += OnTitleBarPointerPressed;
@@ -91,6 +106,18 @@ public partial class WindowTitleBar : UserControl
             Height = 12
         };
         ToolTip.SetTip(MaximizeButton, maximized ? "Restore" : "Maximize");
+    }
+
+    private void ApplyAccentForeground()
+    {
+        string resourceKey = UseAccentBackground ? "SkuaAccentForegroundBrush" : "SkuaAccentBrush";
+        if (!TryGetResource(resourceKey, ActualThemeVariant, out object? resource) || resource is not IBrush brush)
+            return;
+
+        TitleTextBlock.Foreground = brush;
+        MinimizeButton.Foreground = brush;
+        MaximizeButton.Foreground = brush;
+        CloseButton.Foreground = brush;
     }
 
     private void ApplyArtworkPath(string? path)

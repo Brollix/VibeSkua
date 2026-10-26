@@ -43,6 +43,7 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
     public AvaloniaThemeService(ISettingsService settingsService)
     {
         _settingsService = settingsService;
+        _useAccentOnMainTitleBar = ReadUseAccentOnMainTitleBarSetting();
 
         _applyThrottleTimer = new DispatcherTimer
         {
@@ -276,6 +277,26 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         }
     }
 
+    private bool _useAccentOnMainTitleBar = true;
+
+    /// <summary>
+    /// Gets or sets whether the main VibeSkua host title bar follows the active theme's primary accent.
+    /// </summary>
+    public bool UseAccentOnMainTitleBar
+    {
+        get => _useAccentOnMainTitleBar;
+        set
+        {
+            if (_useAccentOnMainTitleBar == value)
+                return;
+
+            _useAccentOnMainTitleBar = value;
+            PersistUseAccentOnMainTitleBarSetting(value);
+            OnPropertyChanged();
+            ThemeChanged?.Invoke(_primaryColor);
+        }
+    }
+
     public Color PrimaryColor => _primaryColor;
     public Color PrimaryForegroundColor => _primaryForegroundColor;
     public Color SecondaryColor => _secondaryColor;
@@ -414,6 +435,84 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         _settingsService.Set("UserThemes", updated);
 
         UserThemes.RemoveAll(t => ThemeNameEquals(t, name));
+    }
+
+    /// <summary>
+    /// Applies a live theme snapshot received from the tab host or an embedded client without
+    /// writing it back to shared settings. Snapshot colors are already adjusted for display.
+    /// </summary>
+    public void ApplyExternalThemeSnapshot(ThemeItem item, bool useAccentOnMainTitleBar)
+    {
+        if (item is null)
+            return;
+
+        if (_useAccentOnMainTitleBar != useAccentOnMainTitleBar)
+        {
+            _useAccentOnMainTitleBar = useAccentOnMainTitleBar;
+            OnPropertyChanged(nameof(UseAccentOnMainTitleBar));
+        }
+        SetUseAccentOnMainTitleBarSettingInMemory(useAccentOnMainTitleBar);
+
+        ThemeItem displaySnapshot = new()
+        {
+            Name = item.Name,
+            IsDarkTheme = item.IsDarkTheme,
+            PrimaryColor = item.PrimaryColor,
+            SecondaryColor = item.SecondaryColor,
+            PrimaryForegroundColor = item.PrimaryForegroundColor,
+            SecondaryForegroundColor = item.SecondaryForegroundColor,
+            UseColorAdjustment = false,
+            DesiredContrastRatio = item.DesiredContrastRatio,
+            ContrastValue = item.ContrastValue,
+            ColorSelectionValue = item.ColorSelectionValue
+        };
+
+        ApplyThemeItem(displaySnapshot);
+        ThemeChanged?.Invoke(_primaryColor);
+        SchemeChanged?.Invoke(ColorScheme.Primary, _primaryColor);
+    }
+
+    private bool ReadUseAccentOnMainTitleBarSetting()
+    {
+        try
+        {
+            System.Collections.Generic.Dictionary<string, object>? extensionData = _settingsService.GetShared().ExtensionData;
+            if (extensionData is not null &&
+                extensionData.TryGetValue("UseAccentOnMainTitleBar", out object? value) &&
+                bool.TryParse(value?.ToString(), out bool enabled))
+            {
+                return enabled;
+            }
+        }
+        catch
+        {
+            // Use the enabled default if this setting is unavailable or malformed.
+        }
+
+        return true;
+    }
+
+    private void SetUseAccentOnMainTitleBarSettingInMemory(bool enabled)
+    {
+        Skua.Core.Models.SharedSettings sharedSettings = _settingsService.GetShared();
+        sharedSettings.ExtensionData ??= new System.Collections.Generic.Dictionary<string, object>();
+        sharedSettings.ExtensionData["UseAccentOnMainTitleBar"] = enabled;
+    }
+
+    private void PersistUseAccentOnMainTitleBarSetting(bool enabled)
+    {
+        try
+        {
+            SetUseAccentOnMainTitleBarSettingInMemory(enabled);
+            Skua.Core.Models.SharedSettings sharedSettings = _settingsService.GetShared();
+
+            // Set a known property to invoke the existing settings persistence path.
+            _settingsService.Set("TitleBarArtworkPath", sharedSettings.TitleBarArtworkPath);
+        }
+        catch
+        {
+            // The setting still applies for this session if persistence is unavailable.
+        }
     }
 
     private void ApplyThemeItem(ThemeItem item)

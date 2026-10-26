@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.Input;
 using Skua.Core.Interfaces;
+using Skua.Shared.Avalonia.Services;
 using System.Collections.Generic;
 
 namespace Skua.Shared.Avalonia.ViewModels;
@@ -20,6 +21,23 @@ public class ApplicationThemesViewModel : BotControlViewModelBase
     }
 
     public IThemeService ThemeService { get; }
+
+    /// <summary>
+    /// Controls whether the main VibeSkua title bar uses the active theme's accent color.
+    /// </summary>
+    public bool UseAccentOnMainTitleBar
+    {
+        get => ThemeService is AvaloniaThemeService avaloniaTheme && avaloniaTheme.UseAccentOnMainTitleBar;
+        set
+        {
+            if (ThemeService is not AvaloniaThemeService avaloniaTheme || avaloniaTheme.UseAccentOnMainTitleBar == value)
+                return;
+
+            avaloniaTheme.UseAccentOnMainTitleBar = value;
+            OnPropertyChanged();
+        }
+    }
+
     public ThemeSettingsViewModel ThemeSettings { get; }
     public ColorSchemeEditorViewModel ColorSchemeEditor { get; }
     public BackgroundThemeViewModel BackgroundTheme { get; }

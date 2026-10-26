@@ -34,14 +34,14 @@ public static class ThemeResourceApplicator
 
     private static readonly Dictionary<IntPtr, (bool isDark, Color caption, Color text)> _appliedTitleBars = new();
 
-    public static void ApplyTitleBarTheme(Application app, bool isDark)
+    public static void ApplyTitleBarTheme(Application app, bool isDark, Color? accentColor = null, Color? accentTextColor = null)
     {
         if (!OperatingSystem.IsWindows())
             return;
 
         if (!Dispatcher.UIThread.CheckAccess())
         {
-            Dispatcher.UIThread.Post(() => ApplyTitleBarTheme(app, isDark));
+            Dispatcher.UIThread.Post(() => ApplyTitleBarTheme(app, isDark, accentColor, accentTextColor));
             return;
         }
 
@@ -49,12 +49,12 @@ public static class ThemeResourceApplicator
         {
             foreach (Window window in desktop.Windows)
             {
-                ApplyTitleBarTheme(window, isDark);
+                ApplyTitleBarTheme(window, isDark, accentColor, accentTextColor);
             }
         }
     }
 
-    public static void ApplyTitleBarTheme(Window window, bool? isDarkTheme = null)
+    public static void ApplyTitleBarTheme(Window window, bool? isDarkTheme = null, Color? accentColor = null, Color? accentTextColor = null)
     {
         bool isDark = isDarkTheme ?? (window.ActualThemeVariant == ThemeVariant.Dark || Application.Current?.RequestedThemeVariant != ThemeVariant.Light);
         ThemeVariant targetVariant = isDark ? ThemeVariant.Dark : ThemeVariant.Light;
@@ -71,7 +71,7 @@ public static class ThemeResourceApplicator
             onOpened = (s, e) =>
             {
                 window.Opened -= onOpened;
-                ApplyTitleBarTheme(window, isDark);
+                ApplyTitleBarTheme(window, isDark, accentColor, accentTextColor);
             };
             window.Opened += onOpened;
             return;
@@ -82,16 +82,22 @@ public static class ThemeResourceApplicator
 
         try
         {
-            if (Application.Current?.Resources.ThemeDictionaries.TryGetValue(isDark ? ThemeVariant.Dark : ThemeVariant.Light, out var provider) == true
-                && provider is IResourceDictionary dict)
-            {
-                if (dict.TryGetValue("SkuaSurfaceAltBrush", out var sBrush) && sBrush is ISolidColorBrush scb)
-                    captionColor = scb.Color;
-                if (dict.TryGetValue("SkuaTextBrush", out var tBrush) && tBrush is ISolidColorBrush tcb)
-                    textColor = tcb.Color;
-            }
+            // Resolve through the window so Avalonia selects resources for this window's
+            // active theme variant instead of reading the application dictionary directly.
+            if (window.TryFindResource("SkuaSurfaceAltBrush", out object? surfaceBrush) && surfaceBrush is ISolidColorBrush surface)
+                captionColor = surface.Color;
+            if (window.TryFindResource("SkuaTextBrush", out object? foregroundBrush) && foregroundBrush is ISolidColorBrush foreground)
+                textColor = foreground.Color;
         }
-        catch { }
+        catch
+        {
+            // Keep safe system defaults if a custom theme omits title-bar resources.
+        }
+
+        if (accentColor is Color selectedAccent)
+            captionColor = selectedAccent;
+        if (accentTextColor is Color selectedAccentText)
+            textColor = selectedAccentText;
 
         ApplyNativeTitleBar(hwnd, isDark, captionColor, textColor);
     }
