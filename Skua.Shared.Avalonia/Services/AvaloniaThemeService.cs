@@ -43,7 +43,7 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
     public AvaloniaThemeService(ISettingsService settingsService)
     {
         _settingsService = settingsService;
-        _useAccentOnMainTitleBar = _settingsService.Get("UseAccentOnMainTitleBar", true);
+        _useAccentOnMainTitleBar = ReadUseAccentOnMainTitleBarSetting();
 
         _applyThrottleTimer = new DispatcherTimer
         {
@@ -291,7 +291,7 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
                 return;
 
             _useAccentOnMainTitleBar = value;
-            _settingsService.Set("UseAccentOnMainTitleBar", value);
+            PersistUseAccentOnMainTitleBarSetting(value);
             OnPropertyChanged();
             ThemeChanged?.Invoke(_primaryColor);
         }
@@ -469,6 +469,43 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         ApplyThemeItem(displaySnapshot);
         ThemeChanged?.Invoke(_primaryColor);
         SchemeChanged?.Invoke(ColorScheme.Primary, _primaryColor);
+    }
+
+    private bool ReadUseAccentOnMainTitleBarSetting()
+    {
+        try
+        {
+            System.Collections.Generic.Dictionary<string, object>? extensionData = _settingsService.GetShared().ExtensionData;
+            if (extensionData is not null &&
+                extensionData.TryGetValue("UseAccentOnMainTitleBar", out object? value) &&
+                bool.TryParse(value?.ToString(), out bool enabled))
+            {
+                return enabled;
+            }
+        }
+        catch
+        {
+            // Use the enabled default if this setting is unavailable or malformed.
+        }
+
+        return true;
+    }
+
+    private void PersistUseAccentOnMainTitleBarSetting(bool enabled)
+    {
+        try
+        {
+            Skua.Core.Models.SharedSettings sharedSettings = _settingsService.GetShared();
+            sharedSettings.ExtensionData ??= new System.Collections.Generic.Dictionary<string, object>();
+            sharedSettings.ExtensionData["UseAccentOnMainTitleBar"] = enabled;
+
+            // Set a known property to invoke the existing settings persistence path.
+            _settingsService.Set("TitleBarArtworkPath", sharedSettings.TitleBarArtworkPath);
+        }
+        catch
+        {
+            // The setting still applies for this session if persistence is unavailable.
+        }
     }
 
     private void ApplyThemeItem(ThemeItem item)
