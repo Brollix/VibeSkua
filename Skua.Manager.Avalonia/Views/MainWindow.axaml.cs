@@ -6,6 +6,8 @@ using Skua.Core.Interfaces;
 using Skua.Shared.Avalonia.Services;
 using Avalonia.Threading;
 using Skua.Manager.Avalonia.ViewModels;
+using Skua.Shared.Avalonia.ViewModels;
+using System.ComponentModel;
 using System;
 using System.Runtime.InteropServices;
 
@@ -15,6 +17,7 @@ public partial class MainWindow : Window
 {
     private readonly ManagerMainViewModel _viewModel;
     private readonly AvaloniaThemeService? _themeService;
+    private readonly ApplicationThemesViewModel _themesViewModel;
     private bool _allowClose;
 
     [DllImport("user32.dll")]
@@ -28,6 +31,9 @@ public partial class MainWindow : Window
         InitializeComponent();
         _viewModel = Ioc.Default.GetRequiredService<ManagerMainViewModel>();
         DataContext = _viewModel;
+        _themesViewModel = Ioc.Default.GetRequiredService<ApplicationThemesViewModel>();
+        TitleBar.SetInstanceArtworkPath(_themesViewModel.ManagerTitleBarArtworkPath);
+        _themesViewModel.PropertyChanged += OnThemesViewModelPropertyChanged;
 
         _themeService = Ioc.Default.GetService<IThemeService>() as AvaloniaThemeService;
         if (_themeService != null)
@@ -72,8 +78,15 @@ public partial class MainWindow : Window
         _viewModel.IsActive = false;
         if (_themeService != null)
             _themeService.ThemeChanged -= OnThemeChanged;
+        _themesViewModel.PropertyChanged -= OnThemesViewModelPropertyChanged;
         StrongReferenceMessenger.Default.UnregisterAll(this);
         base.OnClosing(e);
+    }
+
+    private void OnThemesViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ApplicationThemesViewModel.ManagerTitleBarArtworkPath))
+            Dispatcher.UIThread.Post(() => TitleBar.SetInstanceArtworkPath(_themesViewModel.ManagerTitleBarArtworkPath));
     }
 
     private void OnThemeChanged(object? theme)
