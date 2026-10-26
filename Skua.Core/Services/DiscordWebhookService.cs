@@ -70,16 +70,16 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         {
             while (true)
             {
-                await _queueSemaphore.WaitAsync(_cts.Token).ConfigureAwait(false);
+                await _queueSemaphore.WaitAsync(_cts.Token);
                 if (!_messageQueue.TryDequeue(out Func<Task>? action))
                     continue;
 
                 try
                 {
-                    await action().ConfigureAwait(false);
+                    await action();
 
                     // Rate limit: Max 2 messages per second
-                    await Task.Delay(500, _cts.Token).ConfigureAwait(false);
+                    await Task.Delay(500, _cts.Token);
                 }
                 catch (OperationCanceledException) when (_cts.IsCancellationRequested)
                 {
