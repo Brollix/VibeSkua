@@ -111,7 +111,7 @@ public partial class WindowTitleBar : UserControl
     private void ApplyAccentForeground()
     {
         string resourceKey = UseAccentBackground ? "SkuaAccentForegroundBrush" : "SkuaAccentBrush";
-        if (!TryFindResource(resourceKey, out object? resource) || resource is not IBrush brush)
+        if (!TryGetResource(resourceKey, ActualThemeVariant, out object? resource) || resource is not IBrush brush)
             return;
 
         TitleTextBlock.Foreground = brush;
