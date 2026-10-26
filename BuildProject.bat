@@ -2,25 +2,26 @@
 setlocal EnableExtensions
 
 rem Run a temporary copy so git pull can safely update this script on disk.
-if not defined BUILDPROJECT_RUNNING (
-    set "BUILDPROJECT_ROOT=%~dp0"
-    if "%~1"=="" set "BUILDPROJECT_PAUSE=1"
-    set "BUILDPROJECT_RUNNING=1"
-    set "BUILDPROJECT_TEMP=%TEMP%\BuildProject-%RANDOM%-%RANDOM%.bat"
+if defined BUILDPROJECT_RUNNING goto :BuildRunner
 
-    copy /Y "%~f0" "%BUILDPROJECT_TEMP%" >nul
-    if errorlevel 1 (
-        echo Failed to create a temporary copy of the build script.
-        pause
-        exit /b 1
-    )
+set "BUILDPROJECT_ROOT=%~dp0"
+if "%~1"=="" set "BUILDPROJECT_PAUSE=1"
+set "BUILDPROJECT_RUNNING=1"
+set "BUILDPROJECT_TEMP=%TEMP%\BuildProject-%RANDOM%-%RANDOM%.bat"
 
-    call "%BUILDPROJECT_TEMP%"
-    set "BUILDPROJECT_EXIT=%ERRORLEVEL%"
-    del "%BUILDPROJECT_TEMP%" >nul 2>&1
-    exit /b %BUILDPROJECT_EXIT%
+copy /Y "%~f0" "%BUILDPROJECT_TEMP%" >nul
+if errorlevel 1 (
+    echo Failed to create a temporary copy of the build script.
+    pause
+    exit /b 1
 )
 
+call "%BUILDPROJECT_TEMP%"
+set "BUILDPROJECT_EXIT=%ERRORLEVEL%"
+del "%BUILDPROJECT_TEMP%" >nul 2>&1
+exit /b %BUILDPROJECT_EXIT%
+
+:BuildRunner
 pushd "%BUILDPROJECT_ROOT%" || goto :Failure
 
 echo Updating repository...
@@ -40,7 +41,7 @@ if not exist "Build" (
 )
 
 if exist "Skua.AS3\skua\bin\skua.swf" (
-    echo Skipping AS3 build (skua.swf already exists). Delete it to force a rebuild.
+    echo Skipping AS3 build because skua.swf already exists. Delete it to force a rebuild.
 ) else (
     echo Building AS3 Client...
     set "MXMLC_PATH="
