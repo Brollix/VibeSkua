@@ -19,6 +19,7 @@ public partial class WindowTitleBar : UserControl
     private static readonly IImage DefaultIconSource = LoadDefaultIconSource();
     private static string? _artworkPath;
     private Bitmap? _artworkBitmap;
+    private bool _usesInstanceArtwork;
 
     public static event Action<string?>? ArtworkPathChanged;
 
@@ -26,6 +27,12 @@ public partial class WindowTitleBar : UserControl
     {
         _artworkPath = string.IsNullOrWhiteSpace(path) ? null : path;
         ArtworkPathChanged?.Invoke(_artworkPath);
+    }
+
+    public void SetInstanceArtworkPath(string? path)
+    {
+        _usesInstanceArtwork = true;
+        LoadArtworkPath(path);
     }
 
     public static readonly StyledProperty<IImage?> IconSourceProperty =
@@ -121,6 +128,14 @@ public partial class WindowTitleBar : UserControl
     }
 
     private void ApplyArtworkPath(string? path)
+    {
+        if (_usesInstanceArtwork)
+            return;
+
+        LoadArtworkPath(path);
+    }
+
+    private void LoadArtworkPath(string? path)
     {
         _artworkBitmap?.Dispose();
         _artworkBitmap = null;
