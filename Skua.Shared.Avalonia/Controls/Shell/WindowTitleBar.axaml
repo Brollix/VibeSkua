@@ -3,8 +3,7 @@
              xmlns:materialIcons="clr-namespace:Material.Icons.Avalonia;assembly=Material.Icons.Avalonia"
              x:Name="Root"
              x:Class="Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar">
-  <Grid x:Name="TitleBarRoot"
-        Height="32"
+  <Grid Height="32"
         Background="{DynamicResource SkuaSurfaceAltBrush}">
     <Border Grid.ColumnSpan="3"
             Background="{DynamicResource SkuaAccentBrush}"
