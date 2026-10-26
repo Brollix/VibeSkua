@@ -81,7 +81,7 @@ public partial class MainWindow : Window
         Dispatcher.UIThread.Post(() =>
         {
             if (_themeService != null)
-                TitleBar.UseAccentBackground = _themeService.UseAccentOnMainTitleBar;
+                TitleBar.UseAccentBackground = _themeService.UseAccentOnManagerTitleBar;
         });
     }
 
