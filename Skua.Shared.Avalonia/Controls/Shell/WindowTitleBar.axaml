@@ -5,6 +5,8 @@
              x:Class="Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar">
   <Grid Height="32"
         Background="{DynamicResource SkuaSurfaceAltBrush}">
+    <Image x:Name="ArtworkImage" Stretch="UniformToFill" Opacity="0.62" IsHitTestVisible="False" />
+    <Border Background="#9910141C" IsHitTestVisible="False" />
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="Auto" />
       <ColumnDefinition Width="*" />
