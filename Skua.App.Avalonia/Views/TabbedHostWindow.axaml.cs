@@ -692,18 +692,42 @@ public partial class TabbedHostWindow : Window
                         string? line = await sr.ReadLineAsync();
                         if (!string.IsNullOrWhiteSpace(line))
                         {
-                            string[]? parsedArgs = null;
-                            try
+                            if (line.StartsWith("THEME|", StringComparison.Ordinal))
                             {
-                                if (line.TrimStart().StartsWith("["))
+                                string themeCsv = line.Substring("THEME|".Length);
+                                Dispatcher.UIThread.Post(() =>
                                 {
-                                    parsedArgs = System.Text.Json.JsonSerializer.Deserialize<string[]>(line);
-                                }
+                                    try
+                                    {
+                                        Skua.Shared.Avalonia.Services.ThemeItem? themeItem =
+                                            Skua.Shared.Avalonia.Services.ThemeItem.FromString(themeCsv);
+                                        if (themeItem is not null &&
+                                            Ioc.Default.GetService<IThemeService>() is Skua.Shared.Avalonia.Services.AvaloniaThemeService themeService)
+                                        {
+                                            themeService.ApplyExternalThemeSnapshot(themeItem);
+                                        }
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Trace.WriteLine($"VibeSkua theme sync failed: {ex.GetType().Name}: {ex.Message}");
+                                    }
+                                });
                             }
-                            catch { }
+                            else
+                            {
+                                string[]? parsedArgs = null;
+                                try
+                                {
+                                    if (line.TrimStart().StartsWith("["))
+                                    {
+                                        parsedArgs = System.Text.Json.JsonSerializer.Deserialize<string[]>(line);
+                                    }
+                                }
+                                catch { }
 
-                            parsedArgs ??= ParseRawCommandLine(line);
-                            Dispatcher.UIThread.Post(() => AddNewInstance(parsedArgs));
+                                parsedArgs ??= ParseRawCommandLine(line);
+                                Dispatcher.UIThread.Post(() => AddNewInstance(parsedArgs));
+                            }
                         }
                     }
                 }
