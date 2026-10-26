@@ -1067,6 +1067,9 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     }
 
     // Script Commands
+    /// <summary>
+    /// Opens the selected script's shared options editor in the Manager.
+    /// </summary>
     [RelayCommand]
     public async Task EditScriptOptions()
     {
