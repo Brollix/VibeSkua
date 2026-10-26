@@ -31,6 +31,15 @@ public partial class WindowTitleBar : UserControl
     public static readonly StyledProperty<IImage?> IconSourceProperty =
         AvaloniaProperty.Register<WindowTitleBar, IImage?>(nameof(IconSource), DefaultIconSource);
 
+    public static readonly StyledProperty<bool> UseAccentBackgroundProperty =
+        AvaloniaProperty.Register<WindowTitleBar, bool>(nameof(UseAccentBackground), false);
+
+    public bool UseAccentBackground
+    {
+        get => GetValue(UseAccentBackgroundProperty);
+        set => SetValue(UseAccentBackgroundProperty, value);
+    }
+
     public string TitleText
     {
         get => GetValue(TitleTextProperty);
