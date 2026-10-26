@@ -458,6 +458,9 @@ public partial class App : Application
 
         if (themeService is AvaloniaThemeService ats)
         {
+            // Scheme edits can change the primary palette without changing the base theme.
+            // Keep the native caption synchronized with the latest selected theme colors.
+            ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark, ats.PrimaryColor, ats.PrimaryForegroundColor);
             ThemeResourceApplicator.ApplyAccentBrushes(
                 this,
                 ats.PrimaryColor,
