@@ -268,6 +268,10 @@ public partial class App : Application
                 SetupTrayIcon();
                 Views.TabbedHostWindow masterWindow = new(clientArgs) { WindowStartupLocation = global::Avalonia.Controls.WindowStartupLocation.CenterScreen };
                 desktop.MainWindow = masterWindow;
+                if (themeService is AvaloniaThemeService activeTheme)
+                    ThemeResourceApplicator.ApplyTitleBarTheme(masterWindow, activeTheme.IsDarkTheme, activeTheme.PrimaryColor, activeTheme.PrimaryForegroundColor);
+                else
+                    ThemeResourceApplicator.ApplyTitleBarTheme(masterWindow, themeService.IsDarkTheme);
             }
             desktop.Exit += OnDesktopExit;
         }
