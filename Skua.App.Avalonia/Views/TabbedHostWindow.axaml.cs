@@ -713,7 +713,24 @@ public partial class TabbedHostWindow : Window
                         string? line = await sr.ReadLineAsync();
                         if (!string.IsNullOrWhiteSpace(line))
                         {
-                            if (line.StartsWith("THEME|", StringComparison.Ordinal))
+                            if (line.StartsWith("ARTWORK|", StringComparison.Ordinal))
+                            {
+                                string encodedPath = line.Substring("ARTWORK|".Length);
+                                Dispatcher.UIThread.Post(() =>
+                                {
+                                    try
+                                    {
+                                        string artworkPath = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(encodedPath));
+                                        Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar.SetArtworkPath(
+                                            string.IsNullOrWhiteSpace(artworkPath) ? null : artworkPath);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        Trace.WriteLine($"VibeSkua artwork sync failed: {ex.GetType().Name}: {ex.Message}");
+                                    }
+                                });
+                            }
+                            else if (line.StartsWith("THEME|", StringComparison.Ordinal))
                             {
                                 string themePayload = line.Substring("THEME|".Length);
                                 bool useAccentOnMainTitleBar = true;
