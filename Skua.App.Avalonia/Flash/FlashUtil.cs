@@ -331,6 +331,10 @@ public class FlashUtil : IFlashUtil
 #else
 public class FlashUtil : IFlashUtil
 {
+    public static void PreloadSwf()
+    {
+    }
+
     public void Dispose()
     {
         throw new NotImplementedException();
