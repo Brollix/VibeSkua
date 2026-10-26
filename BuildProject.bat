@@ -1,10 +1,8 @@
 @echo off
 setlocal EnableExtensions
 
-rem Run from a temporary copy so git pull can safely update this file on disk.
-if not defined BUILDPROJECT_RUNNING (
-    set "BUILDPROJECT_RUNNING=1"
-    set "BUILDPROJECT_ROOT=%~dp0"
+rem Use a temporary copy so git pull can safely update this script on disk.
+if /i not "%~1"=="__BUILD_RUNNING__" (
     set "BUILDPROJECT_TEMP=%TEMP%\BuildProject-%RANDOM%-%RANDOM%.bat"
     copy /Y "%~f0" "%BUILDPROJECT_TEMP%" >nul
     if errorlevel 1 (
@@ -12,12 +10,18 @@ if not defined BUILDPROJECT_RUNNING (
         pause
         exit /b 1
     )
-    call "%BUILDPROJECT_TEMP%" %*
+    if "%~1"=="" (
+        call "%BUILDPROJECT_TEMP%" __BUILD_RUNNING__ "%~dp0" __PAUSE__
+    ) else (
+        call "%BUILDPROJECT_TEMP%" __BUILD_RUNNING__ "%~dp0" %*
+    )
     set "BUILDPROJECT_EXIT=%ERRORLEVEL%"
     del "%BUILDPROJECT_TEMP%" >nul 2>&1
     exit /b %BUILDPROJECT_EXIT%
 )
 
+set "BUILDPROJECT_ROOT=%~2"
+if /i "%~3"=="__PAUSE__" set "BUILDPROJECT_PAUSE=1"
 pushd "%BUILDPROJECT_ROOT%" || goto :Failure
 
 echo Updating repository...
@@ -93,6 +97,6 @@ echo.
 echo Fast Build failed. Check the output above for details.
 
 :Finish
-if "%~1"=="" pause
+if defined BUILDPROJECT_PAUSE pause
 popd
 exit /b %BUILD_EXIT_CODE%
