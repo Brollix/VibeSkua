@@ -75,6 +75,9 @@ public class HotKeyService : IHotKeyService, IDisposable
                 !global::Skua.Core.AppStartup.HotKeys.GetRegistry().TryGetValue(binding, out command))
                 continue;
 
+            if (command is null)
+                continue;
+
             if (split.Length < 2 || string.IsNullOrWhiteSpace(split[1]) || split[1].Equals("Unassigned", StringComparison.OrdinalIgnoreCase))
                 continue;
 
