@@ -54,14 +54,22 @@
                     </Grid>
 
                     <!-- Manager title bar accent setting -->
-                    <StackPanel Spacing="3" Margin="0,2,0,0">
-                        <CheckBox Content="Use theme accent on the manager title bar"
-                                  IsChecked="{Binding ThemeService.UseAccentOnManagerTitleBar, Mode=TwoWay}" />
-                        <TextBlock Text="When enabled, the manager title bar follows the active theme. Turn it off to keep the normal title bar surface color. This setting is independent of the main client title bar."
-                                   FontSize="11"
-                                   Opacity="0.8"
-                                   TextWrapping="Wrap" />
-                    </StackPanel>
+                    <Border Classes="card" Padding="10" Margin="0,2,0,0">
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="Manager Title Bar Accent" FontWeight="SemiBold" />
+                                <TextBlock Text="Use the active theme's accent color on the Manager title bar. This setting is independent of the main client title bar."
+                                           FontSize="11"
+                                           Opacity="0.8"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          VerticalAlignment="Center"
+                                          IsChecked="{Binding ThemeService.UseAccentOnManagerTitleBar, Mode=TwoWay}"
+                                          OnContent="On"
+                                          OffContent="Off" />
+                        </Grid>
+                    </Border>
 
                     <!-- Color Picker Section -->
                     <Grid ColumnDefinitions="200,*" Margin="0,4,0,0">
