@@ -276,7 +276,9 @@ public partial class App : Application
                 Views.TabbedHostWindow masterWindow = new(clientArgs) { WindowStartupLocation = global::Avalonia.Controls.WindowStartupLocation.CenterScreen };
                 desktop.MainWindow = masterWindow;
                 if (themeService is AvaloniaThemeService activeTheme)
-                    ThemeResourceApplicator.ApplyTitleBarTheme(masterWindow, activeTheme.IsDarkTheme, activeTheme.PrimaryColor, activeTheme.PrimaryForegroundColor);
+                    ThemeResourceApplicator.ApplyTitleBarTheme(masterWindow, activeTheme.IsDarkTheme,
+                        activeTheme.UseAccentOnMainTitleBar ? activeTheme.PrimaryColor : (Color?)null,
+                        activeTheme.UseAccentOnMainTitleBar ? activeTheme.PrimaryForegroundColor : (Color?)null);
                 else
                     ThemeResourceApplicator.ApplyTitleBarTheme(masterWindow, themeService.IsDarkTheme);
             }
@@ -437,7 +439,9 @@ public partial class App : Application
 
         if (themeService is AvaloniaThemeService ats)
         {
-            ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme, ats.PrimaryColor, ats.PrimaryForegroundColor);
+            ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme,
+                ats.UseAccentOnMainTitleBar ? ats.PrimaryColor : (Color?)null,
+                ats.UseAccentOnMainTitleBar ? ats.PrimaryForegroundColor : (Color?)null);
             ThemeResourceApplicator.ApplyAccentBrushes(
                 this,
                 ats.PrimaryColor,
@@ -468,7 +472,9 @@ public partial class App : Application
         {
             // Scheme edits can change the primary palette without changing the base theme.
             // Keep the native caption synchronized with the latest selected theme colors.
-            ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark, ats.PrimaryColor, ats.PrimaryForegroundColor);
+            ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark,
+                ats.UseAccentOnMainTitleBar ? ats.PrimaryColor : (Color?)null,
+                ats.UseAccentOnMainTitleBar ? ats.PrimaryForegroundColor : (Color?)null);
             ThemeResourceApplicator.ApplyAccentBrushes(
                 this,
                 ats.PrimaryColor,
@@ -495,7 +501,9 @@ public partial class App : Application
         RequestedThemeVariant = isDark ? ThemeVariant.Dark : ThemeVariant.Light;
         if (themeService is AvaloniaThemeService ats)
         {
-            ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark, ats.PrimaryColor, ats.PrimaryForegroundColor);
+            ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark,
+                ats.UseAccentOnMainTitleBar ? ats.PrimaryColor : (Color?)null,
+                ats.UseAccentOnMainTitleBar ? ats.PrimaryForegroundColor : (Color?)null);
             ThemeResourceApplicator.ApplyAccentBrushes(
                 this,
                 ats.PrimaryColor,
@@ -563,7 +571,7 @@ public partial class App : Application
                 ColorSelectionValue = themeService.ColorSelectionValue?.ToString() ?? "All"
             };
 
-            string message = "THEME|" + displaySnapshot.ConvertToString();
+            string message = "THEME|" + themeService.UseAccentOnMainTitleBar.ToString() + "|" + displaySnapshot.ConvertToString();
             _ = Task.Run(() =>
             {
                 for (int attempt = 0; attempt < 5; attempt++)
