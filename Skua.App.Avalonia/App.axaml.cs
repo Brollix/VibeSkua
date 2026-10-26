@@ -11,7 +11,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Skua.App.Avalonia.Flash;
 using Skua.App.Avalonia.AppStartup;
 using Skua.App.Avalonia.Services;
-using Skua.App.Avalonia.Views;
 using Skua.Shared.Avalonia.Services;
 using Skua.Shared.Avalonia.Controls.Theming;
 using Skua.Core.AppStartup;
@@ -142,8 +141,6 @@ public partial class App : Application
                 clientFiles.CreateDirectories();
                 clientFiles.CreateFiles();
             });
-
-            SetupTrayIcon();
         }
         else
         {
@@ -266,7 +263,9 @@ public partial class App : Application
                     catch { }
                 }
 
-                // Master instance
+                // Master instance. The tray icon is created only here: an instance that forwards to an
+                // existing host exits through Environment.Exit, which never removes it (ghost icon).
+                SetupTrayIcon();
                 Views.TabbedHostWindow masterWindow = new(clientArgs) { WindowStartupLocation = global::Avalonia.Controls.WindowStartupLocation.CenterScreen };
                 desktop.MainWindow = masterWindow;
             }
@@ -509,9 +508,9 @@ public partial class App : Application
     {
         if (ApplicationLifetime is not IClassicDesktopStyleApplicationLifetime desktop || desktop.MainWindow is null)
             return;
-        if (desktop.MainWindow is TabbedHostWindow hostWindow)
-            hostWindow.HideEmbeddedClients();
-
+        // Minimize the owner instead of hiding it directly. The embedded game HWNDs
+        // are separate top-level windows owned by the host; Windows hides owned windows
+        // with the owner while preserving the Flash renderer for a clean restore.
         desktop.MainWindow.WindowState = WindowState.Minimized;
     }
 
@@ -580,10 +579,6 @@ public partial class App : Application
             desktop.MainWindow.Show();
         if (desktop.MainWindow.WindowState == WindowState.Minimized)
             desktop.MainWindow.WindowState = WindowState.Normal;
-
-        if (desktop.MainWindow is TabbedHostWindow hostWindow)
-            hostWindow.ShowEmbeddedClients();
-
         desktop.MainWindow.Activate();
     }
 
