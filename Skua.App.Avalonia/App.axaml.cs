@@ -522,19 +522,21 @@ public partial class App : Application
         _pendingHostThemeSync = themeService;
         if (_hostThemeSyncTimer is null)
         {
-            _hostThemeSyncTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
-            _hostThemeSyncTimer.Tick += (_, _) =>
+            DispatcherTimer syncTimer = new() { Interval = TimeSpan.FromMilliseconds(100) };
+            syncTimer.Tick += (_, _) =>
             {
-                _hostThemeSyncTimer.Stop();
+                syncTimer.Stop();
                 AvaloniaThemeService? latestTheme = _pendingHostThemeSync;
                 _pendingHostThemeSync = null;
                 if (latestTheme is not null)
                     SendHostThemeSnapshot(latestTheme);
             };
+            _hostThemeSyncTimer = syncTimer;
         }
 
-        _hostThemeSyncTimer.Stop();
-        _hostThemeSyncTimer.Start();
+        DispatcherTimer timer = _hostThemeSyncTimer!;
+        timer.Stop();
+        timer.Start();
     }
 
     /// <summary>
