@@ -28,9 +28,11 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
 
     // Queue system
     private readonly ConcurrentQueue<Func<Task>> _messageQueue = new();
-
     private readonly SemaphoreSlim _queueSemaphore = new(0);
     private readonly CancellationTokenSource _cts = new();
+    private readonly object _queueLock = new();
+    private readonly Task _queueProcessorTask;
+    private bool _disposed;
 
     // Snapshot state
     private int _startGold;
@@ -45,7 +47,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         _httpClient = new HttpClient();
 
         // Start background queue processor
-        _ = ProcessQueueAsync();
+        _queueProcessorTask = ProcessQueueAsync();
         Initialize();
     }
 
@@ -64,16 +66,24 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
 
     private async Task ProcessQueueAsync()
     {
-        while (!_cts.Token.IsCancellationRequested)
+        try
         {
-            await _queueSemaphore.WaitAsync(_cts.Token);
-            if (_messageQueue.TryDequeue(out var action))
+            while (true)
             {
+                await _queueSemaphore.WaitAsync(_cts.Token).ConfigureAwait(false);
+                if (!_messageQueue.TryDequeue(out Func<Task>? action))
+                    continue;
+
                 try
                 {
-                    await action();
+                    await action().ConfigureAwait(false);
+
                     // Rate limit: Max 2 messages per second
-                    await Task.Delay(500, _cts.Token);
+                    await Task.Delay(500, _cts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+                {
+                    break;
                 }
                 catch (Exception ex)
                 {
@@ -81,12 +91,22 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
                 }
             }
         }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested)
+        {
+            // Expected when the service is shutting down.
+        }
     }
 
     private void EnqueueAction(Func<Task> action)
     {
-        _messageQueue.Enqueue(action);
-        _queueSemaphore.Release();
+        lock (_queueLock)
+        {
+            if (_disposed)
+                return;
+
+            _messageQueue.Enqueue(action);
+            _queueSemaphore.Release();
+        }
     }
 
     private string GetBotName()
@@ -574,11 +594,35 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
 
     public void Dispose()
     {
-        _cts.Cancel();
-        _cts.Dispose();
+        lock (_queueLock)
+        {
+            if (_disposed)
+                return;
+
+            _disposed = true;
+        }
+
+        StrongReferenceMessenger.Default.UnregisterAll(this);
         _pingTimer?.Dispose();
-        _queueSemaphore.Dispose();
-        _httpClient.Dispose();
+        _pingTimer = null;
+        _cts.Cancel();
+
+        // Let an in-flight webhook finish before disposing resources it may still use.
+        _ = DisposeResourcesAsync();
         GC.SuppressFinalize(this);
+    }
+
+    private async Task DisposeResourcesAsync()
+    {
+        try
+        {
+            await _queueProcessorTask.ConfigureAwait(false);
+        }
+        finally
+        {
+            _queueSemaphore.Dispose();
+            _httpClient.Dispose();
+            _cts.Dispose();
+        }
     }
 }
