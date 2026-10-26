@@ -592,7 +592,7 @@ public class DialogService : IDialogService
         double maxScreenHeight = 720;
         var screen = Skua.Shared.Avalonia.Services.WindowPlacementHelper.GetTargetScreen(dialog);
         if (screen != null)
-            maxScreenHeight = Math.Max(160, screen.WorkingArea.Height * 0.85);
+            maxScreenHeight = Math.Max(160, screen.WorkingArea.Height / screen.Scaling * 0.85);
         dialog.MinHeight = 160;
         dialog.MaxHeight = maxScreenHeight;
 
