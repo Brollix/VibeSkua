@@ -1095,9 +1095,10 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
             }
 
             _scriptManager.LoadScriptConfig(compiled);
-            if (_scriptManager.Config != null && (_scriptManager.Config.Options.Count > 0 || _scriptManager.Config.MultipleOptions.Count > 0))
+            IScriptOptionContainer? config = _scriptManager.Config;
+            if (config != null && (config.Options.Count > 0 || config.MultipleOptions.Count > 0))
             {
-                _scriptManager.Config.Configure();
+                config.Configure();
             }
             else
             {
