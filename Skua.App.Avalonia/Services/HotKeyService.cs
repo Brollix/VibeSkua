@@ -314,16 +314,23 @@ public class HotKeyService : IHotKeyService, IDisposable
 
     private IntPtr KeyboardHookCallback(int nCode, IntPtr wParam, IntPtr lParam)
     {
-        if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN))
+        try
         {
-            int vkCode = Marshal.ReadInt32(lParam);
-            KeyModifiers modifiers = GetCurrentModifiers();
-
-            if (IsForegroundApplicable() && TryExecuteVirtualBinding(vkCode, modifiers))
+            if (nCode >= 0 && (wParam == (IntPtr)WM_KEYDOWN || wParam == (IntPtr)WM_SYSKEYDOWN))
             {
-                // Match WPF behavior: consume hotkey once matched.
-                return (IntPtr)1;
+                int vkCode = Marshal.ReadInt32(lParam);
+                KeyModifiers modifiers = GetCurrentModifiers();
+
+                if (IsForegroundApplicable() && TryExecuteVirtualBinding(vkCode, modifiers))
+                {
+                    // Match WPF behavior: consume hotkey once matched.
+                    return (IntPtr)1;
+                }
             }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Global keyboard hook callback failed: {ex}");
         }
 
         return CallNextHookEx(_keyboardHook, nCode, wParam, lParam);
@@ -576,11 +583,22 @@ public class HotKeyService : IHotKeyService, IDisposable
 
     private bool ExecuteBinding(HotKeyBinding binding)
     {
-        if (_disposed || !binding.Command.CanExecute(null))
+        if (_disposed)
             return false;
 
-        binding.Command.Execute(null);
-        return true;
+        try
+        {
+            if (!binding.Command.CanExecute(null))
+                return false;
+
+            binding.Command.Execute(null);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Trace.WriteLine($"Hotkey '{binding.Binding}' failed: {ex}");
+            return false;
+        }
     }
 
     public void Dispose()
