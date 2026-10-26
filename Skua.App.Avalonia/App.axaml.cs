@@ -137,6 +137,8 @@ public partial class App : Application
         }
 
         _parentHostProcessId = hasEmbedFlag ? hostPid : 0;
+        if (_parentHostProcessId > 0)
+            Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar.ArtworkPathChanged += OnTitleBarArtworkPathChanged;
         if (_parentHostProcessId > 0 && themeService is AvaloniaThemeService initialTheme)
             QueueHostThemeSync(initialTheme);
 
@@ -524,6 +526,39 @@ public partial class App : Application
 
         string? accentHex = themeService.SelectedColor?.ToString();
         ThemeResourceApplicator.ApplyAccentBrushes(this, accentHex, isDarkTheme: isDark);
+    }
+
+    /// <summary>
+    /// Sends the selected title-bar artwork path to the separate main tab-host process.
+    /// The image is updated independently of palette changes so other clients cannot overwrite it
+    /// with an older in-memory settings value.
+    /// </summary>
+    private void OnTitleBarArtworkPathChanged(string? path)
+    {
+        if (_parentHostProcessId <= 0 || !OperatingSystem.IsWindows())
+            return;
+
+        string encodedPath = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(path ?? string.Empty));
+        _ = Task.Run(() =>
+        {
+            for (int attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    using System.IO.Pipes.NamedPipeClientStream pipe = new(".", "VibeSkuaTabHostPipe", System.IO.Pipes.PipeDirection.Out);
+                    pipe.Connect(500);
+                    using System.IO.StreamWriter writer = new(pipe);
+                    writer.WriteLine("ARTWORK|" + encodedPath);
+                    writer.Flush();
+                    return;
+                }
+                catch
+                {
+                    if (attempt < 4)
+                        System.Threading.Thread.Sleep(100);
+                }
+            }
+        });
     }
 
     /// <summary>
