@@ -301,19 +301,26 @@ public partial class TabbedHostWindow : Window
         _initialArgs = initialArgs ?? Array.Empty<string>();
         InitializeComponent();
         Title = $"VibeSkua V{Skua.Core.Models.ClientFileSources.DisplayVersion}";
+        MainTitleBar.TitleText = Title;
 
-        // Theme the native title bar now, while the window is still hidden. Applied after it is shown (in Opened),
-        // Windows 10 repaints only the caption text in dark mode, leaving dark boxes on a light bar until the
-        // next activation change.
         try
         {
             IThemeService? themeService = Ioc.Default.GetService<IThemeService>();
+            Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar.SetArtworkPath(
+                Ioc.Default.GetRequiredService<ISettingsService>().GetShared().TitleBarArtworkPath);
+
             if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
+            {
+                MainTitleBar.UseAccentBackground = avaloniaTheme.UseAccentOnMainTitleBar;
                 Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme,
-                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryColor : (Color?)null,
-                            avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryForegroundColor : (Color?)null);
+                    avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryColor : (Color?)null,
+                    avaloniaTheme.UseAccentOnMainTitleBar ? avaloniaTheme.PrimaryForegroundColor : (Color?)null);
+            }
             else
+            {
+                MainTitleBar.UseAccentBackground = false;
                 Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService?.IsDarkTheme);
+            }
         }
         catch { }
 
@@ -451,11 +458,17 @@ public partial class TabbedHostWindow : Window
                 void RefreshNativeTitleBar()
                 {
                     if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService currentTheme)
+                    {
+                        MainTitleBar.UseAccentBackground = currentTheme.UseAccentOnMainTitleBar;
                         Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme,
                             currentTheme.UseAccentOnMainTitleBar ? currentTheme.PrimaryColor : (Color?)null,
                             currentTheme.UseAccentOnMainTitleBar ? currentTheme.PrimaryForegroundColor : (Color?)null);
+                    }
                     else
+                    {
+                        MainTitleBar.UseAccentBackground = false;
                         Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
+                    }
                 }
 
                 // Preset changes and single-scheme edits use separate events. Listen to both so
