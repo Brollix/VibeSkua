@@ -32,11 +32,11 @@
 
     <Style Selector="Border.account-row-list:pointerover">
         <Setter Property="Background" Value="{DynamicResource SkuaNavHoverBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderStrongBrush}" />
     </Style>
 
     <Style Selector="Border.account-row-list.selected">
-        <Setter Property="Background" Value="{DynamicResource SkuaSelectionBrush}" />
+        <Setter Property="Background" Value="{DynamicResource SkuaAccentTintBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaAccentBrush}" />
     </Style>
 
@@ -49,11 +49,11 @@
 
     <Style Selector="Border.account-row-grid:pointerover">
         <Setter Property="Background" Value="{DynamicResource SkuaNavHoverBrush}" />
-        <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderStrongBrush}" />
     </Style>
 
     <Style Selector="Border.account-row-grid.selected">
-        <Setter Property="Background" Value="{DynamicResource SkuaSelectionBrush}" />
+        <Setter Property="Background" Value="{DynamicResource SkuaAccentTintBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaAccentBrush}" />
     </Style>
     
@@ -92,7 +92,7 @@
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaTagBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
         <Setter Property="CornerRadius" Value="12" />
-        <Setter Property="Padding" Value="6,1,7,1" />
+        <Setter Property="Padding" Value="8,1,8,1" />
         <Setter Property="Margin" Value="0,1,4,2" />
         <Setter Property="Transitions">
             <Transitions>

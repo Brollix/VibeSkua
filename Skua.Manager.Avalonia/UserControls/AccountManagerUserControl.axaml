@@ -186,7 +186,6 @@
                         <!-- Grid Columns ComboBox -->
                         <ComboBox Grid.Column="8"
                                   Classes="columns-picker"
-                                  Width="50"
                                   Height="30"
                                   Margin="0,0,8,0"
                                   VerticalAlignment="Center"
@@ -205,7 +204,7 @@
                         <!-- Tag Filter Button -->
                         <ToggleButton x:Name="FilterPopupAnchor"
                                       Grid.Column="9"
-                                      Classes="app-toggle app-toggle-compact app-toggle-filter"
+                                      Classes="app-toggle"
                                       Width="32"
                                       Height="30"
                                       Margin="0,0,8,0"
@@ -217,7 +216,7 @@
 
                         <!-- Toggle Tags Visibility -->
                         <ToggleButton Grid.Column="10"
-                                      Classes="app-toggle app-toggle-compact"
+                                      Classes="app-toggle"
                                       Width="32"
                                       Height="30"
                                       Margin="0,0,8,0"
@@ -229,7 +228,7 @@
 
                         <!-- Toggle Grid/List View -->
                         <ToggleButton Grid.Column="11"
-                                      Classes="app-toggle app-toggle-compact"
+                                      Classes="app-toggle"
                                       Width="32"
                                       Height="30"
                                       VerticalAlignment="Center"
@@ -354,6 +353,7 @@
             <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="6">
                 <ComboBox Grid.Column="0"
                           Height="34"
+                          HorizontalAlignment="Stretch"
                           ItemsSource="{Binding ServerList}"
                           SelectedItem="{Binding SelectedServer}"
                           VerticalAlignment="Center"
