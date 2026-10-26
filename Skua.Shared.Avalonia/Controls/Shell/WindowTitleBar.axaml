@@ -35,7 +35,8 @@
              VerticalAlignment="Center" />
     </Grid>
 
-    <TextBlock Grid.Column="1"
+    <TextBlock x:Name="TitleTextBlock"
+               Grid.Column="1"
                Margin="6,0,8,0"
                VerticalAlignment="Center"
                Text="{Binding TitleText, ElementName=Root}"
