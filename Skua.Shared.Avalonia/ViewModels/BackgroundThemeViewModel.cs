@@ -56,7 +56,7 @@ public class BackgroundThemeViewModel : ObservableObject
     {
         string? selectedFilePath = _fileDialogService.OpenFile(
             ClientFileSources.SkuaDIR,
-            "Image files (*.png;*.jpg;*.jpeg;*.webp;*.bmp)|*.png;*.jpg;*.jpeg;*.webp;*.bmp|All files (*.*)|*.*");
+            "Image files (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp|All files (*.*)|*.*");
 
         if (string.IsNullOrWhiteSpace(selectedFilePath))
             return;
