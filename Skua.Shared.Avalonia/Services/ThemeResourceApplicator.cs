@@ -41,7 +41,7 @@ public static class ThemeResourceApplicator
 
         if (!Dispatcher.UIThread.CheckAccess())
         {
-            Dispatcher.UIThread.Post(() => ApplyTitleBarTheme(app, isDark));
+            Dispatcher.UIThread.Post(() => ApplyTitleBarTheme(app, isDark, accentColor, accentTextColor));
             return;
         }
 
