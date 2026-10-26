@@ -82,16 +82,17 @@ public static class ThemeResourceApplicator
 
         try
         {
-            if (Application.Current?.Resources.ThemeDictionaries.TryGetValue(isDark ? ThemeVariant.Dark : ThemeVariant.Light, out var provider) == true
-                && provider is IResourceDictionary dict)
-            {
-                if (dict.TryGetValue("SkuaSurfaceAltBrush", out var sBrush) && sBrush is ISolidColorBrush scb)
-                    captionColor = scb.Color;
-                if (dict.TryGetValue("SkuaTextBrush", out var tBrush) && tBrush is ISolidColorBrush tcb)
-                    textColor = tcb.Color;
-            }
+            // Resolve through the window so Avalonia selects resources for this window's
+            // active theme variant instead of reading the application dictionary directly.
+            if (window.TryFindResource("SkuaSurfaceAltBrush", out object? surfaceBrush) && surfaceBrush is ISolidColorBrush surface)
+                captionColor = surface.Color;
+            if (window.TryFindResource("SkuaTextBrush", out object? foregroundBrush) && foregroundBrush is ISolidColorBrush foreground)
+                textColor = foreground.Color;
         }
-        catch { }
+        catch
+        {
+            // Keep safe system defaults if a custom theme omits title-bar resources.
+        }
 
         ApplyNativeTitleBar(hwnd, isDark, captionColor, textColor);
     }

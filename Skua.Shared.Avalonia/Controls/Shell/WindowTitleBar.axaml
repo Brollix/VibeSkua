@@ -6,7 +6,7 @@
   <Grid Height="32"
         Background="{DynamicResource SkuaSurfaceAltBrush}">
     <Image x:Name="ArtworkImage" Grid.ColumnSpan="3" Stretch="UniformToFill" Opacity="0.62" IsHitTestVisible="False" />
-    <Border Grid.ColumnSpan="3" Background="#9910141C" IsHitTestVisible="False" />
+    <Border Grid.ColumnSpan="3" Background="{DynamicResource SkuaTitleBarOverlayBrush}" IsHitTestVisible="False" />
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="Auto" />
       <ColumnDefinition Width="*" />
