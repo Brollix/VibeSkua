@@ -68,7 +68,7 @@ public partial class App : Application
         public int Bottom;
     }
 
-    public static System.Threading.Mutex AppMutex;
+    public static System.Threading.Mutex? AppMutex;
 
     public override void OnFrameworkInitializationCompleted()
     {
