@@ -11,11 +11,15 @@ public class BackgroundThemeViewModel : ObservableObject
 {
     private readonly BackgroundThemeService _backgroundService;
     private readonly IFileDialogService _fileDialogService;
+    private readonly ISettingsService _settingsService;
 
-    public BackgroundThemeViewModel(BackgroundThemeService backgroundService, IFileDialogService fileDialogService)
+    public BackgroundThemeViewModel(BackgroundThemeService backgroundService, IFileDialogService fileDialogService, ISettingsService settingsService)
     {
         _backgroundService = backgroundService;
         _fileDialogService = fileDialogService;
+        _settingsService = settingsService;
+        BrowseTitleBarArtworkCommand = new RelayCommand(BrowseTitleBarArtwork);
+        ClearTitleBarArtworkCommand = new RelayCommand(ClearTitleBarArtwork);
         BrowseBackgroundCommand = new AsyncRelayCommand(BrowseBackgroundAsync);
         OpenThemesFolderCommand = new RelayCommand(OpenThemesFolder);
         RefreshBackgroundsCommand = new RelayCommand(() => OnPropertyChanged(nameof(AvailableBackgrounds)));
@@ -39,10 +43,35 @@ public class BackgroundThemeViewModel : ObservableObject
 
 
 
+    public string? TitleBarArtworkPath => _settingsService.GetShared().TitleBarArtworkPath;
+
+    public IRelayCommand BrowseTitleBarArtworkCommand { get; }
+    public IRelayCommand ClearTitleBarArtworkCommand { get; }
     public IAsyncRelayCommand BrowseBackgroundCommand { get; }
     public IRelayCommand OpenThemesFolderCommand { get; }
     public IRelayCommand RefreshBackgroundsCommand { get; }
     public IRelayCommand GetBackgroundsCommand { get; }
+
+    private void BrowseTitleBarArtwork()
+    {
+        string? selectedFilePath = _fileDialogService.OpenFile(
+            ClientFileSources.SkuaDIR,
+            "Image files (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp|All files (*.*)|*.*");
+
+        if (string.IsNullOrWhiteSpace(selectedFilePath))
+            return;
+
+        _settingsService.Set("TitleBarArtworkPath", selectedFilePath);
+        Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar.SetArtworkPath(selectedFilePath);
+        OnPropertyChanged(nameof(TitleBarArtworkPath));
+    }
+
+    private void ClearTitleBarArtwork()
+    {
+        _settingsService.Set<string?>("TitleBarArtworkPath", null);
+        Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar.SetArtworkPath(null);
+        OnPropertyChanged(nameof(TitleBarArtworkPath));
+    }
 
     private async Task BrowseBackgroundAsync()
     {

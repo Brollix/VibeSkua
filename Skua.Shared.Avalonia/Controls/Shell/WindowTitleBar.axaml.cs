@@ -17,6 +17,16 @@ public partial class WindowTitleBar : UserControl
         AvaloniaProperty.Register<WindowTitleBar, string>(nameof(TitleText), "VibeSkua");
 
     private static readonly IImage DefaultIconSource = LoadDefaultIconSource();
+    private static string? _artworkPath;
+    private Bitmap? _artworkBitmap;
+
+    public static event Action<string?>? ArtworkPathChanged;
+
+    public static void SetArtworkPath(string? path)
+    {
+        _artworkPath = string.IsNullOrWhiteSpace(path) ? null : path;
+        ArtworkPathChanged?.Invoke(_artworkPath);
+    }
 
     public static readonly StyledProperty<IImage?> IconSourceProperty =
         AvaloniaProperty.Register<WindowTitleBar, IImage?>(nameof(IconSource), DefaultIconSource);
@@ -36,6 +46,13 @@ public partial class WindowTitleBar : UserControl
     public WindowTitleBar()
     {
         InitializeComponent();
+        Loaded += (_, _) =>
+        {
+            ArtworkPathChanged -= ApplyArtworkPath;
+            ArtworkPathChanged += ApplyArtworkPath;
+            ApplyArtworkPath(_artworkPath);
+        };
+        Unloaded += (_, _) => ArtworkPathChanged -= ApplyArtworkPath;
         PointerPressed += OnTitleBarPointerPressed;
         MinimizeButton.Click += OnMinimizeClicked;
         MaximizeButton.Click += OnMaximizeClicked;
@@ -74,6 +91,26 @@ public partial class WindowTitleBar : UserControl
             Height = 12
         };
         ToolTip.SetTip(MaximizeButton, maximized ? "Restore" : "Maximize");
+    }
+
+    private void ApplyArtworkPath(string? path)
+    {
+        _artworkBitmap?.Dispose();
+        _artworkBitmap = null;
+
+        if (!string.IsNullOrWhiteSpace(path) && System.IO.File.Exists(path))
+        {
+            try
+            {
+                _artworkBitmap = new Bitmap(path);
+            }
+            catch (Exception)
+            {
+                // Keep the normal themed title bar if the selected image cannot be loaded.
+            }
+        }
+
+        ArtworkImage.Source = _artworkBitmap;
     }
 
     private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)

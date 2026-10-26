@@ -1279,6 +1279,33 @@ public partial class TabbedHostWindow : Window
         }
     }
 
+    /// <summary>
+    /// Hides all embedded game windows to prevent their pixels remaining visible when the client is hidden.
+    /// </summary>
+    public void HideEmbeddedClients()
+    {
+        foreach (TabInfo info in _tabs.Values)
+        {
+            if (info.ChildHwnd != IntPtr.Zero)
+                ShowWindow(info.ChildHwnd, SW_HIDE);
+        }
+
+        HotKeys.ActiveChildHwnd = IntPtr.Zero;
+    }
+
+    /// <summary>
+    /// Restores embedded game windows after the client is shown again.
+    /// </summary>
+    public void ShowEmbeddedClients()
+    {
+        _lastX = int.MinValue;
+        _lastY = int.MinValue;
+        _lastW = int.MinValue;
+        _lastH = int.MinValue;
+        _lastActiveHwnd = IntPtr.Zero;
+        ScheduleReposition();
+    }
+
     private void OnWindowPositionChanged(PixelPoint newPos)
     {
         if (!IsLoaded || _isClosing || WindowState == WindowState.Minimized || !IsVisible)
