@@ -416,6 +416,34 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         UserThemes.RemoveAll(t => ThemeNameEquals(t, name));
     }
 
+    /// <summary>
+    /// Applies a live theme snapshot received from the tab host or an embedded client without
+    /// writing it back to shared settings. Snapshot colors are already adjusted for display.
+    /// </summary>
+    public void ApplyExternalThemeSnapshot(ThemeItem item)
+    {
+        if (item is null)
+            return;
+
+        ThemeItem displaySnapshot = new()
+        {
+            Name = item.Name,
+            IsDarkTheme = item.IsDarkTheme,
+            PrimaryColor = item.PrimaryColor,
+            SecondaryColor = item.SecondaryColor,
+            PrimaryForegroundColor = item.PrimaryForegroundColor,
+            SecondaryForegroundColor = item.SecondaryForegroundColor,
+            UseColorAdjustment = false,
+            DesiredContrastRatio = item.DesiredContrastRatio,
+            ContrastValue = item.ContrastValue,
+            ColorSelectionValue = item.ColorSelectionValue
+        };
+
+        ApplyThemeItem(displaySnapshot);
+        ThemeChanged?.Invoke(_primaryColor);
+        SchemeChanged?.Invoke(ColorScheme.Primary, _primaryColor);
+    }
+
     private void ApplyThemeItem(ThemeItem item)
     {
         _isDarkTheme = item.IsDarkTheme;
