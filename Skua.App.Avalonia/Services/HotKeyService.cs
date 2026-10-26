@@ -34,6 +34,7 @@ public class HotKeyService : IHotKeyService, IDisposable
     private readonly ISettingsService _settingsService;
     private readonly IDecamelizer _decamelizer;
     private readonly List<HotKeyBinding> _bindings = [];
+    private readonly object _bindingsLock = new();
     private Window? _mainWindow;
     private bool _isMainWindowActive;
     private bool _disposed;
@@ -44,6 +45,9 @@ public class HotKeyService : IHotKeyService, IDisposable
 
     public void Reload()
     {
+        if (_disposed)
+            return;
+
         if (!Dispatcher.UIThread.CheckAccess())
         {
             Dispatcher.UIThread.Post(Reload, DispatcherPriority.Normal);
@@ -58,7 +62,7 @@ public class HotKeyService : IHotKeyService, IDisposable
             _settingsService.Set("HotKeys", hotkeys);
 
         AttachMainWindow();
-        _bindings.Clear();
+        List<HotKeyBinding> bindings = [];
 
         foreach (string hk in hotkeys)
         {
@@ -81,7 +85,13 @@ public class HotKeyService : IHotKeyService, IDisposable
                 continue;
             }
 
-            _bindings.Add(new HotKeyBinding(binding, command, parsed.Key, parsed.Modifiers, TryToVirtualKey(parsed.Key)));
+            bindings.Add(new HotKeyBinding(binding, command, parsed.Key, parsed.Modifiers, TryToVirtualKey(parsed.Key)));
+        }
+
+        lock (_bindingsLock)
+        {
+            _bindings.Clear();
+            _bindings.AddRange(bindings);
         }
 
 #if IS_WINDOWS
@@ -223,11 +233,15 @@ public class HotKeyService : IHotKeyService, IDisposable
 
     private void MainWindowOnKeyDown(object? sender, KeyEventArgs e)
     {
-        if (_bindings.Count == 0)
+        HotKeyBinding[] bindings;
+        lock (_bindingsLock)
+            bindings = _bindings.ToArray();
+
+        if (bindings.Length == 0)
             return;
 
         KeyModifiers modifiers = e.KeyModifiers & (KeyModifiers.Control | KeyModifiers.Alt | KeyModifiers.Shift);
-        foreach (HotKeyBinding binding in _bindings)
+        foreach (HotKeyBinding binding in bindings)
         {
             if (!IsKeyMatch(binding.Key, e.Key) || binding.Modifiers != modifiers)
                 continue;
@@ -317,7 +331,14 @@ public class HotKeyService : IHotKeyService, IDisposable
 
     private bool TryExecuteVirtualBinding(int vkCode, KeyModifiers modifiers)
     {
-        foreach (HotKeyBinding binding in _bindings)
+        if (_disposed)
+            return false;
+
+        HotKeyBinding[] bindings;
+        lock (_bindingsLock)
+            bindings = _bindings.ToArray();
+
+        foreach (HotKeyBinding binding in bindings)
         {
             if (!IsVkMatch(binding.VirtualKey, vkCode) || binding.Modifiers != modifiers)
                 continue;
@@ -553,9 +574,9 @@ public class HotKeyService : IHotKeyService, IDisposable
         };
     }
 
-    private static bool ExecuteBinding(HotKeyBinding binding)
+    private bool ExecuteBinding(HotKeyBinding binding)
     {
-        if (!binding.Command.CanExecute(null))
+        if (_disposed || !binding.Command.CanExecute(null))
             return false;
 
         binding.Command.Execute(null);
@@ -583,7 +604,9 @@ public class HotKeyService : IHotKeyService, IDisposable
         }
 #endif
 
-        _bindings.Clear();
+        lock (_bindingsLock)
+            _bindings.Clear();
+
         GC.SuppressFinalize(this);
     }
 
