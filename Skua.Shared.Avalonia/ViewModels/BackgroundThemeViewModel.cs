@@ -41,8 +41,6 @@ public class BackgroundThemeViewModel : ObservableObject
         }
     }
 
-
-
     public string? TitleBarArtworkPath => _settingsService.GetShared().TitleBarArtworkPath;
 
     public IRelayCommand BrowseTitleBarArtworkCommand { get; }
@@ -56,7 +54,7 @@ public class BackgroundThemeViewModel : ObservableObject
     {
         string? selectedFilePath = _fileDialogService.OpenFile(
             ClientFileSources.SkuaDIR,
-            "Image files (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.bmp|All files (*.*)|*.*");
+            "Image files (*.png;*.jpg;*.jpeg;*.bmp;*.gif)|*.png;*.jpg;*.jpeg;*.bmp;*.gif|All files (*.*)|*.*");
 
         if (string.IsNullOrWhiteSpace(selectedFilePath))
             return;
@@ -100,7 +98,6 @@ public class BackgroundThemeViewModel : ObservableObject
             SelectedBackground = fileName;
         }
     }
-
 
     private void OpenThemesFolder()
     {

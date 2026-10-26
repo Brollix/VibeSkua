@@ -51,7 +51,7 @@
 
     <Style Selector="ToggleButton.app-toggle, ToggleButton.option-chip">
         <Setter Property="FontWeight" Value="SemiBold" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
@@ -62,7 +62,7 @@
     <Style Selector="ToggleButton.app-toggle /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.option-chip /template/ ContentPresenter#PART_ContentPresenter">
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource SkuaMutedTextBrush}" />
     </Style>
     <Style Selector="ToggleButton.app-toggle:pointerover /template/ ContentPresenter#PART_ContentPresenter, ToggleButton.option-chip:pointerover /template/ ContentPresenter#PART_ContentPresenter">
@@ -103,7 +103,7 @@
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource SkuaMutedTextBrush}" />
     </Style>
     <Style Selector="ToggleButton.compare">
@@ -167,7 +167,7 @@
         <Setter Property="Padding" Value="10,0" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource SkuaAccentBrush}" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>

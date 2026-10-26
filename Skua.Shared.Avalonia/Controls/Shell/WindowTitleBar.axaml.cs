@@ -1,3 +1,4 @@
+using AnimatedImage.Avalonia;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
@@ -19,6 +20,7 @@ public partial class WindowTitleBar : UserControl
     private static readonly IImage DefaultIconSource = LoadDefaultIconSource();
     private static string? _artworkPath;
     private Bitmap? _artworkBitmap;
+    private bool _usesInstanceArtwork;
 
     public static event Action<string?>? ArtworkPathChanged;
 
@@ -28,8 +30,23 @@ public partial class WindowTitleBar : UserControl
         ArtworkPathChanged?.Invoke(_artworkPath);
     }
 
+    public void SetInstanceArtworkPath(string? path)
+    {
+        _usesInstanceArtwork = true;
+        LoadArtworkPath(path);
+    }
+
     public static readonly StyledProperty<IImage?> IconSourceProperty =
         AvaloniaProperty.Register<WindowTitleBar, IImage?>(nameof(IconSource), DefaultIconSource);
+
+    public static readonly StyledProperty<bool> UseAccentBackgroundProperty =
+        AvaloniaProperty.Register<WindowTitleBar, bool>(nameof(UseAccentBackground), false);
+
+    public bool UseAccentBackground
+    {
+        get => GetValue(UseAccentBackgroundProperty);
+        set => SetValue(UseAccentBackgroundProperty, value);
+    }
 
     public string TitleText
     {
@@ -46,11 +63,17 @@ public partial class WindowTitleBar : UserControl
     public WindowTitleBar()
     {
         InitializeComponent();
+        PropertyChanged += (_, e) =>
+        {
+            if (e.Property == UseAccentBackgroundProperty)
+                ApplyAccentForeground();
+        };
         Loaded += (_, _) =>
         {
             ArtworkPathChanged -= ApplyArtworkPath;
             ArtworkPathChanged += ApplyArtworkPath;
             ApplyArtworkPath(_artworkPath);
+            ApplyAccentForeground();
         };
         Unloaded += (_, _) => ArtworkPathChanged -= ApplyArtworkPath;
         PointerPressed += OnTitleBarPointerPressed;
@@ -93,24 +116,58 @@ public partial class WindowTitleBar : UserControl
         ToolTip.SetTip(MaximizeButton, maximized ? "Restore" : "Maximize");
     }
 
+    private void ApplyAccentForeground()
+    {
+        string resourceKey = UseAccentBackground ? "SkuaAccentForegroundBrush" : "SkuaAccentBrush";
+        if (!TryGetResource(resourceKey, ActualThemeVariant, out object? resource) || resource is not IBrush brush)
+            return;
+
+        TitleTextBlock.Foreground = brush;
+        MinimizeButton.Foreground = brush;
+        MaximizeButton.Foreground = brush;
+        CloseButton.Foreground = brush;
+    }
+
     private void ApplyArtworkPath(string? path)
     {
+        if (_usesInstanceArtwork)
+            return;
+
+        LoadArtworkPath(path);
+    }
+
+    private void LoadArtworkPath(string? path)
+    {
+        ArtworkImage.ClearValue(ImageBehavior.AnimatedSourceProperty);
         _artworkBitmap?.Dispose();
         _artworkBitmap = null;
 
-        if (!string.IsNullOrWhiteSpace(path) && System.IO.File.Exists(path))
+        if (string.IsNullOrWhiteSpace(path) || !System.IO.File.Exists(path))
         {
-            try
-            {
-                _artworkBitmap = new Bitmap(path);
-            }
-            catch (Exception)
-            {
-                // Keep the normal themed title bar if the selected image cannot be loaded.
-            }
+            ArtworkImage.Source = null;
+            return;
         }
 
-        ArtworkImage.Source = _artworkBitmap;
+        try
+        {
+            if (string.Equals(System.IO.Path.GetExtension(path), ".gif", StringComparison.OrdinalIgnoreCase))
+            {
+                ArtworkImage.Source = null;
+                ImageBehavior.SetAnimatedSource(ArtworkImage, new Uri(path, UriKind.Absolute));
+                return;
+            }
+
+            _artworkBitmap = new Bitmap(path);
+            ArtworkImage.Source = _artworkBitmap;
+        }
+        catch (Exception)
+        {
+            ArtworkImage.ClearValue(ImageBehavior.AnimatedSourceProperty);
+            _artworkBitmap?.Dispose();
+            _artworkBitmap = null;
+            ArtworkImage.Source = null;
+            // Keep the normal themed title bar if the selected image cannot be loaded.
+        }
     }
 
     private void OnTitleBarPointerPressed(object? sender, PointerPressedEventArgs e)
