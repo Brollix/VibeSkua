@@ -579,11 +579,10 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         var settings = _settingsService.GetClient();
         if (settings == null || !settings.WebhookNotifyItemDrops) return;
 
-        var dropList = settings.WebhookNotifyItemDropsList?.ToLower().Split(',') ?? Array.Empty<string>();
-        foreach (var item in dropList)
+        string[] dropList = settings.WebhookNotifyItemDropsList?.Split(',', StringSplitOptions.TrimEntries) ?? Array.Empty<string>();
+        foreach (string item in dropList)
         {
-            var trimmed = item.Trim();
-            if (!string.IsNullOrWhiteSpace(trimmed) && msg.Item.Name.ToLower().Contains(trimmed))
+            if (!string.IsNullOrWhiteSpace(item) && msg.Item.Name.Contains(item, StringComparison.OrdinalIgnoreCase))
             {
                 string wikiUrl = "https://aqwwiki.wikidot.com/" + Uri.EscapeDataString(msg.Item.Name);
                 _ = SendScreenshotAsync($"🏆 **Rare Drop!** - **{GetBotName()}** just got **[{msg.Item.Name}]({wikiUrl})** x{msg.Item.Quantity}!");
