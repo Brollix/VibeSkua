@@ -29,7 +29,7 @@ namespace Skua.Manager.Avalonia.ViewModels;
 public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 {
     // Constructor and Dependencies
-    public AccountManagerViewModel(ISettingsService settingsService, IDialogService dialogService, IFileDialogService fileService)
+    public AccountManagerViewModel(ISettingsService settingsService, IDialogService dialogService, IFileDialogService fileService, IScriptManager scriptManager)
         : base("Accounts")
     {
         IMessengerExtensions.Register<AccountManagerViewModel, RemoveAccountMessage>(Messenger, this, (r, m) => r._RemoveAccount(m.Account));
@@ -46,6 +46,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         _settingsService = settingsService;
         _dialogService = dialogService;
         _fileService = fileService;
+        _scriptManager = scriptManager;
         ServerList = new();
         Task.Run(async () => await _GetServers());
         Accounts = new();
@@ -64,6 +65,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     private readonly ISettingsService _settingsService;
     private readonly IDialogService _dialogService;
     private readonly IFileDialogService _fileService;
+    private readonly IScriptManager _scriptManager;
 
     // Collections
     public RangedObservableCollection<IAccountItemViewModel> Accounts { get; }
@@ -144,7 +146,10 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
     // Script and Server Properties
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasScriptPath))]
     private string _scriptPath = string.Empty;
+
+    public bool HasScriptPath => !string.IsNullOrWhiteSpace(ScriptPath);
 
     partial void OnScriptPathChanged(string value)
     {
@@ -1062,6 +1067,57 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     }
 
     // Script Commands
+    /// <summary>
+    /// Opens the selected script's shared options editor in the Manager.
+    /// </summary>
+    [RelayCommand]
+    public async Task EditScriptOptions()
+    {
+        string scriptPath = ScriptPath;
+        if (string.IsNullOrWhiteSpace(scriptPath))
+        {
+            _dialogService.ShowMessageBox("Please select a script first.", "No Script Selected");
+            return;
+        }
+
+        if (!File.Exists(scriptPath))
+        {
+            _dialogService.ShowMessageBox($"Script file not found:\n{scriptPath}", "Script Not Found");
+            return;
+        }
+
+        try
+        {
+            _scriptManager.OverrideStorage = null;
+            _scriptManager.SetLoadedScript(scriptPath);
+            object? compiled = await Task.Run(() => _scriptManager.Compile(File.ReadAllText(scriptPath)));
+            if (compiled == null)
+            {
+                _dialogService.ShowMessageBox("Failed to compile script for configuration.", "Script Error");
+                return;
+            }
+
+            _scriptManager.LoadScriptConfig(compiled);
+            IScriptOptionContainer? config = _scriptManager.Config;
+            if (config != null && (config.Options.Count > 0 || config.MultipleOptions.Count > 0))
+            {
+                config.Configure();
+            }
+            else
+            {
+                _dialogService.ShowMessageBox("The loaded script has no options to configure.", "No Options");
+            }
+        }
+        catch (Exception ex)
+        {
+            _dialogService.ShowMessageBox($"Script cannot be configured as it has compilation errors:\n{ex.Message}", "Script Error");
+        }
+        finally
+        {
+            _scriptManager.OverrideStorage = null;
+        }
+    }
+
     [RelayCommand]
     public void ChangeScriptPath()
     {
