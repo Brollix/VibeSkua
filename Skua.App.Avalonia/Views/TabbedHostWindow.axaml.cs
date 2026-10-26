@@ -307,7 +307,11 @@ public partial class TabbedHostWindow : Window
         // next activation change.
         try
         {
-            Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, Ioc.Default.GetService<IThemeService>()?.IsDarkTheme);
+            IThemeService? themeService = Ioc.Default.GetService<IThemeService>();
+            if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
+                Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme, avaloniaTheme.PrimaryColor, avaloniaTheme.PrimaryForegroundColor);
+            else
+                Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService?.IsDarkTheme);
         }
         catch { }
 
@@ -444,9 +448,15 @@ public partial class TabbedHostWindow : Window
             {
                 themeService.ThemeChanged += _ => Dispatcher.UIThread.Post(() =>
                 {
-                    Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
+                    if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
+                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme, avaloniaTheme.PrimaryColor, avaloniaTheme.PrimaryForegroundColor);
+                    else
+                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
                 });
-                Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
+                if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
+                    Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme, avaloniaTheme.PrimaryColor, avaloniaTheme.PrimaryForegroundColor);
+                else
+                    Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, themeService.IsDarkTheme);
             }
         }
         catch { }
@@ -505,7 +515,10 @@ public partial class TabbedHostWindow : Window
                 {
                     var themeService = Ioc.Default.GetService<IThemeService>();
                     bool isDark = themeService?.IsDarkTheme ?? true;
-                    Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark);
+                    if (themeService is Skua.Shared.Avalonia.Services.AvaloniaThemeService avaloniaTheme)
+                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark, avaloniaTheme.PrimaryColor, avaloniaTheme.PrimaryForegroundColor);
+                    else
+                        Skua.Shared.Avalonia.Services.ThemeResourceApplicator.ApplyTitleBarTheme(this, isDark);
                 }
                 catch { }
             });
