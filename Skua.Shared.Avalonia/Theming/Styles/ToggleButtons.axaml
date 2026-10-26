@@ -21,7 +21,7 @@
     <Style Selector="ToggleButton.app-toggle">
         <Setter Property="Height" Value="22" />
         <Setter Property="Padding" Value="6,1" />
-        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
@@ -67,7 +67,7 @@
         <Setter Property="Padding" Value="10,0" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource SkuaAccentBrush}" />
         <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
@@ -91,7 +91,7 @@
         <Setter Property="VerticalAlignment" Value="Center" />
         <Setter Property="Background" Value="Transparent" />
         <Setter Property="BorderThickness" Value="0" />
-        <Setter Property="CornerRadius" Value="4" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="FontSize" Value="15" />
     </Style>
     
@@ -118,7 +118,7 @@
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource SkuaMutedTextBrush}" />
         <Setter Property="HorizontalContentAlignment" Value="Center" />
         <Setter Property="VerticalContentAlignment" Value="Center" />
@@ -128,13 +128,13 @@
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="12" />
     </Style>
     <Style Selector="ToggleButton.option-chip /template/ Border#PART_RootBorder">
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="12" />
     </Style>
 
     <Style Selector="ToggleButton.option-chip /template/ ContentPresenter">
@@ -192,7 +192,7 @@
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource SkuaAccentBrush}" />
         <Setter Property="Content" Value="≤" />
     </Style>
@@ -216,7 +216,7 @@
         <Setter Property="Background" Value="{DynamicResource SkuaSurfaceAltBrush}" />
         <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
         <Setter Property="BorderThickness" Value="1" />
-        <Setter Property="CornerRadius" Value="6" />
+        <Setter Property="CornerRadius" Value="12" />
         <Setter Property="Foreground" Value="{DynamicResource SkuaAccentBrush}" />
         <Setter Property="Content" Value="#" />
     </Style>
