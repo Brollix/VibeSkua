@@ -1,7 +1,24 @@
 @echo off
 setlocal EnableExtensions
 
-pushd "%~dp0" || exit /b 1
+rem Run from a temporary copy so git pull can safely update this file on disk.
+if not defined BUILDPROJECT_RUNNING (
+    set "BUILDPROJECT_RUNNING=1"
+    set "BUILDPROJECT_ROOT=%~dp0"
+    set "BUILDPROJECT_TEMP=%TEMP%\BuildProject-%RANDOM%-%RANDOM%.bat"
+    copy /Y "%~f0" "%BUILDPROJECT_TEMP%" >nul
+    if errorlevel 1 (
+        echo Failed to create a temporary copy of the build script.
+        pause
+        exit /b 1
+    )
+    call "%BUILDPROJECT_TEMP%" %*
+    set "BUILDPROJECT_EXIT=%ERRORLEVEL%"
+    del "%BUILDPROJECT_TEMP%" >nul 2>&1
+    exit /b %BUILDPROJECT_EXIT%
+)
+
+pushd "%BUILDPROJECT_ROOT%" || goto :Failure
 
 echo Updating repository...
 git pull --ff-only
