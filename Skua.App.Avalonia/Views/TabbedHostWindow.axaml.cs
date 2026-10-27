@@ -44,6 +44,7 @@ public partial class TabbedHostWindow : Window
 
     private SubclassProc? _subclassProc;
     private const int WM_SKUA_CHILD_READY = 0x0400 + 440;
+    private const int WM_SKUA_CHILD_DPICHANGED = 0x0400 + 441;
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
@@ -331,6 +332,7 @@ public partial class TabbedHostWindow : Window
         Opened += TabbedHostWindow_Opened;
         PositionChanged += (s, e) => OnWindowPositionChanged(e.Point);
         SizeChanged += (s, e) => { ScheduleReposition(); UpdateTabScrollButtons(); };
+        ScalingChanged += (s, e) => Dispatcher.UIThread.Post(RepositionWithFreshCache, DispatcherPriority.Loaded);
 
         PropertyChanged += (s, e) => { if (e.Property == WindowStateProperty || e.Property == IsVisibleProperty) ScheduleReposition(); };
         Activated += (s, e) => { ScheduleReposition(); UpdateTabScrollButtons(); };
@@ -583,6 +585,14 @@ public partial class TabbedHostWindow : Window
                     AttachChildWindow(targetInfo, childHwnd);
                 }
             });
+            return IntPtr.Zero;
+        }
+
+        // A child moved onto a monitor with another scale may have resized itself. Its new size is invisible to the
+        // position cache, so place it again.
+        if (uMsg == WM_SKUA_CHILD_DPICHANGED)
+        {
+            Dispatcher.UIThread.Post(RepositionWithFreshCache, DispatcherPriority.Loaded);
             return IntPtr.Zero;
         }
 
@@ -1404,6 +1414,23 @@ public partial class TabbedHostWindow : Window
         _lastH = int.MinValue;
         _lastActiveHwnd = IntPtr.Zero;
         ScheduleReposition();
+    }
+
+    // Places the tabs now, even mid-drag. A drag only moves them (FastReposition) at the size and offset cached when
+    // it started, which are wrong once the host or a child has crossed onto a monitor with another scale.
+    private void RepositionWithFreshCache()
+    {
+        if (_isClosing) return;
+
+        bool dragging = _isDraggingWindow;
+        _isDraggingWindow = false;
+        _lastX = int.MinValue;
+        _lastY = int.MinValue;
+        _lastW = int.MinValue;
+        _lastH = int.MinValue;
+        _lastActiveHwnd = IntPtr.Zero;
+        DoReposition();
+        _isDraggingWindow = dragging;
     }
 
     private void OnWindowPositionChanged(PixelPoint newPos)
