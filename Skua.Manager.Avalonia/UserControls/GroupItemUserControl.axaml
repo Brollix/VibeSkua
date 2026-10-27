@@ -14,7 +14,7 @@
               BorderBrush="{DynamicResource SkuaBorderBrush}"
               BorderThickness="0,0,0,1">
         <Expander.Header>
-            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto,Auto,Auto"
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto,Auto"
                   ColumnSpacing="4"
                   MinHeight="36">
                 <TextBlock Grid.Column="0"
@@ -43,13 +43,7 @@
                                                 Height="16" />
                 </Button>
 
-                <Button Grid.Column="3" Margin="0,0,4,0" Classes="icon icon-28" Command="{Binding StartInNewWindowCommand}" ToolTip.Tip="Start Group in New Window">
-                    <materialIcons:MaterialIcon Kind="OpenInNew" Width="16" Height="16" />
-                </Button>
-                <Button Grid.Column="4" Margin="0,0,4,0" Classes="icon icon-28" Command="{Binding StartWithScriptInNewWindowCommand}" ToolTip.Tip="Start Group With Script in New Window">
-                    <materialIcons:MaterialIcon Kind="ScriptTextPlayOutline" Width="16" Height="16" />
-                </Button>
-                <Button Grid.Column="5"
+                <Button Grid.Column="3"
                         Margin="0,0,4,0"
                         Classes="icon icon-28 icon-muted"
                         Command="{Binding RenameCommand}"
@@ -59,7 +53,7 @@
                                                 Height="16" />
                 </Button>
 
-                <Button Grid.Column="6"
+                <Button Grid.Column="4"
                         Classes="icon icon-28 icon-muted"
                         Command="{Binding RemoveCommand}"
                         ToolTip.Tip="Remove Group">
