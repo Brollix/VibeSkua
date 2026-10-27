@@ -283,7 +283,18 @@ public partial class GrabberListViewModel : ObservableRecipient
             }
             else if (value is System.Collections.IEnumerable enumerable)
             {
-                var entries = enumerable.Cast<object?>().Where(e => e is not null).Cast<object>().ToList();
+                List<object> entries;
+                try
+                {
+                    entries = enumerable.Cast<object?>().Where(e => e is not null).Cast<object>().ToList();
+                }
+                catch
+                {
+                    // A collection that throws while iterated is skipped, not allowed to abort the whole export.
+                    sb.AppendLine($"{indent}{property.Name}: (unreadable)");
+                    continue;
+                }
+
                 sb.AppendLine($"{indent}{property.Name} ({entries.Count}):");
                 foreach (var entry in entries)
                 {
