@@ -17,6 +17,11 @@ public class RemoteRegistry {
     }
 
     public static function destroy(object:LinkedObject):void {
+        if (object == null) {
+            return;
+        }
+
+        object.destroyChildren();
         delete _linked[object.getId()];
     }
 
@@ -31,7 +36,10 @@ public class RemoteRegistry {
     }
 
     public static function ext_destroy(id:int):void {
-        destroy(_linked[id]);
+        var object:LinkedObject = _linked[id] as LinkedObject;
+        if (object != null) {
+            destroy(object);
+        }
     }
 
     public static function ext_getChild(id:int, path:String):String {
