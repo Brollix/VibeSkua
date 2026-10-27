@@ -73,9 +73,6 @@ public partial class App : Application
     }
 
     public static System.Threading.Mutex? AppMutex;
-    public static string? HostInstanceId { get; private set; }
-    public static string HostPipeName { get; private set; } = "VibeSkuaTabHostPipe";
-    public static string HostMutexName { get; private set; } = "VibeSkuaTabHostMutex";
 
     public override void OnFrameworkInitializationCompleted()
     {
@@ -139,21 +136,6 @@ public partial class App : Application
             }
         }
 
-        for (int i = 1; i < args.Length - 1; i++)
-        {
-            if (string.Equals(args[i], "--host-instance", StringComparison.OrdinalIgnoreCase)) { HostInstanceId = args[i + 1]; break; }
-        }
-        if (!string.IsNullOrWhiteSpace(HostInstanceId))
-        {
-            string safeInstanceId = new string(System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Where(HostInstanceId, char.IsLetterOrDigit)));
-            if (!string.IsNullOrWhiteSpace(safeInstanceId))
-            {
-                HostInstanceId = safeInstanceId;
-                HostPipeName = $"VibeSkuaTabHostPipe-{safeInstanceId}";
-                HostMutexName = $"VibeSkuaTabHostMutex-{safeInstanceId}";
-            }
-            else HostInstanceId = null;
-        }
         _parentHostProcessId = hasEmbedFlag ? hostPid : 0;
         if (_parentHostProcessId > 0)
             Skua.Shared.Avalonia.Controls.Shell.WindowTitleBar.ArtworkPathChanged += OnTitleBarArtworkPathChanged;
@@ -249,17 +231,10 @@ public partial class App : Application
             }
             else
             {
-                string[] rawClientArgs = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Skip(args, 1));
-                List<string> filteredArgs = new();
-                for (int i = 0; i < rawClientArgs.Length; i++)
-                {
-                    if (string.Equals(rawClientArgs[i], "--host-instance", StringComparison.OrdinalIgnoreCase)) { i++; continue; }
-                    filteredArgs.Add(rawClientArgs[i]);
-                }
-                string[] clientArgs = filteredArgs.ToArray();
+                string[] clientArgs = System.Linq.Enumerable.ToArray(System.Linq.Enumerable.Skip(args, 1));
                 string payload = System.Text.Json.JsonSerializer.Serialize(clientArgs);
                 bool createdNew;
-                AppMutex = new System.Threading.Mutex(true, HostMutexName, out createdNew);
+                AppMutex = new System.Threading.Mutex(true, "VibeSkuaTabHostMutex", out createdNew);
 
                 if (!createdNew)
                 {
@@ -268,7 +243,7 @@ public partial class App : Application
                     {
                         try
                         {
-                            using System.IO.Pipes.NamedPipeClientStream pipeClient = new(".", HostPipeName, System.IO.Pipes.PipeDirection.Out, System.IO.Pipes.PipeOptions.None);
+                            using System.IO.Pipes.NamedPipeClientStream pipeClient = new(".", "VibeSkuaTabHostPipe", System.IO.Pipes.PipeDirection.Out, System.IO.Pipes.PipeOptions.None);
                             pipeClient.Connect(1000);
                             using System.IO.StreamWriter sw = new(pipeClient);
                             sw.WriteLine(payload);
@@ -293,7 +268,7 @@ public partial class App : Application
                     try
                     {
                         AppMutex?.Dispose();
-                        AppMutex = new System.Threading.Mutex(true, HostMutexName);
+                        AppMutex = new System.Threading.Mutex(true, "VibeSkuaTabHostMutex");
                     }
                     catch { }
                 }
@@ -570,7 +545,7 @@ public partial class App : Application
             {
                 try
                 {
-                    using System.IO.Pipes.NamedPipeClientStream pipe = new(".", HostPipeName, System.IO.Pipes.PipeDirection.Out);
+                    using System.IO.Pipes.NamedPipeClientStream pipe = new(".", "VibeSkuaTabHostPipe", System.IO.Pipes.PipeDirection.Out);
                     pipe.Connect(500);
                     using System.IO.StreamWriter writer = new(pipe);
                     writer.WriteLine("ARTWORK|" + encodedPath);
@@ -646,7 +621,7 @@ public partial class App : Application
                 {
                     try
                     {
-                        using System.IO.Pipes.NamedPipeClientStream pipe = new(".", HostPipeName, System.IO.Pipes.PipeDirection.Out);
+                        using System.IO.Pipes.NamedPipeClientStream pipe = new(".", "VibeSkuaTabHostPipe", System.IO.Pipes.PipeDirection.Out);
                         pipe.Connect(500);
                         using System.IO.StreamWriter writer = new(pipe);
                         writer.WriteLine(message);
