@@ -1744,15 +1744,20 @@ public partial class TabbedHostWindow : Window
 
         if (_tabs.Count == 0 || !InstancesTabControl.Items.OfType<TabItem>().Any())
         {
-            // Keep the host window alive when the final account tab closes.
-            // This allows the user to open another tab without restarting VibeSkua.
             _lastSelectedTab = null;
             _lastActiveHwnd = IntPtr.Zero;
             _isGridViewEnabled = false;
 
-            // Explicitly keep the host alive and visible after the final child exits.
-            // The host is the desktop MainWindow, so closing a child tab must not leave
-            // the application with no visible window or trigger an accidental shutdown.
+            // Army Queue passes this flag so its monitored host process exits after the
+            // final account finishes. Without it, keep the normal reusable tab host open.
+            if (_initialArgs.Contains("--exit-on-script-stop", StringComparer.OrdinalIgnoreCase))
+            {
+                Close();
+                return;
+            }
+
+            // Keep the normal host alive when the final account tab closes so the user
+            // can open another tab without restarting VibeSkua.
             if (!IsVisible)
                 Show();
             if (WindowState == WindowState.Minimized)
