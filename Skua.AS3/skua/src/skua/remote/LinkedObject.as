@@ -34,6 +34,16 @@ public class LinkedObject {
         }
     }
 
+    public function destroyChildren():void {
+        for (var name:String in this._children) {
+            var linked:LinkedObject = this._children[name];
+            if (linked != null) {
+                RemoteRegistry.destroy(linked);
+            }
+            delete this._children[name];
+        }
+    }
+
     public function getChild(path:String):LinkedObject {
         var cached:LinkedObject = this._children[path];
         if (cached != null) {
