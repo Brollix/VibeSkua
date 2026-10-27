@@ -59,6 +59,7 @@ public partial class MainWindow : Window
     private const int WM_SKUA_ARMY_SCHEDULER_STOP = 0x0400 + 455;
     private const int WM_SKUA_CHECK_LOGIN = 0x0400 + 456;
     private const int WM_SKUA_JUMP_PLAYER = 0x0400 + 457;
+    private const int WM_SKUA_JUMP_HOUSE = 0x0400 + 464;
     private const int WM_SKUA_LOGIN = 0x0400 + 447;
     private const int WM_SKUA_GRIDVIEW = 0x0400 + 444;
     private const int WM_SKUA_AUTO_ATTACK = 0x0400 + 459;
@@ -460,6 +461,21 @@ public partial class MainWindow : Window
                             mapService.Join(map, cell, pad, true, false);
                     }
                 } catch { }
+            });
+            return IntPtr.Zero;
+        }
+        else if (uMsg == WM_SKUA_JUMP_HOUSE)
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    // Same packet CoreBots uses to join the player's own house.
+                    var player = Ioc.Default.GetRequiredService<IScriptPlayer>();
+                    if (player.LoggedIn && !string.IsNullOrWhiteSpace(player.Username))
+                        Ioc.Default.GetRequiredService<IScriptSend>().Packet($"%xt%zm%house%1%{player.Username}%");
+                }
+                catch { }
             });
             return IntPtr.Zero;
         }
