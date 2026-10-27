@@ -84,6 +84,7 @@ public class Externalizer {
 
         // Inventory
         this.addCallback("hasInventoryCategories", Inventory.hasInventoryCategories);
+        this.addCallback("equippedItems", Inventory.equippedItems);
         this.addCallback("inventoryBagUsedSlots", Inventory.inventoryBagUsedSlots);
         this.addCallback("inventoryMiscSlots", Inventory.inventoryMiscSlots);
         this.addCallback("inventoryMiscUsedSlots", Inventory.inventoryMiscUsedSlots);

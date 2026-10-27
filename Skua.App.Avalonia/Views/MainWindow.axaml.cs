@@ -333,7 +333,7 @@ public partial class MainWindow : Window
                     if (username != lastWrittenUsername)
                     {
                         lastWrittenUsername = username;
-                        string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "VibeSkuaTabs");
+                        string dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BonxieTabs");
                         System.IO.Directory.CreateDirectory(dir);
                         string file = System.IO.Path.Combine(dir, $"{Environment.ProcessId}.txt");
                         System.IO.File.WriteAllText(file, username);
@@ -351,7 +351,7 @@ public partial class MainWindow : Window
         _tabTitleSyncTimer?.Stop();
         try
         {
-            string file = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "VibeSkuaTabs", $"{Environment.ProcessId}.txt");
+            string file = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "BonxieTabs", $"{Environment.ProcessId}.txt");
             if (System.IO.File.Exists(file))
                 System.IO.File.Delete(file);
         }
@@ -832,7 +832,7 @@ public partial class MainWindow : Window
         if (Math.Abs(RenderScaling - windowScaling) < 0.001 && Math.Abs(inputScaling - windowScaling) < 0.001)
             return;
 
-        Trace.WriteLine($"VibeSkua scaling resync: layout {RenderScaling}, input {inputScaling}, window DPI {dpi}");
+        Trace.WriteLine($"Bonxie scaling resync: layout {RenderScaling}, input {inputScaling}, window DPI {dpi}");
         IntPtr rect = Marshal.AllocHGlobal(Marshal.SizeOf<RECT>());
         try
         {

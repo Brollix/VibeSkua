@@ -282,7 +282,7 @@ public partial class TabbedHostWindow : Window
         catch (Exception ex)
         {
             _isSpawning = false;
-            Trace.WriteLine($"VibeSkua child spawn failed: {ex}");
+            Trace.WriteLine($"Bonxie child spawn failed: {ex}");
             Dispatcher.UIThread.Post(ProcessNextSpawn, DispatcherPriority.Background);
         }
     }
@@ -301,7 +301,7 @@ public partial class TabbedHostWindow : Window
     {
         _initialArgs = initialArgs ?? Array.Empty<string>();
         InitializeComponent();
-        Title = $"VibeSkua V{Skua.Core.Models.ClientFileSources.DisplayVersion}";
+        Title = "Bonxie Beta";
         MainTitleBar.TitleText = Title;
 
         try
@@ -384,7 +384,7 @@ public partial class TabbedHostWindow : Window
 
         Task.Run(() =>
         {
-            string dir = Path.Combine(Path.GetTempPath(), "VibeSkuaTabs");
+            string dir = Path.Combine(Path.GetTempPath(), "BonxieTabs");
             if (!Directory.Exists(dir)) return;
 
             var updates = new List<(TabItem Tab, string Username)>();
@@ -666,7 +666,7 @@ public partial class TabbedHostWindow : Window
                     info.Process.Kill();
                     info.Process.WaitForExit(500);
                 }
-                try { File.Delete(Path.Combine(Path.GetTempPath(), "VibeSkuaTabs", $"{info.Process.Id}.txt")); } catch { }
+                try { File.Delete(Path.Combine(Path.GetTempPath(), "BonxieTabs", $"{info.Process.Id}.txt")); } catch { }
             }
             catch { }
         }
@@ -736,7 +736,7 @@ public partial class TabbedHostWindow : Window
                                     }
                                     catch (Exception ex)
                                     {
-                                        Trace.WriteLine($"VibeSkua artwork sync failed: {ex.GetType().Name}: {ex.Message}");
+                                        Trace.WriteLine($"Bonxie artwork sync failed: {ex.GetType().Name}: {ex.Message}");
                                     }
                                 });
                             }
@@ -767,7 +767,7 @@ public partial class TabbedHostWindow : Window
                                     }
                                     catch (Exception ex)
                                     {
-                                        Trace.WriteLine($"VibeSkua theme sync failed: {ex.GetType().Name}: {ex.Message}");
+                                        Trace.WriteLine($"Bonxie theme sync failed: {ex.GetType().Name}: {ex.Message}");
                                     }
                                 });
                             }
@@ -1760,7 +1760,7 @@ public partial class TabbedHostWindow : Window
                         info.Process.Kill();
                     if (info.Process != null)
                     {
-                        try { File.Delete(Path.Combine(Path.GetTempPath(), "VibeSkuaTabs", $"{info.Process.Id}.txt")); } catch { }
+                        try { File.Delete(Path.Combine(Path.GetTempPath(), "BonxieTabs", $"{info.Process.Id}.txt")); } catch { }
                     }
                 }
                 catch { }
@@ -1784,7 +1784,7 @@ public partial class TabbedHostWindow : Window
             }
 
             // Keep the normal host alive when the final account tab closes so the user
-            // can open another tab without restarting VibeSkua.
+            // can open another tab without restarting Bonxie.
             if (!IsVisible)
                 Show();
             if (WindowState == WindowState.Minimized)
@@ -2032,7 +2032,7 @@ public partial class TabbedHostWindow : Window
             {
                 p.Dispose();
                 _isSpawning = false;
-                Trace.WriteLine($"VibeSkua failed to start child process for tab '{tabName}': {ex}");
+                Trace.WriteLine($"Bonxie failed to start child process for tab '{tabName}': {ex}");
                 Dispatcher.UIThread.Post(() =>
                 {
                     if (_tabs.ContainsKey(newTab))
@@ -2233,7 +2233,7 @@ public partial class TabbedHostWindow : Window
         {
             try
             {
-                string file = Path.Combine(Path.GetTempPath(), "VibeSkuaTabs", $"{info.Process.Id}.txt");
+                string file = Path.Combine(Path.GetTempPath(), "BonxieTabs", $"{info.Process.Id}.txt");
                 if (File.Exists(file))
                 {
                     string name = File.ReadAllText(file).Trim();
@@ -2344,7 +2344,7 @@ public partial class TabbedHostWindow : Window
 
         settings.ReloadSettings();
 
-        // 1. Ensure the account exists in ManagedAccounts so it appears in VibeSkua Manager!
+        // 1. Ensure the account exists in ManagedAccounts so it appears in Bonxie Manager!
         var accs = settings.Get<Dictionary<string, AccountData>>("ManagedAccounts") ?? new();
         if (!accs.ContainsKey(accountName))
         {

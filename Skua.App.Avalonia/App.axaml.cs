@@ -74,8 +74,8 @@ public partial class App : Application
 
     public static System.Threading.Mutex? AppMutex;
     public static string? HostInstanceId { get; private set; }
-    public static string HostPipeName { get; private set; } = "VibeSkuaTabHostPipe";
-    public static string HostMutexName { get; private set; } = "VibeSkuaTabHostMutex";
+    public static string HostPipeName { get; private set; } = "BonxieTabHostPipe";
+    public static string HostMutexName { get; private set; } = "BonxieTabHostMutex";
 
     public override void OnFrameworkInitializationCompleted()
     {
@@ -148,8 +148,8 @@ public partial class App : Application
             if (!string.IsNullOrWhiteSpace(safeInstanceId))
             {
                 HostInstanceId = safeInstanceId;
-                HostPipeName = $"VibeSkuaTabHostPipe-{safeInstanceId}";
-                HostMutexName = $"VibeSkuaTabHostMutex-{safeInstanceId}";
+                HostPipeName = $"BonxieTabHostPipe-{safeInstanceId}";
+                HostMutexName = $"BonxieTabHostMutex-{safeInstanceId}";
             }
             else HostInstanceId = null;
         }

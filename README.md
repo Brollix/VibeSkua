@@ -1,4 +1,4 @@
-# VibeSkua
+# Bonxie
 > **Note:** This project is **Vibe Coded**—built through AI-assisted development, and pure momentum.
 
 A feature-rich, high-performance rehaul of [auqw/skua](https://github.com/auqw/skua) (v1.4.3.0), building upon the early Avalonia port by [ArrowDev](https://github.com/ArrowDev123/Skua) (BlackArrow on Discord). Upgraded with native multi-client army orchestration, headless performance, and core stability fixes.
@@ -6,7 +6,7 @@ A feature-rich, high-performance rehaul of [auqw/skua](https://github.com/auqw/s
 ---
 
 ## The Avalonia UI Rehaul (What's New in 2.0)
-VibeSkua has officially transitioned away from legacy WPF to a ground-up modern desktop architecture:
+Bonxie has officially transitioned away from legacy WPF to a ground-up modern desktop architecture:
 
 * 🎨 **Modern Fluent Avalonia Shell:** Completely redesigned from scratch using **Avalonia 11**. Features a sleek, modern dark glassmorphism theme, crisp typography, responsive layout scaling, and smooth animations.
 * ⚡ **Unified Multi-Client Tabbed Host:** Native multi-client workspace (`TabbedHostWindow`) with dynamic scrollable tabs, instant 1-click tab creation, and seamless instance management without overlapping taskbar clutter.
@@ -16,10 +16,10 @@ VibeSkua has officially transitioned away from legacy WPF to a ground-up modern 
 ---
 
 ## Skua Architecture Comparison
-The following overview compares the systems and core features between the legacy WPF `auqw/skua` client and VibeSkua.
+The following overview compares the systems and core features between the legacy WPF `auqw/skua` client and Bonxie.
 
 ### Quality of Life & Features
-| Feature | Original (Legacy WPF) | VibeSkua (Avalonia) |
+| Feature | Original (Legacy WPF) | Bonxie (Avalonia) |
 | :--- | :--- | :--- |
 | **UI Framework & Design** | Legacy WPF framework. | **Rebuilt in Avalonia UI.** Features sleek Fluent dark styling, smooth animations, and hardware acceleration. |
 | **Account Tabs & Multi-Client** | Required running individual separate windows which clutter the screen and taskbar. | Native `TabbedHostWindow` host with dynamic SWF patching and horizontal tab bar. |
@@ -60,10 +60,10 @@ The following overview compares the systems and core features between the legacy
 
 ## Installation & Downloads
 
-Pre-built binaries are available on the [**Releases**](https://github.com/NinjaXz/VibeSkua/releases) page:
+Pre-built binaries are available on the [**Releases**](https://github.com/retr0gr4d3/Bonxie/releases) page:
 
-* **`VibeSkua-win-Setup.exe` (Recommended):** 1-click Windows installer. Installs cleanly to `%LocalAppData%\VibeSkua`, provisions Desktop and Start Menu shortcuts, and enables seamless background auto-updating.
-* **`VibeSkua-win-Portable.zip`:** Zero-install portable package. Extract anywhere and launch `VibeSkua.Manager.exe` or `VibeSkua.exe`.
+* **`Bonxie-win-Setup.exe` (Recommended):** 1-click Windows installer. Installs cleanly to `%LocalAppData%\Bonxie`, provisions Desktop and Start Menu shortcuts, and enables seamless background auto-updating.
+* **`Bonxie-win-Portable.zip`:** Zero-install portable package. Extract anywhere and launch `Bonxie.Manager.exe` or `Bonxie.exe`.
 
 ---
 
@@ -103,6 +103,6 @@ dotnet build Skua.sln -c Release -p:WarningLevel=0 --nologo
 
 **Educational & Personal Use Only:** This project is a derivative of [auqw/skua](https://github.com/auqw/skua) and is provided "as-is" under the MIT License. I do not claim ownership of the original assets, game data, or the intellectual property of the game developers.
 
-**Game player:** the game runs in a separate program, the Skua build of [Mugetsu](https://github.com/mugetsu-aqw/mugetsu) (a modified [Ruffle](https://ruffle.rs)), shipped in the `player` folder. It is licensed under the GPL-3.0, separately from VibeSkua; its full source is at [retr0gr4d3/skua-mugetsu](https://github.com/retr0gr4d3/skua-mugetsu), and its license texts are in `player\LICENSES`.
+**Game player:** the game runs in a separate program, the Skua build of [Mugetsu](https://github.com/mugetsu-aqw/mugetsu) (a modified [Ruffle](https://ruffle.rs)), shipped in the `player` folder. It is licensed under the GPL-3.0, separately from Bonxie; its full source is at [retr0gr4d3/skua-mugetsu](https://github.com/retr0gr4d3/skua-mugetsu), and its license texts are in `player\LICENSES`.
  
 **Disclaimer:** Use of this software may violate the Terms of Service of the associated game. The author assumes no responsibility for any account actions, bans, or other consequences taken by game developers against users of this software. By using this tool, you acknowledge that you do so entirely at your own risk. If your PC decides to commit a toaster bath, that is not my problem.

@@ -119,7 +119,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
             if (bot.Servers != null && !string.IsNullOrWhiteSpace(bot.Servers.CachedUsername))
                 return bot.Servers.CachedUsername!;
         }
-        return "VibeSkua Bot";
+        return "Bonxie Bot";
     }
 
     private void OnScriptStarted(ScriptStartedMessage msg)
@@ -334,7 +334,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
     }
 
     /// <summary>
-    /// Builds a compact snapshot for the local dashboard using the existing VibeSkua scripting interfaces.
+    /// Builds a compact snapshot for the local dashboard using the existing Bonxie scripting interfaces.
     /// </summary>
     /// <returns>Webhook fields containing current character, equipment, and active quest data.</returns>
     private List<object> BuildDashboardSnapshotFields()
@@ -424,7 +424,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         EnqueueAction(async () =>
         {
             List<object> fields = BuildDashboardSnapshotFields();
-            await SendEmbedToUrlAsync(url, "Discord Webhook Test Successful!", "Your VibeSkua Discord Webhooks are perfectly configured.", 0x00FF00, fields);
+            await SendEmbedToUrlAsync(url, "Discord Webhook Test Successful!", "Your Bonxie Discord Webhooks are perfectly configured.", 0x00FF00, fields);
         });
 
         return Task.CompletedTask;
@@ -439,7 +439,7 @@ public class DiscordWebhookService : IDiscordWebhookService, IDisposable
         EnqueueAction(async () =>
         {
             List<object> fields = BuildDashboardSnapshotFields();
-            await SendEmbedToUrlAsync(url, "Skua Nexus Webhook Test Successful!", "Your VibeSkua Nexus Webhooks are perfectly configured.", 0x00FF00, fields);
+            await SendEmbedToUrlAsync(url, "Skua Nexus Webhook Test Successful!", "Your Bonxie Nexus Webhooks are perfectly configured.", 0x00FF00, fields);
         });
 
         return Task.CompletedTask;

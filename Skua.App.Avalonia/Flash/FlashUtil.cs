@@ -62,7 +62,7 @@ public class FlashUtil : IFlashUtil
         if (!File.Exists(SwfPath))
             throw new FileNotFoundException("Missing skua.swf. Build the AS3 client first so the game content can load.");
         if (!File.Exists(PlayerPath))
-            throw new FileNotFoundException($"Missing the game player ({PlayerPath}). Rebuild VibeSkua so it downloads the player.");
+            throw new FileNotFoundException($"Missing the game player ({PlayerPath}). Rebuild Bonxie so it downloads the player.");
 
         if (_listener is null)
         {

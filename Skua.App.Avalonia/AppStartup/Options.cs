@@ -107,13 +107,11 @@ internal class Options
             }), s.GetRequiredService<ISettingsService>().Get<int>("ReloginTryDelay")),
             new CommandOptionItemViewModel<IRelayCommand>("Clear Flash Cache", new RelayCommand(() =>
             {
-                string flash = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Adobe", "Flash Player");
-                string macromedia = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Macromedia", "Flash Player");
+                // The game player (Ruffle) keeps the game's saved data (Flash shared objects) here.
+                string sharedObjects = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ruffle", "SharedObjects");
 
-                if (Directory.Exists(flash))
-                    Directory.Delete(flash, true);
-                if (Directory.Exists(macromedia))
-                    Directory.Delete(macromedia, true);
+                if (Directory.Exists(sharedObjects))
+                    Directory.Delete(sharedObjects, true);
             }))
         };
 

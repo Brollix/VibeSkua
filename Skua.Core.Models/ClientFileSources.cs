@@ -13,8 +13,8 @@ public static class ClientFileSources
     public static string DisplayVersion { get; } = IsNightly ? AssemblyVersion + "-N" : AssemblyVersion;
 
     public static string LegacySkuaDIR { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Skua");
-    public static string SkuaDIR { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "VibeSkua");
-    public static string VibeSkuaDIR => SkuaDIR;
+    public static string SkuaDIR { get; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Bonxie");
+    public static string BonxieDIR => SkuaDIR;
     public static string SkuaSettingsDIR { get; } = Path.Combine(SkuaDIR, "Skua.settings.json");
     public static string SkuaScriptsDIR { get; } = Path.Combine(SkuaDIR, "Scripts");
     public static string SkuaThemesDIR { get; } = Path.Combine(SkuaDIR, "themes");
@@ -42,19 +42,19 @@ public static class ClientFileSources
             _migrationAttempted = true;
 
             string appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
-            string vibeSkuaDir = Path.Combine(appData, "VibeSkua");
+            string bonxieDir = Path.Combine(appData, "Bonxie");
             string legacySkuaDir = Path.Combine(appData, "Skua");
-            string migrationMarker = Path.Combine(vibeSkuaDir, ".migration_done");
+            string migrationMarker = Path.Combine(bonxieDir, ".migration_done");
 
             try
             {
                 bool isAlreadyMigrated = File.Exists(migrationMarker) ||
-                                         File.Exists(Path.Combine(vibeSkuaDir, "Skua.settings.json")) ||
-                                         File.Exists(Path.Combine(vibeSkuaDir, "ClientSettings.json"));
+                                         File.Exists(Path.Combine(bonxieDir, "Skua.settings.json")) ||
+                                         File.Exists(Path.Combine(bonxieDir, "ClientSettings.json"));
 
                 if (!isAlreadyMigrated)
                 {
-                    using var migrationMutex = new Mutex(false, @"Global\VibeSkua.Migration.Init");
+                    using var migrationMutex = new Mutex(false, @"Global\Bonxie.Migration.Init");
                     bool hasHandle = false;
                     try
                     {
@@ -68,16 +68,16 @@ public static class ClientFileSources
                         }
 
                         bool stillNotMigrated = !File.Exists(migrationMarker) &&
-                                                !File.Exists(Path.Combine(vibeSkuaDir, "Skua.settings.json")) &&
-                                                !File.Exists(Path.Combine(vibeSkuaDir, "ClientSettings.json"));
+                                                !File.Exists(Path.Combine(bonxieDir, "Skua.settings.json")) &&
+                                                !File.Exists(Path.Combine(bonxieDir, "ClientSettings.json"));
 
                         if (stillNotMigrated)
                         {
-                            Directory.CreateDirectory(vibeSkuaDir);
+                            Directory.CreateDirectory(bonxieDir);
 
                             if (Directory.Exists(legacySkuaDir))
                             {
-                                CopyDirectoryRecursive(legacySkuaDir, vibeSkuaDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "plugins" });
+                                CopyDirectoryRecursive(legacySkuaDir, bonxieDir, new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "plugins" });
                             }
 
                             try

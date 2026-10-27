@@ -8,8 +8,8 @@
     <DefaultItemExcludes>$(DefaultItemExcludes);obj_run\**</DefaultItemExcludes>
     <ApplicationIcon>../Skua.Shared.Avalonia/Assets/SkuaIcon.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <AssemblyName>VibeSkua.Manager</AssemblyName>
-    <AssemblyTitle>VibeSkua Manager</AssemblyTitle>
+    <AssemblyName>Bonxie.Manager</AssemblyName>
+    <AssemblyTitle>Bonxie Manager</AssemblyTitle>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 

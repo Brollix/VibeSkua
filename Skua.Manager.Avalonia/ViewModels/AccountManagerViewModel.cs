@@ -768,7 +768,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
             // 1. Cross-process instant signaling via named EventWaitHandle
             try
             {
-                _globalNotifyEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Global\VibeSkua.Settings.Changed");
+                _globalNotifyEvent = new EventWaitHandle(false, EventResetMode.AutoReset, @"Global\Bonxie.Settings.Changed");
                 _registeredWaitHandle = ThreadPool.RegisterWaitForSingleObject(
                     _globalNotifyEvent,
                     (state, timedOut) =>

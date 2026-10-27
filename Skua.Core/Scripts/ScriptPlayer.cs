@@ -145,7 +145,10 @@ public partial class ScriptPlayer : IScriptPlayer
     [ObjectBinding("world.myAvatar.dataLeaf.sta")]
     private PlayerStats? _stats;
 
-    public InventoryItem? CurrentClass => Playing ? Inventory.Items?.Find(i => i is { Equipped: true, Category: ItemCategory.Class }) : null;
+    // Asks for the equipped items only: the whole inventory takes most of a second to fetch in Ruffle, freezing the game meanwhile.
+    public InventoryItem? CurrentClass => Playing && Flash.Call("equippedItems") is { } equipped
+        ? Newtonsoft.Json.JsonConvert.DeserializeObject<List<InventoryItem>>(equipped)?.Find(i => i.Category == ItemCategory.Class)
+        : null;
 
     public void Rest(bool full = false)
     {

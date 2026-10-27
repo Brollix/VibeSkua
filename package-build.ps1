@@ -37,7 +37,7 @@ foreach ($Target in $Targets) {
 
     # 1. Copy Root Files from AppBin
     $RootAppFiles = @(
-        "VibeSkua.exe", "VibeSkua.dll", "VibeSkua.runtimeconfig.json", "VibeSkua.deps.json",
+        "Bonxie.exe", "Bonxie.dll", "Bonxie.runtimeconfig.json", "Bonxie.deps.json",
         "QuestData.json", "AdvancedSkills.json", "ScriptDates.json"
     )
     foreach ($file in $RootAppFiles) {
@@ -50,7 +50,7 @@ foreach ($Target in $Targets) {
     }
 
     # 2. Copy Root Files from ManagerBin
-    $RootManagerFiles = @("VibeSkua.Manager.exe", "VibeSkua.Manager.dll", "VibeSkua.Manager.runtimeconfig.json", "Velopack.dll")
+    $RootManagerFiles = @("Bonxie.Manager.exe", "Bonxie.Manager.dll", "Bonxie.Manager.runtimeconfig.json", "Velopack.dll")
     foreach ($file in $RootManagerFiles) {
         $src = Join-Path $ManagerBin $file
         if (Test-Path $src) {
@@ -66,7 +66,7 @@ foreach ($Target in $Targets) {
     }
 
     # 4. Copy all DLLs and XMLs into Assemblies (excluding root DLLs)
-    $ExcludedDlls = @("VibeSkua.dll", "VibeSkua.Manager.dll", "Skua.dll", "Skua.Manager.dll")
+    $ExcludedDlls = @("Bonxie.dll", "Bonxie.Manager.dll", "Skua.dll", "Skua.Manager.dll")
     $AppDlls = Get-ChildItem -Path $AppBin -Filter "*.dll" -File
     foreach ($dll in $AppDlls) {
         if ($ExcludedDlls -notcontains $dll.Name) {
@@ -116,6 +116,16 @@ foreach ($Target in $Targets) {
         Copy-Item (Join-Path $FFDecDir "*") $TargetFFDecDir -Recurse -Force
     }
 
+    # 7b. Copy the game player (downloaded by the Skua.App.Avalonia build)
+    $PlayerSourceDir = Join-Path $AppBin "player"
+    if (Test-Path $PlayerSourceDir) {
+        $TargetPlayerDir = Join-Path $Target "player"
+        New-Item -ItemType Directory -Path $TargetPlayerDir -Force | Out-Null
+        Copy-Item (Join-Path $PlayerSourceDir "*") $TargetPlayerDir -Recurse -Force
+    } else {
+        throw "The game player is missing from $PlayerSourceDir; the build should have downloaded it."
+    }
+
     # 8. Copy Plugins
     $PluginSourceDir = Join-Path $RootDir "Skua.Plugin.DailyTracker\bin\Release\net10.0"
     if (Test-Path $PluginSourceDir) {
@@ -140,8 +150,8 @@ foreach ($Target in $Targets) {
 
     # 9. Clean up stray files from target root
     $AllowedRootFiles = @(
-        "VibeSkua.exe", "VibeSkua.dll", "VibeSkua.runtimeconfig.json", "VibeSkua.deps.json",
-        "VibeSkua.Manager.exe", "VibeSkua.Manager.dll", "VibeSkua.Manager.runtimeconfig.json", "VibeSkua.Manager.deps.json",
+        "Bonxie.exe", "Bonxie.dll", "Bonxie.runtimeconfig.json", "Bonxie.deps.json",
+        "Bonxie.Manager.exe", "Bonxie.Manager.dll", "Bonxie.Manager.runtimeconfig.json", "Bonxie.Manager.deps.json",
         "Velopack.dll", "skua.swf", "AdvancedSkills.json", "QuestData.json", "ScriptDates.json"
     )
 
