@@ -24,12 +24,69 @@ exit /b %BUILDPROJECT_EXIT%
 :BuildRunner
 pushd "%BUILDPROJECT_ROOT%" || goto :Failure
 
-echo Updating repository...
-git pull --ff-only
-if errorlevel 1 (
-    echo Failed to pull updates. Resolve any Git issues before building.
+echo Checking repository state...
+for /f "delims=" %%B in ('git branch --show-current 2^>nul') do set "BUILDPROJECT_BRANCH=%%B"
+if not "%BUILDPROJECT_BRANCH%"=="main" (
+    echo BuildProject.bat must run from the main branch. Current branch: %BUILDPROJECT_BRANCH%
     goto :Failure
 )
+
+git status --porcelain >nul 2>&1
+if errorlevel 1 (
+    echo Git status failed. Make sure this is a valid Git repository.
+    goto :Failure
+)
+for /f "delims=" %%S in ('git status --porcelain') do (
+    echo Your working tree has uncommitted changes:
+    git status --short
+    echo Commit or stash them before running this build.
+    goto :Failure
+)
+
+git remote get-url origin >nul 2>&1
+if errorlevel 1 (
+    echo Missing Git remote 'origin' for wtffidy/VibeSkua.
+    goto :Failure
+)
+git remote get-url upstream >nul 2>&1
+if errorlevel 1 (
+    echo Missing Git remote 'upstream' for NinjaXz/VibeSkua.
+    echo Add it with: git remote add upstream https://github.com/NinjaXz/VibeSkua.git
+    goto :Failure
+)
+
+echo.
+echo [1/3] Pulling the latest changes from your fork...
+git pull --ff-only origin main
+if errorlevel 1 (
+    echo Failed to pull origin/main. Resolve the Git issue before building.
+    goto :Failure
+)
+
+echo.
+echo [2/3] Syncing your fork with NinjaXz/VibeSkua...
+git fetch upstream
+if errorlevel 1 (
+    echo Failed to fetch upstream changes.
+    goto :Failure
+)
+
+git merge --no-edit upstream/main
+if errorlevel 1 (
+    echo Upstream merge failed or has conflicts. Attempting to cancel the incomplete merge...
+    git merge --abort >nul 2>&1
+    echo Resolve the sync issue manually, then run BuildProject.bat again.
+    goto :Failure
+)
+
+git push origin main
+if errorlevel 1 (
+    echo Failed to push the synced main branch to your fork.
+    echo Your local repository may now contain the upstream merge. Fix authentication or push issues, then rerun.
+    goto :Failure
+)
+
+echo Fork sync complete.
 
 echo Closing any running instances...
 for %%P in (VibeSkua.exe VibeSkua.Manager.exe Skua.exe Skua.Manager.exe) do taskkill /IM "%%P" /F >nul 2>&1
