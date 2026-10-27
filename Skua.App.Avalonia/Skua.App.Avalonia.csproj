@@ -1,9 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
+    <!-- Windows build (WinForms hosting, Win32 tab host) unless building for or on another OS, e.g. -r linux-x64. -->
+    <PropertyGroup>
+        <BonxieWindows Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier.StartsWith('win'))</BonxieWindows>
+        <BonxieWindows Condition="'$(RuntimeIdentifier)' == ''">$([MSBuild]::IsOSPlatform('Windows'))</BonxieWindows>
+    </PropertyGroup>
+
     <PropertyGroup>
         <OutputType>WinExe</OutputType>
-        <TargetFramework>net10.0-windows</TargetFramework>
-        <RuntimeIdentifiers>win-x64;win-x86</RuntimeIdentifiers>
+        <TargetFramework Condition="'$(BonxieWindows)' == 'true'">net10.0-windows</TargetFramework>
+        <TargetFramework Condition="'$(BonxieWindows)' != 'true'">net10.0</TargetFramework>
+        <RuntimeIdentifiers>win-x64;win-x86;linux-x64</RuntimeIdentifiers>
         <Nullable>enable</Nullable>
         <LangVersion>latest</LangVersion>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
@@ -18,7 +25,7 @@
         <AssemblyMetadata Include="Skua.ClientId" Value="BonxieAvalonia" />
     </ItemGroup>
 
-    <PropertyGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+    <PropertyGroup Condition="'$(BonxieWindows)' == 'true'">
         <UseWindowsForms>true</UseWindowsForms>
         <DefineConstants>$(DefineConstants);IS_WINDOWS</DefineConstants>
     </PropertyGroup>
@@ -60,21 +67,28 @@
 
     <!--
       The game player: the Skua build of Mugetsu (GPL-3.0, source at https://github.com/retr0gr4d3/skua-mugetsu).
-      It is downloaded once into player\<version>\ at the repository root and copied to the output's player\ folder.
-      To try a local build of the player instead, pass -p:SkuaPlayerLocal=<folder with Mugetsu.exe>.
+      It is downloaded once into player\<version>-<os>\ at the repository root and copied to the output's player\ folder.
+      To try a local build of the player instead, pass -p:SkuaPlayerLocal=<folder with Mugetsu.exe or Mugetsu>.
     -->
     <PropertyGroup>
         <SkuaPlayerVersion>1.5.1-skua.1</SkuaPlayerVersion>
-        <SkuaPlayerZip>Mugetsu-$(SkuaPlayerVersion).zip</SkuaPlayerZip>
-        <SkuaPlayerUrl>https://github.com/retr0gr4d3/skua-mugetsu/releases/download/v$(SkuaPlayerVersion)/$(SkuaPlayerZip)</SkuaPlayerUrl>
-        <SkuaPlayerCache>$(MSBuildThisFileDirectory)..\player\$(SkuaPlayerVersion)</SkuaPlayerCache>
+        <SkuaPlayerOs Condition="'$(BonxieWindows)' == 'true'">windows</SkuaPlayerOs>
+        <SkuaPlayerOs Condition="'$(BonxieWindows)' != 'true'">linux</SkuaPlayerOs>
+        <SkuaPlayerArchive Condition="'$(BonxieWindows)' == 'true'">Mugetsu-$(SkuaPlayerVersion).zip</SkuaPlayerArchive>
+        <SkuaPlayerArchive Condition="'$(BonxieWindows)' != 'true'">Mugetsu-$(SkuaPlayerVersion)-linux.tar.gz</SkuaPlayerArchive>
+        <SkuaPlayerExe Condition="'$(BonxieWindows)' == 'true'">Mugetsu.exe</SkuaPlayerExe>
+        <SkuaPlayerExe Condition="'$(BonxieWindows)' != 'true'">Mugetsu</SkuaPlayerExe>
+        <SkuaPlayerUrl>https://github.com/retr0gr4d3/skua-mugetsu/releases/download/v$(SkuaPlayerVersion)/$(SkuaPlayerArchive)</SkuaPlayerUrl>
+        <SkuaPlayerCache>$(MSBuildThisFileDirectory)..\player\$(SkuaPlayerVersion)-$(SkuaPlayerOs)</SkuaPlayerCache>
         <SkuaPlayerDir Condition="'$(SkuaPlayerLocal)' != ''">$(SkuaPlayerLocal)</SkuaPlayerDir>
         <SkuaPlayerDir Condition="'$(SkuaPlayerLocal)' == ''">$(SkuaPlayerCache)\Mugetsu</SkuaPlayerDir>
     </PropertyGroup>
 
-    <Target Name="DownloadSkuaPlayer" Condition="'$(SkuaPlayerLocal)' == '' And !Exists('$(SkuaPlayerDir)\Mugetsu.exe')">
+    <Target Name="DownloadSkuaPlayer" Condition="'$(SkuaPlayerLocal)' == '' And !Exists('$(SkuaPlayerDir)\$(SkuaPlayerExe)')">
         <DownloadFile SourceUrl="$(SkuaPlayerUrl)" DestinationFolder="$(SkuaPlayerCache)" />
-        <Unzip SourceFiles="$(SkuaPlayerCache)\$(SkuaPlayerZip)" DestinationFolder="$(SkuaPlayerCache)" />
+        <Unzip Condition="'$(BonxieWindows)' == 'true'" SourceFiles="$(SkuaPlayerCache)\$(SkuaPlayerArchive)" DestinationFolder="$(SkuaPlayerCache)" />
+        <!-- A tar archive keeps the player's executable mark. -->
+        <Exec Condition="'$(BonxieWindows)' != 'true'" Command="tar -xzf &quot;$(SkuaPlayerArchive)&quot;" WorkingDirectory="$(SkuaPlayerCache)" />
     </Target>
 
     <Target Name="AddSkuaPlayer" BeforeTargets="AssignTargetPaths" DependsOnTargets="DownloadSkuaPlayer">

@@ -64,6 +64,7 @@ Pre-built binaries are available on the [**Releases**](https://github.com/retr0g
 
 * **`Bonxie-win-Setup.exe` (Recommended):** 1-click Windows installer. Installs cleanly to `%LocalAppData%\Bonxie`, provisions Desktop and Start Menu shortcuts, and enables seamless background auto-updating.
 * **`Bonxie-win-Portable.zip`:** Zero-install portable package. Extract anywhere and launch `Bonxie.Manager.exe` or `Bonxie.exe`.
+* **`Bonxie-<version>-linux-x64.tar.gz` (Linux, beta):** Extract it and run `./Bonxie` in the `Bonxie` folder. Each launch is one client window for one account (no tabbed host or Manager on Linux yet), and the game opens in a window of its own. Needs a 64-bit distribution from about 2022 on with ICU (`libicu`), and Vulkan or OpenGL for the game. To build it yourself on Linux: `./package-linux.sh`.
 
 ---
 

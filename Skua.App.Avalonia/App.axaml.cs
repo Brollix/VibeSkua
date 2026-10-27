@@ -18,12 +18,12 @@ using Skua.Core.AppStartup;
 using Skua.Core.Interfaces;
 using Skua.Core.Utils;
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 
 #if IS_WINDOWS
 using CommunityToolkit.Mvvm.Input;
-using System.Collections.Generic;
 using WinForms = System.Windows.Forms;
 #endif
 
@@ -244,6 +244,12 @@ public partial class App : Application
                         try { System.Diagnostics.Process.GetCurrentProcess().Kill(); } catch { }
                     });
                 }
+            }
+            else if (!OperatingSystem.IsWindows())
+            {
+                // The tabbed host embeds each account's window with Win32 calls. Elsewhere every launch is its own
+                // client window, one account each (like the original Skua).
+                desktop.MainWindow = new Views.MainWindow { WindowStartupLocation = global::Avalonia.Controls.WindowStartupLocation.CenterScreen };
             }
             else
             {
