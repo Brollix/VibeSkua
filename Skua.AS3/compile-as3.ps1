@@ -10,23 +10,29 @@ $sourcePath = Join-Path $projectRoot 'src'
 $mainSourcePath = Join-Path $sourcePath 'skua\Main.as'
 $outputDirectory = Join-Path $projectRoot 'bin'
 $outputPath = Join-Path $outputDirectory 'skua.swf'
+$defaultMxmlcPath = 'C:\MoonshineSDKs\Flex_SDK\Flex_4.16.1_AIR_51.1\bin\mxmlc.bat'
 
 if (-not (Test-Path -LiteralPath $mainSourcePath)) {
     throw "AS3 entry point was not found: $mainSourcePath"
 }
 
 if ([string]::IsNullOrWhiteSpace($MxmlcPath)) {
-    $mxmlcCommand = Get-Command mxmlc -ErrorAction SilentlyContinue
-    if ($mxmlcCommand) {
-        $MxmlcPath = $mxmlcCommand.Source
+    if (Test-Path -LiteralPath $defaultMxmlcPath) {
+        $MxmlcPath = $defaultMxmlcPath
     }
-    elseif ($env:FLEX_HOME) {
-        $MxmlcPath = Join-Path $env:FLEX_HOME 'bin\mxmlc.bat'
+    else {
+        $mxmlcCommand = Get-Command mxmlc -ErrorAction SilentlyContinue
+        if ($mxmlcCommand) {
+            $MxmlcPath = $mxmlcCommand.Source
+        }
+        elseif ($env:FLEX_HOME) {
+            $MxmlcPath = Join-Path $env:FLEX_HOME 'bin\mxmlc.bat'
+        }
     }
 }
 
 if ([string]::IsNullOrWhiteSpace($MxmlcPath) -or -not (Test-Path -LiteralPath $MxmlcPath)) {
-    throw 'Apache Flex mxmlc was not found. Install Apache Flex SDK 4.16.1 or pass -MxmlcPath.'
+    throw "Flex mxmlc was not found. Install/configure a Flex SDK, set FLEX_HOME, or pass -MxmlcPath. Checked default path: $defaultMxmlcPath"
 }
 
 if (-not $env:FLEX_HOME) {
