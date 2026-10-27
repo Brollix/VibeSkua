@@ -40,7 +40,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         IMessengerExtensions.Register<AccountManagerViewModel, RemoveAccountFromGroupMessage>(Messenger, this, (r, m) => r._RemoveAccountFromGroup(m.Group, m.Account));
         IMessengerExtensions.Register<AccountManagerViewModel, ReplaceAccountInGroupMessage>(Messenger, this, (r, m) => r._ReplaceAccountInGroup(m.Group, m.CurrentAccount, m.ReplacementAccount));
         IMessengerExtensions.Register<AccountManagerViewModel, RefreshAccountDisplayNamesMessage>(Messenger, this, (r, _) => r.RefreshAccountDisplayNames());
-        IMessengerExtensions.Register<AccountManagerViewModel, StartGroupMessage>(Messenger, this, (r, m) => r._StartGroup(m.Group, m.WithScript));
+        IMessengerExtensions.Register<AccountManagerViewModel, StartGroupMessage>(Messenger, this, (r, m) => r._StartGroup(m.Group, m.WithScript, m.NewWindow));
         StrongReferenceMessenger.Default.Register<AccountManagerViewModel, LoadScriptMessage, int>(this,
             (int)MessageChannels.ScriptStatus, (r, m) => r.HandleLoadScript(m));
         _settingsService = settingsService;
@@ -259,6 +259,41 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
     }
 
     [RelayCommand]
+    public async Task StartAccountsInNewWindow()
+    {
+        await StartAccountBatchInNewWindow(Accounts.Where(acc => acc.UseCheck).ToList(), "selected accounts");
+    }
+
+    [RelayCommand]
+    public async Task StartAllAccountsInNewWindow()
+    {
+        await StartAccountBatchInNewWindow(Accounts.ToList(), "all accounts");
+    }
+
+    private async Task StartAccountBatchInNewWindow(List<IAccountItemViewModel> accounts, string batchName)
+    {
+        if (_isLaunching || accounts.Count == 0)
+            return;
+        try
+        {
+            _isLaunching = true;
+            _syncThemes = _settingsService.Get("syncTheme", false);
+            string hostInstanceId = Guid.NewGuid().ToString("N");
+            foreach (IAccountItemViewModel account in accounts)
+            {
+                _LaunchAcc(account.Username, account.Password, account.DisplayName, StartWithScript, hostInstanceId);
+                await Task.Delay(1000);
+            }
+        }
+        catch (Exception ex) { Trace.WriteLine($"Error starting {batchName} in a new window: {ex.Message}"); }
+        finally
+        {
+            _isLaunching = false;
+            if (_pendingReload) { _pendingReload = false; ScheduleReload(); }
+        }
+    }
+
+    [RelayCommand]
     public async Task StartAllAccounts()
     {
         if (_isLaunching)
@@ -429,7 +464,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         _LaunchAcc(account.Username, account.Password, account.DisplayName, runScript);
     }
 
-    private async void _StartGroup(IGroupItemViewModel group, bool withScript)
+    private async void _StartGroup(IGroupItemViewModel group, bool withScript, bool newWindow = false)
     {
         if (_isLaunching)
             return;
@@ -447,9 +482,10 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
 
             bool runScript = withScript || StartWithScript;
             List<IAccountItemViewModel> groupAccounts = group.Accounts.ToList();
+            string? hostInstanceId = newWindow ? Guid.NewGuid().ToString("N") : null;
             foreach (IAccountItemViewModel account in groupAccounts)
             {
-                _LaunchAcc(account.Username, account.Password, account.DisplayName, runScript);
+                _LaunchAcc(account.Username, account.Password, account.DisplayName, runScript, hostInstanceId);
                 await Task.Delay(1000);
             }
         }
@@ -468,7 +504,7 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
         }
     }
 
-    private void _LaunchAcc(string username, string password, string? displayName = null, bool? withScript = null)
+    private void _LaunchAcc(string username, string password, string? displayName = null, bool? withScript = null, string? hostInstanceId = null)
     {
         try
         {
@@ -486,6 +522,11 @@ public sealed partial class AccountManagerViewModel : BotControlViewModelBase
                 WorkingDirectory = SkuaExecutableLocator.WorkingDirectory
             };
 
+            if (!string.IsNullOrWhiteSpace(hostInstanceId))
+            {
+                psi.ArgumentList.Add("--host-instance");
+                psi.ArgumentList.Add(hostInstanceId);
+            }
             if (_syncThemes)
             {
                 psi.ArgumentList.Add("--use-theme");
