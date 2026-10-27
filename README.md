@@ -102,5 +102,7 @@ dotnet build Skua.sln -c Release -p:WarningLevel=0 --nologo
 ### Copyright & Disclaimer
 
 **Educational & Personal Use Only:** This project is a derivative of [auqw/skua](https://github.com/auqw/skua) and is provided "as-is" under the MIT License. I do not claim ownership of the original assets, game data, or the intellectual property of the game developers.
+
+**Game player:** the game runs in a separate program, the Skua build of [Mugetsu](https://github.com/mugetsu-aqw/mugetsu) (a modified [Ruffle](https://ruffle.rs)), shipped in the `player` folder. It is licensed under the GPL-3.0, separately from VibeSkua; its full source is at [retr0gr4d3/skua-mugetsu](https://github.com/retr0gr4d3/skua-mugetsu), and its license texts are in `player\LICENSES`.
  
 **Disclaimer:** Use of this software may violate the Terms of Service of the associated game. The author assumes no responsibility for any account actions, bans, or other consequences taken by game developers against users of this software. By using this tool, you acknowledge that you do so entirely at your own risk. If your PC decides to commit a toaster bath, that is not my problem.

@@ -109,7 +109,6 @@ public partial class App : Application
                 Ioc.Default.GetRequiredService<IDiagnosticsService>().Start();
                 ISettingsService settings = Ioc.Default.GetRequiredService<ISettingsService>();
                 settings.SetApplicationVersion();
-                FlashTrustManager.EnsureTrustFile();
             }
             catch { }
         });
@@ -189,7 +188,6 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
-            Task.Run(() => Skua.App.Avalonia.Flash.FlashUtil.PreloadSwf());
             
             if (hasEmbedFlag)
             {

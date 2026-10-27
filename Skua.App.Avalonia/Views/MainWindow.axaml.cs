@@ -22,7 +22,6 @@ using Skua.Core.AppStartup;
 
 #if IS_WINDOWS
 using Avalonia.Input;
-using AxShockwaveFlashObjects;
 using System.Runtime.Versioning;
 #endif
 
@@ -128,10 +127,6 @@ public partial class MainWindow : Window
         MainMenuBar.DataContext = _mainMenuVm;
         ConfigureMainMenu();
         RegisterLifecycleHandlers();
-        
-        #if IS_WINDOWS
-        RegisterMessages();
-        #endif
     }
 
     private void ConfigureMainMenu()
@@ -266,13 +261,6 @@ public partial class MainWindow : Window
         return menuItem;
     }
 
-    #if IS_WINDOWS
-    private void RegisterMessages()
-    {
-        WeakReferenceMessenger.Default.Register<MainWindow, FlashChangedMessage<AxShockwaveFlash>>(this, static (r, m) => r.OnFlashControlChanged(m.Flash));
-    }
-    #endif
-
     private void RegisterLifecycleHandlers()
     {
         Opened += MainWindow_Opened;
@@ -309,10 +297,19 @@ public partial class MainWindow : Window
         }
         catch { }
         
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) 
+        try
         {
+            if (_flash is Flash.FlashUtil player)
+                player.ParentWindow = FlashHost.WindowHandle;
             _flash.InitializeFlash();
-            
+        }
+        catch (Exception ex)
+        {
+            Ioc.Default.GetRequiredService<IDialogService>().ShowMessageBox(ex.Message, "Game failed to start");
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
 #if IS_WINDOWS
             if (this.TryGetPlatformHandle()?.Handle is IntPtr hwnd && hwnd != IntPtr.Zero)
             {
@@ -366,13 +363,6 @@ public partial class MainWindow : Window
         WeakReferenceMessenger.Default.UnregisterAll(this);
     }
     
-    #if IS_WINDOWS
-    private void OnFlashControlChanged(AxShockwaveFlash flash)
-    {
-        FlashHost.SetChild(flash);
-    }
-    #endif
-
     private void OnFlashCall(string function, params object[] args)
     {
         if (function == "loaded" && !_isFlashLoaded)
@@ -385,7 +375,6 @@ public partial class MainWindow : Window
                 HeadlessOverlay.IsVisible = _options.HeadlessMode;
                 try
                 {
-                    FlashHost?.SetScaleMode(false);
                     _flash.Call("setGameObject", "stage.scaleMode", "showAll");
                 }
                 catch { }
@@ -465,9 +454,6 @@ public partial class MainWindow : Window
                 
                 this.MinWidth = 0;
                 this.MinHeight = 0;
-
-                if (FlashHost != null)
-                    FlashHost.SetScaleMode(false);
 
                 try
                 {
