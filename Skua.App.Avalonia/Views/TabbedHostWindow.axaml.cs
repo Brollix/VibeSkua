@@ -1149,6 +1149,7 @@ public partial class TabbedHostWindow : Window
             case "DisableFX": optionId = 4; val = options.DisableFX; break;
             case "InfiniteRange": optionId = 5; val = options.InfiniteRange; break;
             case "StreamerMode": optionId = 9; val = options.StreamerMode; break;
+            case "AggroMonsters": optionId = 10; val = options.AggroMonsters; break;
         }
 
         if (optionId != -1)
