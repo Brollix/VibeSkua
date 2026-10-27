@@ -21,9 +21,8 @@ public partial class ScriptInfoViewModel : ObservableObject
         _localSize = localSize ?? info.CachedLocalSize ?? (Downloaded ? (int)new FileInfo(LocalFile).Length : 0);
         _isPinned = isPinned;
 
-        // Instances are built off the UI thread; evaluate Outdated here so the SHA256 check
-        // in ScriptInfo.Outdated never runs on the UI thread when the list is bound/counted.
-        _ = Outdated;
+        // Instances are built off the UI thread, so the SHA256 check can run here.
+        _infoOutdated = !IsCustom && Info.Outdated;
 
         UpdateSearchIndex();
     }
@@ -85,7 +84,22 @@ public partial class ScriptInfoViewModel : ObservableObject
 
     partial void OnLocalSizeChanged(int value) => _infoOutdated = null;
 
-    public bool Outdated => !IsCustom && Downloaded && (_localSize != Info.Size || (_infoOutdated ??= Info.Outdated));
+    // Never hashes on the UI thread: a null cache means "not computed yet" and counts as not outdated
+    // until RefreshDownloadStateAsync fills it in off the UI thread.
+    public bool Outdated => !IsCustom && Downloaded && (_localSize != Info.Size || (_infoOutdated ?? false));
+
+    public async Task RefreshDownloadStateAsync(bool downloaded, int localSize)
+    {
+        Info.CachedDownloaded = downloaded;
+        Info.CachedLocalSize = localSize;
+        Downloaded = downloaded;
+        LocalSize = localSize;
+        _infoOutdated = IsCustom ? false : await Task.Run(() => Info.Outdated);
+        OnPropertyChanged(nameof(Outdated));
+        OnPropertyChanged(nameof(StatusText));
+        OnPropertyChanged(nameof(StatusColor));
+        OnPropertyChanged(nameof(StatusBackground));
+    }
 
     public string FormattedSize => Size > 1024 * 1024
         ? $"{Size / (1024.0 * 1024.0):F1} MB"
