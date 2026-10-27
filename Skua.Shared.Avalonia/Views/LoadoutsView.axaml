@@ -77,7 +77,7 @@
     <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="8">
       <Grid Grid.Row="0" ColumnDefinitions="*,Auto" MinHeight="26">
         <TextBlock Grid.Column="0" Classes="section-label" Text="LOADOUT" />
-        <Button Grid.Column="1" Classes="topbar-action" Command="{Binding ShowCurrentCommand}" ToolTip.Tip="Show what this character has equipped now">
+        <Button Grid.Column="1" Classes="skua-button small w140" Command="{Binding ShowCurrentCommand}" ToolTip.Tip="Show what this character has equipped now">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <materialIcons:MaterialIcon Kind="EyeOutline" Width="15" Height="15" />
             <TextBlock Text="Show current gear" VerticalAlignment="Center" />
