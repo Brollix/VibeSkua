@@ -20,7 +20,11 @@ public partial class ScriptInfoViewModel : ObservableObject
         _downloaded = isDownloaded ?? info.CachedDownloaded ?? DownloadedFileExists;
         _localSize = localSize ?? info.CachedLocalSize ?? (Downloaded ? (int)new FileInfo(LocalFile).Length : 0);
         _isPinned = isPinned;
-        
+
+        // Instances are built off the UI thread; evaluate Outdated here so the SHA256 check
+        // in ScriptInfo.Outdated never runs on the UI thread when the list is bound/counted.
+        _ = Outdated;
+
         UpdateSearchIndex();
     }
 
@@ -75,7 +79,13 @@ public partial class ScriptInfoViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(Outdated), nameof(StatusText), nameof(StatusColor), nameof(StatusBackground))]
     private bool _downloaded;
 
-    public bool Outdated => !IsCustom && Downloaded && (_localSize != Info.Size || Info.Outdated);
+    private bool? _infoOutdated;
+
+    partial void OnDownloadedChanged(bool value) => _infoOutdated = null;
+
+    partial void OnLocalSizeChanged(int value) => _infoOutdated = null;
+
+    public bool Outdated => !IsCustom && Downloaded && (_localSize != Info.Size || (_infoOutdated ??= Info.Outdated));
 
     public string FormattedSize => Size > 1024 * 1024
         ? $"{Size / (1024.0 * 1024.0):F1} MB"
