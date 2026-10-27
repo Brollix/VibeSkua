@@ -733,7 +733,7 @@ public partial class TabbedHostWindow : Window
                             else if (line.StartsWith("THEME|", StringComparison.Ordinal))
                             {
                                 string themePayload = line.Substring("THEME|".Length);
-                                bool useAccentOnMainTitleBar = true;
+                                bool useAccentOnMainTitleBar = false;
                                 string themeCsv = themePayload;
                                 int separatorIndex = themePayload.IndexOf('|');
                                 if (separatorIndex >= 0 &&
@@ -1327,6 +1327,15 @@ public partial class TabbedHostWindow : Window
         }
     }
 
+    // Each client joins its own house (no input needed).
+    private void MenuItem_JumpHouse_Click(object? sender, RoutedEventArgs e)
+    {
+        foreach (var info in _tabs.Values)
+            if (info.ChildHwnd != IntPtr.Zero)
+                PostMessage(info.ChildHwnd, WM_SKUA_JUMP_HOUSE, IntPtr.Zero, IntPtr.Zero);
+    }
+
+    private const int WM_SKUA_JUMP_HOUSE = 0x0400 + 464;
     private const int WM_SKUA_ACCEPT_QUEST = 0x0400 + 458;
     private string _lastAcceptQuestId = "";
 

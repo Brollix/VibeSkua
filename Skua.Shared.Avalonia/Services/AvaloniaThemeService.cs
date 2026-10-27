@@ -278,7 +278,7 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         }
     }
 
-    private bool _useAccentOnMainTitleBar = true;
+    private bool _useAccentOnMainTitleBar;
 
     /// <summary>
     /// Gets or sets whether the main VibeSkua host title bar follows the active theme's primary accent.
@@ -298,7 +298,7 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         }
     }
 
-    private bool _useAccentOnManagerTitleBar = true;
+    private bool _useAccentOnManagerTitleBar;
 
     /// <summary>
     /// Gets or sets whether the VibeSkua Manager title bar follows the active theme's primary accent.
@@ -507,7 +507,7 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         }
         catch
         {
-            // Use the enabled default if this setting is unavailable or malformed.
+            // Off by default (the title bar keeps its surface colour) if this setting is unavailable or malformed.
         }
 
         return false;
@@ -550,7 +550,7 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         }
         catch
         {
-            // Use the enabled default if this setting is unavailable or malformed.
+            // Off by default (the title bar keeps its surface colour) if this setting is unavailable or malformed.
         }
 
         return false;
