@@ -694,7 +694,7 @@ public partial class TabbedHostWindow : Window
                 try
                 {
                     pipeServer = new NamedPipeServerStream(
-                        "VibeSkuaTabHostPipe",
+                        App.HostPipeName,
                         PipeDirection.In,
                         NamedPipeServerStream.MaxAllowedServerInstances,
                         PipeTransmissionMode.Byte,
@@ -1973,6 +1973,11 @@ public partial class TabbedHostWindow : Window
             p.StartInfo.ArgumentList.Add(_hostHwnd.ToInt64().ToString());
             p.StartInfo.ArgumentList.Add("--host-pid");
             p.StartInfo.ArgumentList.Add(Process.GetCurrentProcess().Id.ToString());
+            if (!string.IsNullOrWhiteSpace(App.HostInstanceId))
+            {
+                p.StartInfo.ArgumentList.Add("--host-instance");
+                p.StartInfo.ArgumentList.Add(App.HostInstanceId);
+            }
 
             foreach (string arg in clientArgs)
             {
