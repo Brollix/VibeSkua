@@ -510,7 +510,7 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
             // Use the enabled default if this setting is unavailable or malformed.
         }
 
-        return true;
+        return false;
     }
 
     private void SetUseAccentOnMainTitleBarSettingInMemory(bool enabled)
@@ -553,7 +553,7 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
             // Use the enabled default if this setting is unavailable or malformed.
         }
 
-        return true;
+        return false;
     }
 
     private void PersistUseAccentOnManagerTitleBarSetting(bool enabled)
