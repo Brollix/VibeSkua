@@ -733,7 +733,7 @@ public partial class TabbedHostWindow : Window
                             else if (line.StartsWith("THEME|", StringComparison.Ordinal))
                             {
                                 string themePayload = line.Substring("THEME|".Length);
-                                bool useAccentOnMainTitleBar = true;
+                                bool useAccentOnMainTitleBar = false;
                                 string themeCsv = themePayload;
                                 int separatorIndex = themePayload.IndexOf('|');
                                 if (separatorIndex >= 0 &&
