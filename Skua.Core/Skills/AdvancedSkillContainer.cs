@@ -40,6 +40,30 @@ public class AdvancedSkillContainer : ObservableRecipient, IAdvancedSkillContain
         _ = RefreshDefaultSkillsAsync();
     }
 
+    private static async Task WriteFileAtomicallyAsync(string filePath, string contents)
+    {
+        string fullPath = Path.GetFullPath(filePath);
+        string directory = Path.GetDirectoryName(fullPath)
+            ?? throw new IOException($"Could not determine the directory for '{fullPath}'.");
+        Directory.CreateDirectory(directory);
+
+        string temporaryPath = Path.Combine(directory, $".{Path.GetFileName(fullPath)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            await File.WriteAllTextAsync(temporaryPath, contents);
+
+            if (File.Exists(fullPath))
+                File.Replace(temporaryPath, fullPath, null);
+            else
+                File.Move(temporaryPath, fullPath);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+                File.Delete(temporaryPath);
+        }
+    }
+
     private async Task RefreshDefaultSkillsAsync()
     {
         try
@@ -56,11 +80,7 @@ public class AdvancedSkillContainer : ObservableRecipient, IAdvancedSkillContain
             string defaultJson = await File.ReadAllTextAsync(_defaultSkillsSetsPath);
             if (!File.Exists(_userSkillsSetsPath))
             {
-                string? directory = Path.GetDirectoryName(_userSkillsSetsPath);
-                if (!string.IsNullOrEmpty(directory))
-                    Directory.CreateDirectory(directory);
-
-                await File.WriteAllTextAsync(_userSkillsSetsPath, defaultJson);
+                await WriteFileAtomicallyAsync(_userSkillsSetsPath, defaultJson);
             }
             else
             {
@@ -90,7 +110,7 @@ public class AdvancedSkillContainer : ObservableRecipient, IAdvancedSkillContain
                 }
 
                 string mergedJson = user.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
-                await File.WriteAllTextAsync(_userSkillsSetsPath, mergedJson);
+                await WriteFileAtomicallyAsync(_userSkillsSetsPath, mergedJson);
             }
 
             LoadSkills();
@@ -159,57 +179,50 @@ public class AdvancedSkillContainer : ObservableRecipient, IAdvancedSkillContain
 
     public void LoadSkills()
     {
-        LoadedSkills.Clear();
-        _jsonConfig = null;
+        List<AdvancedSkill> loadedSkills = new();
+        AdvancedSkillsConfigJson? jsonConfig = null;
 
         IScriptOption? options = Ioc.Default.GetService<IScriptOption>();
-        if (options != null && options.UseFunctionBasedSkills)
+        if (options == null || !options.UseFunctionBasedSkills)
         {
-            OnPropertyChanged(nameof(LoadedSkills));
-            Broadcast(new(), _loadedSkills, nameof(LoadedSkills));
-            return;
-        }
+            _loadedFilePath = _userSkillsSetsPath;
 
-        _loadedFilePath = _userSkillsSetsPath;
+            if (!File.Exists(_userSkillsSetsPath))
+                _CopyDefaultSkills();
 
-        if (File.Exists(_userSkillsSetsPath))
-        {
-            string fileContent = File.ReadAllText(_userSkillsSetsPath);
-            LoadFromJson(fileContent);
-        }
-        else
-        {
-            _CopyDefaultSkills();
             if (File.Exists(_userSkillsSetsPath))
             {
                 string fileContent = File.ReadAllText(_userSkillsSetsPath);
-                LoadFromJson(fileContent);
+                loadedSkills = LoadFromJson(fileContent, out jsonConfig);
             }
         }
 
-        OnPropertyChanged(nameof(LoadedSkills));
-        Broadcast(new(), _loadedSkills, nameof(LoadedSkills));
+        // Swap in a complete snapshot; consumers holding the old list can finish safely.
+        _jsonConfig = jsonConfig;
+        LoadedSkills = loadedSkills;
     }
 
-    private void LoadFromJson(string jsonContent)
+    private List<AdvancedSkill> LoadFromJson(string jsonContent, out AdvancedSkillsConfigJson? jsonConfig)
     {
+        List<AdvancedSkill> loadedSkills = new();
+        jsonConfig = null;
+
         try
         {
-            _jsonConfig = JsonSerializer.Deserialize<AdvancedSkillsConfigJson>(jsonContent);
-            if (_jsonConfig == null)
-                return;
+            jsonConfig = JsonSerializer.Deserialize<AdvancedSkillsConfigJson>(jsonContent);
+            if (jsonConfig == null)
+                return loadedSkills;
 
-            foreach (KeyValuePair<string, Dictionary<string, SkillModeJson>> classEntry in _jsonConfig)
+            foreach (KeyValuePair<string, Dictionary<string, SkillModeJson>> classEntry in jsonConfig)
             {
                 string className = classEntry.Key;
                 foreach (KeyValuePair<string, SkillModeJson> modeEntry in classEntry.Value)
                 {
                     string classUseMode = modeEntry.Key;
                     SkillModeJson skillMode = modeEntry.Value;
-
                     string skillsStr = ConvertSkillsToString(skillMode.Skills);
 
-                    _loadedSkills.Add(new AdvancedSkill(
+                    loadedSkills.Add(new AdvancedSkill(
                         className,
                         skillsStr,
                         skillMode.SkillTimeout,
@@ -220,7 +233,14 @@ public class AdvancedSkillContainer : ObservableRecipient, IAdvancedSkillContain
                 }
             }
         }
-        catch { /* ignored */ }
+        catch
+        {
+            // Never publish a partially parsed skill set.
+            loadedSkills.Clear();
+            jsonConfig = null;
+        }
+
+        return loadedSkills;
     }
 
     private string ConvertSkillsToString(List<AdvancedSkillJson> skills)

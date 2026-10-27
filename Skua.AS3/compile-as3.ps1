@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$MxmlcPath
+    [string]$MxmlcPath,
+    [string]$OutputPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -9,7 +10,12 @@ $projectRoot = Join-Path $scriptRoot 'skua'
 $sourcePath = Join-Path $projectRoot 'src'
 $mainSourcePath = Join-Path $sourcePath 'skua\Main.as'
 $outputDirectory = Join-Path $projectRoot 'bin'
-$outputPath = Join-Path $outputDirectory 'skua.swf'
+if ([string]::IsNullOrWhiteSpace($OutputPath)) {
+    $outputPath = Join-Path $outputDirectory 'skua.swf'
+}
+else {
+    $outputPath = [System.IO.Path]::GetFullPath($OutputPath)
+}
 
 if (-not (Test-Path -LiteralPath $mainSourcePath)) {
     throw "AS3 entry point was not found: $mainSourcePath"
@@ -58,7 +64,8 @@ if (-not $env:PLAYERGLOBAL_HOME) {
     $env:PLAYERGLOBAL_HOME = Join-Path $env:FLEX_HOME 'frameworks\libs\player'
 }
 
-New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
+$resolvedOutputDirectory = Split-Path -Parent $outputPath
+New-Item -ItemType Directory -Path $resolvedOutputDirectory -Force | Out-Null
 
 & $MxmlcPath `
     -source-path $sourcePath `
