@@ -71,10 +71,11 @@
       To try a local build of the player instead, pass -p:SkuaPlayerLocal=<folder with Mugetsu.exe or Mugetsu>.
     -->
     <PropertyGroup>
-        <SkuaPlayerVersion>1.5.1-skua.1</SkuaPlayerVersion>
+        <!-- Files named as the skua-mugetsu "Build Mugetsu" workflow's draft release names them. -->
+        <SkuaPlayerVersion>1.5.1-skua.2</SkuaPlayerVersion>
         <SkuaPlayerOs Condition="'$(BonxieWindows)' == 'true'">windows</SkuaPlayerOs>
         <SkuaPlayerOs Condition="'$(BonxieWindows)' != 'true'">linux</SkuaPlayerOs>
-        <SkuaPlayerArchive Condition="'$(BonxieWindows)' == 'true'">Mugetsu-$(SkuaPlayerVersion).zip</SkuaPlayerArchive>
+        <SkuaPlayerArchive Condition="'$(BonxieWindows)' == 'true'">Mugetsu-$(SkuaPlayerVersion)-windows.zip</SkuaPlayerArchive>
         <SkuaPlayerArchive Condition="'$(BonxieWindows)' != 'true'">Mugetsu-$(SkuaPlayerVersion)-linux.tar.gz</SkuaPlayerArchive>
         <SkuaPlayerExe Condition="'$(BonxieWindows)' == 'true'">Mugetsu.exe</SkuaPlayerExe>
         <SkuaPlayerExe Condition="'$(BonxieWindows)' != 'true'">Mugetsu</SkuaPlayerExe>

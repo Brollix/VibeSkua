@@ -79,6 +79,9 @@ public class FlashUtil : IFlashUtil
         {
             start.ArgumentList.Add("--skua-parent");
             start.ArgumentList.Add(ParentWindow.ToString(CultureInfo.InvariantCulture));
+            // On Linux the parent is an X11 window; the player would otherwise prefer Wayland, where it can't be embedded.
+            if (!OperatingSystem.IsWindows())
+                start.Environment.Remove("WAYLAND_DISPLAY");
         }
         start.ArgumentList.Add(SwfPath);
         _player = Process.Start(start);
