@@ -10,29 +10,44 @@ $sourcePath = Join-Path $projectRoot 'src'
 $mainSourcePath = Join-Path $sourcePath 'skua\Main.as'
 $outputDirectory = Join-Path $projectRoot 'bin'
 $outputPath = Join-Path $outputDirectory 'skua.swf'
-$defaultMxmlcPath = 'C:\MoonshineSDKs\Flex_SDK\Flex_4.16.1_AIR_51.1\bin\mxmlc.bat'
 
 if (-not (Test-Path -LiteralPath $mainSourcePath)) {
     throw "AS3 entry point was not found: $mainSourcePath"
 }
 
 if ([string]::IsNullOrWhiteSpace($MxmlcPath)) {
-    if (Test-Path -LiteralPath $defaultMxmlcPath) {
-        $MxmlcPath = $defaultMxmlcPath
+    $mxmlcCommand = Get-Command mxmlc -ErrorAction SilentlyContinue
+    if ($mxmlcCommand) {
+        $MxmlcPath = $mxmlcCommand.Source
     }
-    else {
-        $mxmlcCommand = Get-Command mxmlc -ErrorAction SilentlyContinue
-        if ($mxmlcCommand) {
-            $MxmlcPath = $mxmlcCommand.Source
+    elseif ($env:FLEX_HOME) {
+        $candidate = Join-Path $env:FLEX_HOME 'bin\mxmlc.bat'
+        if (Test-Path -LiteralPath $candidate) {
+            $MxmlcPath = $candidate
         }
-        elseif ($env:FLEX_HOME) {
-            $MxmlcPath = Join-Path $env:FLEX_HOME 'bin\mxmlc.bat'
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($MxmlcPath)) {
+    $searchRoots = @(
+        'C:\MoonshineSDKs',
+        'C:\ApacheFlex',
+        $env:ProgramFiles,
+        ${env:ProgramFiles(x86)},
+        $env:LOCALAPPDATA
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+
+    foreach ($searchRoot in $searchRoots) {
+        $foundCompiler = Get-ChildItem -LiteralPath $searchRoot -Filter 'mxmlc.bat' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($foundCompiler) {
+            $MxmlcPath = $foundCompiler.FullName
+            break
         }
     }
 }
 
 if ([string]::IsNullOrWhiteSpace($MxmlcPath) -or -not (Test-Path -LiteralPath $MxmlcPath)) {
-    throw "Flex mxmlc was not found. Install/configure a Flex SDK, set FLEX_HOME, or pass -MxmlcPath. Checked default path: $defaultMxmlcPath"
+    throw 'Flex mxmlc was not found. Add it to PATH, set FLEX_HOME, install a Flex SDK in a common SDK location, or pass -MxmlcPath.'
 }
 
 if (-not $env:FLEX_HOME) {
