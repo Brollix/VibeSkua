@@ -507,10 +507,10 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         }
         catch
         {
-            // Default to the existing accent-enabled behavior if this setting is unavailable or malformed.
+            // Off by default (the title bar keeps its surface colour) if this setting is unavailable or malformed.
         }
 
-        return true;
+        return false;
     }
 
     private void SetUseAccentOnMainTitleBarSettingInMemory(bool enabled)
@@ -550,10 +550,10 @@ public class AvaloniaThemeService : IThemeService, INotifyPropertyChanged
         }
         catch
         {
-            // Default to the existing accent-enabled behavior if this setting is unavailable or malformed.
+            // Off by default (the title bar keeps its surface colour) if this setting is unavailable or malformed.
         }
 
-        return true;
+        return false;
     }
 
     private void PersistUseAccentOnManagerTitleBarSetting(bool enabled)
