@@ -101,7 +101,7 @@
                 Content="Skip sell warning"
                 IsChecked="{Binding SkipSellWarning, Mode=TwoWay}"
                 VerticalAlignment="Center" />
-      <Button Grid.Column="2" Classes="topbar-action w112" Content="Unmark all" Command="{Binding UnmarkAllJunkCommand}" />
+      <Button Grid.Column="2" Classes="skua-button w112" Content="Unmark all" Command="{Binding UnmarkAllJunkCommand}" />
       <Button Grid.Column="3" Classes="skua-button skua-danger-soft w112" Command="{Binding SellSelectedCommand}">
         <StackPanel Orientation="Horizontal" Spacing="6">
           <materialIcons:MaterialIcon Kind="CurrencyUsd" Width="15" Height="15" />
