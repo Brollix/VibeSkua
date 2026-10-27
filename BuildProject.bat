@@ -36,10 +36,11 @@ if errorlevel 1 (
     echo Git status failed. Make sure this is a valid Git repository.
     goto :Failure
 )
-for /f "delims=" %%S in ('git status --porcelain') do (
+for /f "delims=" %%S in ('git status --porcelain ^| findstr /V /C:"Skua.AS3/skua/bin/skua.swf"') do (
     echo Your working tree has uncommitted changes:
     git status --short
-    echo Commit or stash them before running this build.
+    echo Only changes to Skua.AS3/skua/bin/skua.swf are ignored by this build check.
+    echo Commit or stash other changes before running this build.
     goto :Failure
 )
 
@@ -97,19 +98,14 @@ if not exist "Build" (
     if errorlevel 1 goto :Failure
 )
 
-if exist "Skua.AS3\skua\bin\skua.swf" (
-    echo Skipping AS3 build because skua.swf already exists. Delete it to force a rebuild.
-) else (
+set "AS3_REBUILD=0"
+if not exist "Skua.AS3\skua\bin\skua.swf" set "AS3_REBUILD=1"
+git diff --quiet -- "Skua.AS3/skua/bin/skua.swf"
+if errorlevel 1 set "AS3_REBUILD=1"
+if "%AS3_REBUILD%"=="1" (
     echo Building AS3 Client...
-    set "MXMLC_PATH="
-    if exist "%USERPROFILE%\Downloads\apache-flex-sdk-4.16.1-bin\bin\mxmlc.bat" set "MXMLC_PATH=%USERPROFILE%\Downloads\apache-flex-sdk-4.16.1-bin\bin\mxmlc.bat"
-
-    if defined MXMLC_PATH (
-        powershell -NoProfile -ExecutionPolicy Bypass -File "Skua.AS3\compile-as3.ps1" -MxmlcPath "%MXMLC_PATH%"
-    ) else (
-        powershell -NoProfile -ExecutionPolicy Bypass -File "Skua.AS3\compile-as3.ps1"
-    )
-
+    if exist "Skua.AS3\skua\bin\skua.swf" del /F /Q "Skua.AS3\skua\bin\skua.swf"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "Skua.AS3\compile-as3.ps1"
     if errorlevel 1 (
         echo Failed to build AS3 client.
         goto :Failure
@@ -118,6 +114,8 @@ if exist "Skua.AS3\skua\bin\skua.swf" (
         echo AS3 build completed without producing skua.swf.
         goto :Failure
     )
+) else (
+    echo Skipping AS3 build because skua.swf is unchanged.
 )
 
 echo Restoring solution once for faster project builds...
