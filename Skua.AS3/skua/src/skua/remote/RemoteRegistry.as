@@ -11,9 +11,9 @@ public class RemoteRegistry {
         super();
     }
 
-    public static function createLinked(parent:*, name:String):LinkedObject {
+    public static function createLinked(parent:*, name:String, owner:LinkedObject = null, ownerKey:String = null):LinkedObject {
         var id:int = cid++;
-        return _linked[id] = new LinkedObject(id, parent, name);
+        return _linked[id] = new LinkedObject(id, parent, name, owner, ownerKey);
     }
 
     public static function destroy(object:LinkedObject):void {
@@ -21,6 +21,7 @@ public class RemoteRegistry {
             return;
         }
 
+        object.detachFromOwner();
         object.destroyChildren();
         delete _linked[object.getId()];
     }
