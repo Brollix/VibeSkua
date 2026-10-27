@@ -21,12 +21,33 @@ if ([string]::IsNullOrWhiteSpace($MxmlcPath)) {
         $MxmlcPath = $mxmlcCommand.Source
     }
     elseif ($env:FLEX_HOME) {
-        $MxmlcPath = Join-Path $env:FLEX_HOME 'bin\mxmlc.bat'
+        $candidate = Join-Path $env:FLEX_HOME 'bin\mxmlc.bat'
+        if (Test-Path -LiteralPath $candidate) {
+            $MxmlcPath = $candidate
+        }
+    }
+}
+
+if ([string]::IsNullOrWhiteSpace($MxmlcPath)) {
+    $searchRoots = @(
+        'C:\MoonshineSDKs',
+        'C:\ApacheFlex',
+        $env:ProgramFiles,
+        ${env:ProgramFiles(x86)},
+        $env:LOCALAPPDATA
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) -and (Test-Path -LiteralPath $_) } | Select-Object -Unique
+
+    foreach ($searchRoot in $searchRoots) {
+        $foundCompiler = Get-ChildItem -LiteralPath $searchRoot -Filter 'mxmlc.bat' -File -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($foundCompiler) {
+            $MxmlcPath = $foundCompiler.FullName
+            break
+        }
     }
 }
 
 if ([string]::IsNullOrWhiteSpace($MxmlcPath) -or -not (Test-Path -LiteralPath $MxmlcPath)) {
-    throw 'Apache Flex mxmlc was not found. Install Apache Flex SDK 4.16.1 or pass -MxmlcPath.'
+    throw 'Flex mxmlc was not found. Add it to PATH, set FLEX_HOME, install a Flex SDK in a common SDK location, or pass -MxmlcPath.'
 }
 
 if (-not $env:FLEX_HOME) {

@@ -83,6 +83,8 @@ public partial class LauncherViewModel : BotControlViewModelBase, IDisposable
                 args.Add(_settingsService.Get("CurrentTheme", "no-theme"));
             }
 
+            args.Add("--host-instance");
+            args.Add(Guid.NewGuid().ToString("N"));
             string server = _settingsService.Get("LastServer", "Twilly");
             if (!string.IsNullOrWhiteSpace(server))
             {
