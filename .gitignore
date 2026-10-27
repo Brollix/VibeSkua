@@ -416,3 +416,4 @@ skua_global_*.txt
 
 Skua.sln
 *.sln
+/Skua.AS3/skua/bin
