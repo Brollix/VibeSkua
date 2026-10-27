@@ -92,7 +92,6 @@ if "%BUILDPROJECT_BRANCH%"=="main" (
 )
 
 echo Closing any running instances...
-echo Closing any running instances...
 for %%P in (VibeSkua.exe VibeSkua.Manager.exe Skua.exe Skua.Manager.exe) do taskkill /IM "%%P" /F >nul 2>&1
 
 if not exist "Build" (
