@@ -65,7 +65,7 @@
     -->
     <PropertyGroup>
         <SkuaPlayerVersion>1.5.1-skua.1</SkuaPlayerVersion>
-        <SkuaPlayerZip>Mugetsu-$(SkuaPlayerVersion)-windows.zip</SkuaPlayerZip>
+        <SkuaPlayerZip>Mugetsu-$(SkuaPlayerVersion).zip</SkuaPlayerZip>
         <SkuaPlayerUrl>https://github.com/retr0gr4d3/skua-mugetsu/releases/download/v$(SkuaPlayerVersion)/$(SkuaPlayerZip)</SkuaPlayerUrl>
         <SkuaPlayerCache>$(MSBuildThisFileDirectory)..\player\$(SkuaPlayerVersion)</SkuaPlayerCache>
         <SkuaPlayerDir Condition="'$(SkuaPlayerLocal)' != ''">$(SkuaPlayerLocal)</SkuaPlayerDir>
