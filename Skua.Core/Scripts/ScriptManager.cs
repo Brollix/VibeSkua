@@ -1265,7 +1265,7 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
         if (string.IsNullOrEmpty(source))
             return source;
 
-        return source
+        source = source
             .Replace("using System.Windows.Forms;\r\n", "", StringComparison.Ordinal)
             .Replace("using System.Windows.Forms;\n", "", StringComparison.Ordinal)
             .Replace("using System.Windows.Forms;", "", StringComparison.Ordinal)
@@ -1279,6 +1279,20 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
             .Replace("Process.Start(\"explorer\",", "Process.Start(\"xdg-open\",", StringComparison.Ordinal)
             .Replace("Process.Start(\"explorer.exe\",", "Process.Start(\"xdg-open\",", StringComparison.Ordinal)
             .Replace("Process.Start(\"notepad.exe\",", "Process.Start(\"xdg-open\",", StringComparison.Ordinal);
+
+        const string progressBlockStart = "// Create a new thread for the progress bar to avoid blocking the main thread";
+        int blockStart = source.IndexOf(progressBlockStart, StringComparison.Ordinal);
+        if (blockStart >= 0)
+        {
+            int blockEnd = source.IndexOf("}).Start();", blockStart, StringComparison.Ordinal);
+            if (blockEnd >= 0)
+            {
+                blockEnd += "}).Start();".Length;
+                source = source[..blockStart] + "#if WINDOWS\n" + source[blockStart..blockEnd] + "\n#endif" + source[blockEnd..];
+            }
+        }
+
+        return source;
 #else
         return source;
 #endif
