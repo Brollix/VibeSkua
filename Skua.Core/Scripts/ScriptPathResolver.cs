@@ -107,17 +107,91 @@ public sealed class ScriptPathResolver : IScriptPathResolver
                 candidates.Add(Path.Combine(runtimeDir, normalizedSpecifier));
         }
 
-        List<string> existing = candidates
-            .Select(Canonicalize)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Where(File.Exists)
-            .ToList();
+        List<string> existing = new();
+        List<string> errors = new();
+        foreach (string candidate in candidates.Select(Canonicalize))
+        {
+            string? resolved = ResolveExistingFile(candidate, out string? error);
+            if (resolved is not null)
+                existing.Add(resolved);
+            else if (error is not null)
+                errors.Add($"{candidate}: {error}");
+        }
 
-        ScriptPathResolution resolution = new(existing.FirstOrDefault(), existing);
+        existing = existing.Distinct(
+            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal).ToList();
+
+        ScriptPathResolution resolution = new(existing.FirstOrDefault(), existing, errors.Count > 0 ? string.Join("; ", errors) : null);
         if (resolution.SelectedPath != null)
             _resolutionCache[cacheKey] = resolution;
 
         return resolution;
+    }
+
+    // Linux filesystems distinguish case, while script catalogs commonly use Windows-style paths.
+    // Resolve one segment at a time and refuse ambiguous matches instead of guessing.
+    private static string? ResolveExistingFile(string path, out string? error)
+    {
+        error = null;
+        if (File.Exists(path))
+            return path;
+
+        if (!OperatingSystem.IsLinux())
+            return null;
+
+        try
+        {
+            string fullPath = Path.GetFullPath(path);
+            string? root = Path.GetPathRoot(fullPath);
+            if (string.IsNullOrEmpty(root))
+                return null;
+
+            string[] segments = fullPath[root.Length..]
+                .Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+            string current = root;
+
+            for (int i = 0; i < segments.Length; i++)
+            {
+                string segment = segments[i];
+                string exact = Path.Combine(current, segment);
+                bool isLast = i == segments.Length - 1;
+
+                if (isLast ? File.Exists(exact) : Directory.Exists(exact))
+                {
+                    current = exact;
+                    continue;
+                }
+
+                if (!Directory.Exists(current))
+                    return null;
+
+                string[] matches = Directory.EnumerateFileSystemEntries(current)
+                    .Where(entry => string.Equals(
+                        Path.GetFileName(entry),
+                        segment,
+                        StringComparison.OrdinalIgnoreCase))
+                    .Where(entry => isLast ? File.Exists(entry) : Directory.Exists(entry))
+                    .Take(2)
+                    .ToArray();
+
+                if (matches.Length != 1)
+                    return null;
+
+                current = matches[0];
+            }
+
+            return File.Exists(current) ? current : null;
+        }
+        catch (IOException exception)
+        {
+            error = exception.Message;
+            return null;
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            error = exception.Message;
+            return null;
+        }
     }
 
     private static void AddOwnerRelativeCandidate(List<string> candidates, string? ownerFile, string specifier)

@@ -426,7 +426,8 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
             throw new ScriptCompileException($"Script file '{LoadedScript}' contains no class definitions after processing includes and references. Scripts must contain at least one class.", final);
         }
 
-        ConcurrentDictionary<string, string> sourceCache = new(StringComparer.OrdinalIgnoreCase);
+        StringComparer pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        ConcurrentDictionary<string, string> sourceCache = new(pathComparer);
 
         // Recursively discover all transitive includes using single-pass BFS and populate sourceCache
         DiscoverAllIncludes(references, sourceCache);
@@ -551,7 +552,7 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
             }
         }
 
-        return sb.ToString().Trim();
+        return SanitizeScriptSourceForLinux(sb.ToString().Trim());
     }
 
     private string? ResolveImport(string ownerFile, string specifier)
@@ -559,13 +560,18 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
         Skua.Core.Models.Scripts.ScriptPathResolution resolution = _pathResolver.Resolve(ownerFile, specifier);
         if (resolution.IsAmbiguous)
             _diagnostics.RecordEvent("Script", "ImportAmbiguous", correlationId: GetScriptCorrelationId());
+        if (resolution.Error is not null)
+            _diagnostics.RecordEvent("Script", "ImportResolutionFailed", unit: $"{ownerFile} -> {specifier}: {resolution.Error}", correlationId: GetScriptCorrelationId());
+        else if (resolution.SelectedPath is null)
+            _diagnostics.RecordEvent("Script", "ImportUnresolved", unit: $"{ownerFile} -> {specifier}", correlationId: GetScriptCorrelationId());
 
         return resolution.SelectedPath;
     }
 
     private void DiscoverAllIncludes(HashSet<string> references, ConcurrentDictionary<string, string> sourceCache)
     {
-        HashSet<string> visited = new(StringComparer.OrdinalIgnoreCase);
+        StringComparer pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        HashSet<string> visited = new(pathComparer);
         Queue<string> queue = new();
 
         _includedFilesLock.EnterReadLock();
@@ -591,7 +597,7 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
             try
             {
                 string fileContent = File.ReadAllText(currentFile);
-                sourceCache[currentFile] = fileContent;
+                sourceCache[currentFile] = SanitizeScriptSourceForLinux(fileContent);
 
                 List<string> newIncludes = ExtractIncludeDirectivesFromSource(fileContent, currentFile, references);
                 if (newIncludes.Count > 0)
@@ -734,12 +740,18 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
         using MemoryStream ms = new();
         ms.Write(sourceHash, 0, sourceHash.Length);
 
-        foreach (string file in includedFiles.OrderBy(f => f))
+        byte[] platformBytes = Encoding.UTF8.GetBytes(OperatingSystem.IsLinux() ? "linux" : OperatingSystem.IsWindows() ? "windows" : "other");
+        ms.Write(platformBytes, 0, platformBytes.Length);
+
+        foreach (string file in includedFiles.OrderBy(f => f, OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal))
         {
             if (File.Exists(file))
             {
                 byte[] pathBytes = Encoding.UTF8.GetBytes(file);
                 ms.Write(pathBytes, 0, pathBytes.Length);
+
+                byte[] includeSourceHash = sha256.ComputeHash(Encoding.UTF8.GetBytes(SanitizeScriptSourceForLinux(File.ReadAllText(file))));
+                ms.Write(includeSourceHash, 0, includeSourceHash.Length);
 
                 long ticks = File.GetLastWriteTimeUtc(file).Ticks;
                 byte[] ticksBytes = BitConverter.GetBytes(ticks);
@@ -772,8 +784,9 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
         ConcurrentDictionary<string, bool> compilationCompleted = new();
         object lockObj = new();
 
-        ConcurrentDictionary<string, List<string>> dependencyGraph = new();
-        ConcurrentDictionary<string, (string source, string fileName, int hash, string cachePath)> fileInfoCache = new();
+        StringComparer pathComparer = OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        ConcurrentDictionary<string, List<string>> dependencyGraph = new(pathComparer);
+        ConcurrentDictionary<string, (string source, string fileName, int hash, string cachePath)> fileInfoCache = new(pathComparer);
 
         string cacheDir = _cacheScriptsDir;
 
@@ -792,7 +805,7 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
 
         Parallel.ForEach(includedFilesSnapshot, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, includedFile =>
         {
-            string includeSource = sourceCache.TryGetValue(includedFile, out string? cached) ? cached : File.ReadAllText(includedFile);
+            string includeSource = sourceCache.TryGetValue(includedFile, out string? cached) ? cached : SanitizeScriptSourceForLinux(File.ReadAllText(includedFile));
             sourceCache[includedFile] = includeSource;
             CheckScriptVersionRequirement(includeSource);
             List<string> deps = ExtractIncludeDependencies(includeSource, includedFile);
@@ -855,7 +868,7 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
 
             foreach (string newFile in newlyAddedFiles)
             {
-                string includeSource = sourceCache.TryGetValue(newFile, out string? cached) ? cached : File.ReadAllText(newFile);
+                string includeSource = sourceCache.TryGetValue(newFile, out string? cached) ? cached : SanitizeScriptSourceForLinux(File.ReadAllText(newFile));
                 sourceCache[newFile] = includeSource;
                 CheckScriptVersionRequirement(includeSource);
                 List<string> deps = ExtractIncludeDependencies(includeSource, newFile);
@@ -893,18 +906,18 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
         }
 
         // Compute dependency-aware hashes in topological order (leaves first)
-        Dictionary<string, int> fileHashes = new(StringComparer.OrdinalIgnoreCase);
+        Dictionary<string, int> fileHashes = new(pathComparer);
         using (SHA256 sha256 = SHA256.Create())
         {
             foreach (string file in orderedFiles)
             {
-                string src = sourceCache.TryGetValue(file, out string? cached) ? cached : File.ReadAllText(file);
+                string src = sourceCache.TryGetValue(file, out string? cached) ? cached : SanitizeScriptSourceForLinux(File.ReadAllText(file));
                 byte[] srcBytes = Encoding.UTF8.GetBytes(src);
                 if (dependencyGraph.TryGetValue(file, out List<string>? fileDeps) && fileDeps.Count > 0)
                 {
                     using MemoryStream ms = new();
                     ms.Write(srcBytes, 0, srcBytes.Length);
-                    foreach (string dep in fileDeps.OrderBy(d => d, StringComparer.OrdinalIgnoreCase))
+                    foreach (string dep in fileDeps.OrderBy(d => d, pathComparer))
                     {
                         if (fileHashes.TryGetValue(dep, out int depHash))
                         {
@@ -940,7 +953,7 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
             }
             else
             {
-                string src = sourceCache.TryGetValue(file, out string? cached) ? cached : File.ReadAllText(file);
+                string src = sourceCache.TryGetValue(file, out string? cached) ? cached : SanitizeScriptSourceForLinux(File.ReadAllText(file));
                 fileInfoCache[file] = (src, includeFileName, includeHash, compiledPath);
             }
         }
@@ -1256,7 +1269,42 @@ public partial class ScriptManager : ObservableObject, IScriptManager, IDisposab
             }
         }
 
-        return sb.ToString().Trim();
+        return SanitizeScriptSourceForLinux(sb.ToString().Trim());
+    }
+
+    private static string SanitizeScriptSourceForLinux(string source)
+    {
+        if (!OperatingSystem.IsLinux() || string.IsNullOrEmpty(source))
+            return source;
+
+        source = source
+            .Replace("using System.Windows.Forms;\r\n", "", StringComparison.Ordinal)
+            .Replace("using System.Windows.Forms;\n", "", StringComparison.Ordinal)
+            .Replace("using System.Windows.Forms;", "", StringComparison.Ordinal)
+            .Replace("using Microsoft.Win32;\r\n", "", StringComparison.Ordinal)
+            .Replace("using Microsoft.Win32;\n", "", StringComparison.Ordinal)
+            .Replace("using Microsoft.Win32;", "", StringComparison.Ordinal)
+            .Replace("(System.Windows.Forms.MethodInvoker)", "(System.Action)", StringComparison.Ordinal)
+            .Replace("System.Windows.Forms.MethodInvoker", "System.Action", StringComparison.Ordinal)
+            .Replace("if (!OperatingSystem.IsWindowsVersionAtLeast(10))", "if (OperatingSystem.IsWindows() && !OperatingSystem.IsWindowsVersionAtLeast(10))", StringComparison.Ordinal)
+            .Replace("Process.Start(\"explorer\",", "Process.Start(\"xdg-open\",", StringComparison.Ordinal)
+            .Replace("Process.Start(\"explorer.exe\",", "Process.Start(\"xdg-open\",", StringComparison.Ordinal)
+            .Replace("Process.Start(\"notepad.exe\",", "Process.Start(\"xdg-open\",", StringComparison.Ordinal);
+
+        const string progressBlockStart = "// Create a new thread for the progress bar to avoid blocking the main thread";
+        int blockStart = source.IndexOf(progressBlockStart, StringComparison.Ordinal);
+        if (blockStart >= 0)
+        {
+            int blockEnd = source.IndexOf("}).Start();", blockStart, StringComparison.Ordinal);
+            if (blockEnd >= 0)
+            {
+                blockEnd += "}).Start();".Length;
+                source = source[..blockStart] + "#if WINDOWS\n" + source[blockStart..blockEnd] + "\n#endif" + source[blockEnd..];
+            }
+        }
+
+        return source;
+        return source;
     }
 
     private void UnloadPreviousScript()
