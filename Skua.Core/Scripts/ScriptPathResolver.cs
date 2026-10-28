@@ -107,15 +107,21 @@ public sealed class ScriptPathResolver : IScriptPathResolver
                 candidates.Add(Path.Combine(runtimeDir, normalizedSpecifier));
         }
 
-        List<string> existing = candidates
-            .Select(Canonicalize)
-            .Select(ResolveExistingFile)
-            .Where(path => path is not null)
-            .Select(path => path!)
-            .Distinct(OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal)
-            .ToList();
+        List<string> existing = new();
+        List<string> errors = new();
+        foreach (string candidate in candidates.Select(Canonicalize))
+        {
+            string? resolved = ResolveExistingFile(candidate, out string? error);
+            if (resolved is not null)
+                existing.Add(resolved);
+            else if (error is not null)
+                errors.Add($"{candidate}: {error}");
+        }
 
-        ScriptPathResolution resolution = new(existing.FirstOrDefault(), existing);
+        existing = existing.Distinct(
+            OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal).ToList();
+
+        ScriptPathResolution resolution = new(existing.FirstOrDefault(), existing, errors.Count > 0 ? string.Join("; ", errors) : null);
         if (resolution.SelectedPath != null)
             _resolutionCache[cacheKey] = resolution;
 
@@ -124,8 +130,9 @@ public sealed class ScriptPathResolver : IScriptPathResolver
 
     // Linux filesystems distinguish case, while script catalogs commonly use Windows-style paths.
     // Resolve one segment at a time and refuse ambiguous matches instead of guessing.
-    private static string? ResolveExistingFile(string path)
+    private static string? ResolveExistingFile(string path, out string? error)
     {
+        error = null;
         if (File.Exists(path))
             return path;
 
@@ -175,12 +182,14 @@ public sealed class ScriptPathResolver : IScriptPathResolver
 
             return File.Exists(current) ? current : null;
         }
-        catch (IOException)
+        catch (IOException exception)
         {
+            error = exception.Message;
             return null;
         }
-        catch (UnauthorizedAccessException)
+        catch (UnauthorizedAccessException exception)
         {
+            error = exception.Message;
             return null;
         }
     }
