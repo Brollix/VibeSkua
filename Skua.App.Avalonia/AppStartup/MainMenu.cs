@@ -59,6 +59,7 @@ internal class MainMenu
 
         windowService.RegisterManagedWindow<LogsViewModel>("Logs");
         windowService.RegisterManagedWindow<PluginsViewModel>("Plugins");
+        windowService.RegisterManagedWindow<AboutViewModel>("About");
     }
 
     internal static MainMenuViewModel CreateViewModel(IServiceProvider s)

@@ -160,6 +160,7 @@ public static class Services
         services.AddTransient<DiagnosticsViewModel>();
 
         services.AddSingleton<ScriptRepoViewModel>();
+        services.AddSingleton<AboutViewModel>();
         services.AddSingleton<ScriptLoaderViewModel>();
         services.AddTransient<LoadoutsViewModel>();
 

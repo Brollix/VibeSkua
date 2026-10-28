@@ -170,6 +170,7 @@ public partial class MainWindow : Window
                 "Bank" => MaterialIconKind.BankOutline,
                 "Diagnostics" => MaterialIconKind.BugOutline,
                 "Plugins" => MaterialIconKind.PuzzleOutline,
+                "About" => MaterialIconKind.InformationOutline,
                 _ => null
             };
 

@@ -66,6 +66,9 @@
     <DataTemplate DataType="plugins:PluginsViewModel">
       <views:PluginsView />
     </DataTemplate>
+    <DataTemplate DataType="viewModels:AboutViewModel">
+      <sharedViews:AboutView />
+    </DataTemplate>
     <DataTemplate DataType="vms:LoaderViewModel">
       <views:LoaderView />
     </DataTemplate>

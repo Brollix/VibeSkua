@@ -41,6 +41,7 @@ public partial class MainMenuViewModel : ObservableRecipient
         var list = new List<MainMenuItemViewModel>(mainMenuItems);
         _pluginsMenu = new MainMenuItemViewModel("Plugins", _plugins.ToList());
         list.Add(_pluginsMenu);
+        list.Add(new MainMenuItemViewModel("About"));
 
         MainMenuItems = new(list);
 

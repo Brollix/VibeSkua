@@ -8,15 +8,42 @@
              x:DataType="vms:AboutViewModel"
              d:DesignHeight="700" d:DesignWidth="600"
              mc:Ignorable="d">
+    <UserControl.Styles>
+        <Style Selector="Border.card">
+            <Setter Property="Background" Value="{DynamicResource SkuaSurfaceBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource SkuaBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="12,10" />
+        </Style>
+        <Style Selector="TextBlock.section">
+            <Setter Property="FontSize" Value="10" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{DynamicResource SkuaMutedTextBrush}" />
+            <Setter Property="Margin" Value="0,0,0,8" />
+        </Style>
+        <Style Selector="TextBlock.body">
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Foreground" Value="{DynamicResource SkuaMutedTextBrush}" />
+        </Style>
+        <Style Selector="TextBlock.title">
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource SkuaTextBrush}" />
+        </Style>
+        <Style Selector="materialIcons|MaterialIcon.feature">
+            <Setter Property="Width" Value="18" />
+            <Setter Property="Height" Value="18" />
+            <Setter Property="VerticalAlignment" Value="Top" />
+            <Setter Property="Margin" Value="0,1,10,0" />
+            <Setter Property="Foreground" Value="{DynamicResource SkuaAccentBrush}" />
+        </Style>
+    </UserControl.Styles>
+
     <Grid Margin="12" RowDefinitions="Auto,*">
         <!-- Header Card -->
-        <Border Grid.Row="0"
-                Background="{DynamicResource SkuaSurfaceBrush}"
-                BorderBrush="{DynamicResource SkuaBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="12,10"
-                Margin="0,0,0,10">
+        <Border Grid.Row="0" Classes="card" Margin="0,0,0,10">
             <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                 <StackPanel Grid.Column="0" Spacing="2">
                     <TextBlock Text="ABOUT &amp; INFO"
@@ -35,24 +62,46 @@
             </Grid>
         </Border>
 
-        <!-- Content Card -->
-        <Border Grid.Row="1"
-                Background="{DynamicResource SkuaSurfaceBrush}"
-                BorderBrush="{DynamicResource SkuaBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="8"
-                Padding="16">
-            <ScrollViewer VerticalScrollBarVisibility="Auto">
-                <SelectableTextBlock Text="{Binding MarkdownDoc}"
-                                     TextWrapping="Wrap"
-                                     Foreground="{DynamicResource SkuaTextBrush}"
-                                     FontSize="13"
-                                     LineHeight="20" />
-            </ScrollViewer>
-        </Border>
+        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Spacing="10">
+                <!-- Overview -->
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="section" Text="OVERVIEW" Margin="0" />
+                        <TextBlock Classes="body"
+                                   Foreground="{DynamicResource SkuaTextBrush}"
+                                   Text="A fork of VibeSkua for Windows and Linux users, powered by Ruffle." />
+                        <Border Background="{DynamicResource SkuaAccentTintBrush}"
+                                CornerRadius="6"
+                                Padding="10,8">
+                            <StackPanel Spacing="10">
+                                <Grid ColumnDefinitions="Auto,*">
+                                    <materialIcons:MaterialIcon Classes="feature" Kind="Speedometer" />
+                                    <StackPanel Grid.Column="1" Spacing="2">
+                                        <TextBlock Classes="title" Text="Ruffle (retr0gr4d3/skua-mugetsu)" />
+                                        <TextBlock Classes="body" Text="A fork of Mugetsu, optimized and patched to run with Skua." />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Border>
+
+                <!-- Disclaimer -->
+                <Border Classes="card"
+                        Background="{DynamicResource SkuaWarningTintBrush}"
+                        BorderBrush="{DynamicResource SkuaWarningTintBorderBrush}">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <materialIcons:MaterialIcon Classes="feature" Kind="AlertOutline"
+                                                    Foreground="{DynamicResource SkuaWarningBrush}" />
+                        <StackPanel Grid.Column="1" Spacing="2">
+                            <TextBlock Classes="title" Text="Educational &amp; Personal Use Only" />
+                            <TextBlock Classes="body"
+                                       Text="Use of this software may violate the Terms of Service of the associated game. By using this tool, you acknowledge that you do so entirely at your own risk." />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>
-
-
-
-
