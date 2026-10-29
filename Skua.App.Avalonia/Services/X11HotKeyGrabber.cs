@@ -151,8 +151,18 @@ internal sealed class X11HotKeyGrabber : IDisposable
 
                             uint modifiers = ToX11Modifiers(gesture.Modifiers, altMask);
                             // Caps Lock and Num Lock change the state too; grab every combination so they don't matter.
+                            s_lastErrorCode = 0;
                             foreach (uint locks in lockCombinations)
                                 XGrabKey(display, keycode, modifiers | locks, window, true, GrabModeAsync, GrabModeAsync);
+                            XSync(display, false);
+                            if (s_lastErrorCode == BadAccess)
+                            {
+                                // Another program (often the desktop, e.g. Cinnamon's F2) already holds this key.
+                                foreach (uint locks in lockCombinations)
+                                    XUngrabKey(display, keycode, modifiers | locks, window);
+                                System.Diagnostics.Trace.WriteLine($"Hotkey {gesture.Modifiers}+{gesture.Key} isn't available while the game is focused: another program already uses that key.");
+                                continue;
+                            }
                             grabs.Add((keycode, modifiers, gesture));
                         }
                     }
@@ -381,12 +391,19 @@ internal sealed class X11HotKeyGrabber : IDisposable
         }
     }
 
+    // The last error on our connection, read after XSync on the grabber thread (errors are delivered on that thread).
+    [ThreadStatic]
+    private static int s_lastErrorCode;
+
     private static int OnXError(IntPtr display, IntPtr errorEvent)
     {
         lock (s_ownDisplays)
         {
             if (s_ownDisplays.Contains(display))
+            {
+                s_lastErrorCode = Marshal.ReadByte(errorEvent, XErrorEventErrorCodeOffset);
                 return 0;
+            }
         }
 
         return s_previousErrorHandler != IntPtr.Zero
@@ -394,6 +411,9 @@ internal sealed class X11HotKeyGrabber : IDisposable
             : 0;
     }
 
+    private const int BadAccess = 10;
+    // XErrorEvent (LP64): type, display, resourceid, serial, then error_code at byte 32.
+    private const int XErrorEventErrorCodeOffset = 32;
     private const int KeyPress = 2;
     private const int KeyRelease = 3;
     private const int MappingNotify = 34;
@@ -453,6 +473,9 @@ internal sealed class X11HotKeyGrabber : IDisposable
 
     [DllImport(LibX11)]
     private static extern int XFlush(IntPtr display);
+
+    [DllImport(LibX11)]
+    private static extern int XSync(IntPtr display, bool discard);
 
     [DllImport(LibX11)]
     private static extern int XRefreshKeyboardMapping(IntPtr mappingEvent);
