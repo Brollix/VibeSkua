@@ -126,6 +126,14 @@ foreach ($Target in $Targets) {
         throw "The game player is missing from $PlayerSourceDir; the build should have downloaded it."
     }
 
+    # The x86-64-v2 player for CPUs without AVX2 (only when the player release has one)
+    $AvxPlayerSourceDir = Join-Path $AppBin "player-x86-64-v2"
+    if (Test-Path $AvxPlayerSourceDir) {
+        $TargetAvxPlayerDir = Join-Path $Target "player-x86-64-v2"
+        New-Item -ItemType Directory -Path $TargetAvxPlayerDir -Force | Out-Null
+        Copy-Item (Join-Path $AvxPlayerSourceDir "*") $TargetAvxPlayerDir -Recurse -Force
+    }
+
     # 8. Copy Plugins
     $PluginSourceDir = Join-Path $RootDir "Skua.Plugin.DailyTracker\bin\Release\net10.0"
     if (Test-Path $PluginSourceDir) {

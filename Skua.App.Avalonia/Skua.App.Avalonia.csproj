@@ -83,6 +83,14 @@
         <SkuaPlayerCache>$(MSBuildThisFileDirectory)..\player\$(SkuaPlayerVersion)-$(SkuaPlayerOs)</SkuaPlayerCache>
         <SkuaPlayerDir Condition="'$(SkuaPlayerLocal)' != ''">$(SkuaPlayerLocal)</SkuaPlayerDir>
         <SkuaPlayerDir Condition="'$(SkuaPlayerLocal)' == ''">$(SkuaPlayerCache)\Mugetsu</SkuaPlayerDir>
+
+        <!-- The x86-64-v2 build for CPUs without AVX2, copied to player-x86-64-v2\; Bonxie picks it at startup when
+             the CPU lacks AVX2. Releases before it existed don't have it: the build then warns and ships only player\. -->
+        <SkuaPlayerAvxArchive Condition="'$(BonxieWindows)' == 'true'">Mugetsu-$(SkuaPlayerVersion)-windows-x86-64-v2.zip</SkuaPlayerAvxArchive>
+        <SkuaPlayerAvxArchive Condition="'$(BonxieWindows)' != 'true'">Mugetsu-$(SkuaPlayerVersion)-linux-x86-64-v2.tar.gz</SkuaPlayerAvxArchive>
+        <SkuaPlayerAvxUrl>https://github.com/retr0gr4d3/skua-mugetsu/releases/download/v$(SkuaPlayerVersion)/$(SkuaPlayerAvxArchive)</SkuaPlayerAvxUrl>
+        <SkuaPlayerAvxCache>$(SkuaPlayerCache)-x86-64-v2</SkuaPlayerAvxCache>
+        <SkuaPlayerAvxDir>$(SkuaPlayerAvxCache)\Mugetsu</SkuaPlayerAvxDir>
     </PropertyGroup>
 
     <Target Name="DownloadSkuaPlayer" Condition="'$(SkuaPlayerLocal)' == '' And !Exists('$(SkuaPlayerDir)\$(SkuaPlayerExe)')">
@@ -92,10 +100,18 @@
         <Exec Condition="'$(BonxieWindows)' != 'true'" Command="tar -xzf &quot;$(SkuaPlayerArchive)&quot;" WorkingDirectory="$(SkuaPlayerCache)" />
     </Target>
 
-    <Target Name="AddSkuaPlayer" BeforeTargets="AssignTargetPaths" DependsOnTargets="DownloadSkuaPlayer">
+    <Target Name="DownloadSkuaPlayerAvx" Condition="'$(SkuaPlayerLocal)' == '' And !Exists('$(SkuaPlayerAvxDir)\$(SkuaPlayerExe)')">
+        <DownloadFile SourceUrl="$(SkuaPlayerAvxUrl)" DestinationFolder="$(SkuaPlayerAvxCache)" ContinueOnError="WarnAndContinue" />
+        <Unzip Condition="'$(BonxieWindows)' == 'true' And Exists('$(SkuaPlayerAvxCache)\$(SkuaPlayerAvxArchive)')" SourceFiles="$(SkuaPlayerAvxCache)\$(SkuaPlayerAvxArchive)" DestinationFolder="$(SkuaPlayerAvxCache)" />
+        <Exec Condition="'$(BonxieWindows)' != 'true' And Exists('$(SkuaPlayerAvxCache)\$(SkuaPlayerAvxArchive)')" Command="tar -xzf &quot;$(SkuaPlayerAvxArchive)&quot;" WorkingDirectory="$(SkuaPlayerAvxCache)" />
+    </Target>
+
+    <Target Name="AddSkuaPlayer" BeforeTargets="AssignTargetPaths" DependsOnTargets="DownloadSkuaPlayer;DownloadSkuaPlayerAvx">
         <ItemGroup>
             <_SkuaPlayerFile Include="$(SkuaPlayerDir)\**" />
             <None Include="@(_SkuaPlayerFile)" Link="player\%(_SkuaPlayerFile.RecursiveDir)%(_SkuaPlayerFile.Filename)%(_SkuaPlayerFile.Extension)" CopyToOutputDirectory="PreserveNewest" />
+            <_SkuaPlayerAvxFile Condition="'$(SkuaPlayerLocal)' == ''" Include="$(SkuaPlayerAvxDir)\**" />
+            <None Include="@(_SkuaPlayerAvxFile)" Link="player-x86-64-v2\%(_SkuaPlayerAvxFile.RecursiveDir)%(_SkuaPlayerAvxFile.Filename)%(_SkuaPlayerAvxFile.Extension)" CopyToOutputDirectory="PreserveNewest" />
         </ItemGroup>
     </Target>
 

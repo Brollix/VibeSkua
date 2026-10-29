@@ -26,6 +26,7 @@ cp "$root/Skua.Plugin.DailyTracker/bin/Release/net10.0/Skua.Plugin.DailyTracker.
    "$out/plugins/"
 
 chmod +x "$out/Bonxie" "$out/player/Mugetsu"
+if [[ -f "$out/player-x86-64-v2/Mugetsu" ]]; then chmod +x "$out/player-x86-64-v2/Mugetsu"; fi
 archive="$root/Build/Bonxie-$version-linux-x64.tar.gz"
 tar -C "$root/Build" --transform 's,^linux-x64,Bonxie,' --owner=0 --group=0 --numeric-owner -czf "$archive" linux-x64
 echo "Built $archive"

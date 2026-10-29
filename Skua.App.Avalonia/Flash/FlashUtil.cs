@@ -55,7 +55,18 @@ public class FlashUtil : IFlashUtil
 
     private static string SwfPath => Path.Combine(AppContext.BaseDirectory, "skua.swf");
 
-    private static string PlayerPath => Path.Combine(AppContext.BaseDirectory, "player", OperatingSystem.IsWindows() ? "Mugetsu.exe" : "Mugetsu");
+    // The normal player is built for x86-64-v3 and crashes at once without AVX2; those CPUs get the x86-64-v2 build.
+    private static string PlayerPath
+    {
+        get
+        {
+            string exe = OperatingSystem.IsWindows() ? "Mugetsu.exe" : "Mugetsu";
+            string avxPlayer = Path.Combine(AppContext.BaseDirectory, "player-x86-64-v2", exe);
+            if (!System.Runtime.Intrinsics.X86.Avx2.IsSupported && File.Exists(avxPlayer))
+                return avxPlayer;
+            return Path.Combine(AppContext.BaseDirectory, "player", exe);
+        }
+    }
 
     public void InitializeFlash()
     {
