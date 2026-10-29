@@ -345,7 +345,8 @@ public class HotKeys
 
     private static void ExecuteOrForward(string actionName, Action localExecute)
     {
-        if (IsHostProcess)
+        // Forwarding to a tab's client uses user32; off Windows there are no tabs, so run it here.
+        if (IsHostProcess && OperatingSystem.IsWindows())
         {
             IntPtr childHwnd = IntPtr.Zero;
             IntPtr fg = GetForegroundWindow();
