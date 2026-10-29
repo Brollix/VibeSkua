@@ -21,21 +21,30 @@ internal sealed partial class LogFileWriter : IDisposable
     private const int MaxPendingChars = 1_000_000;
     private static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan SettingRefreshInterval = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan CleanupInterval = TimeSpan.FromHours(1);
 
     private readonly string _directory = Path.Combine(ClientFileSources.SkuaDIR, "logs");
-    // _lock guards the pending lines; _writeLock serializes disk writes, which happen outside _lock.
+    // _lock guards the pending lines and the repeat state; it is never held during I/O or a settings read.
+    // _writeLock keeps batches in order: taking the pending lines and writing them happen together under it.
+    // Nothing here may Trace: Debug lines come from a Trace listener, so it would loop back.
     private readonly object _lock = new();
     private readonly object _writeLock = new();
-    private readonly StringBuilder _pending = new();
+    private readonly Queue<Line> _pending = new();
     private readonly Timer _timer;
+    private int _pendingChars;
     private string _account;
-    private string? _lastLine;
-    private string? _lastLineTime;
+    private LogType _lastType;
+    private string? _lastKey;
+    private DateOnly _lastDay;
+    private string _lastStamp = string.Empty;
     private int _repeats;
     private volatile int _enabled = -1; // -1 unknown, 0 off, 1 on
     private DateTime _enabledReadAt;
-    private bool _cleanedUp;
+    private DateTime _nextCleanup;
+    private bool _writeFailing;
     private bool _disposed;
+
+    private readonly record struct Line(string Account, DateOnly Day, string Text);
 
     public LogFileWriter()
     {
@@ -56,93 +65,130 @@ internal sealed partial class LogFileWriter : IDisposable
             return;
 
         string account = InvalidFileNameChars().Replace(username.Trim().ToLowerInvariant(), "_");
-        string previousAccount;
-        string text;
         lock (_lock)
         {
             if (account == _account)
                 return;
 
+            // Lines already waiting keep the account they were logged under.
             AppendRepeatSummary();
-            _lastLine = null;
-            previousAccount = _account;
-            text = TakePending();
+            _lastKey = null;
             _account = account;
         }
-
-        if (text.Length > 0 && IsEnabled())
-            Write(previousAccount, text);
     }
 
+    /// <summary>Queues a line; called inside LogService's collection lock, so it never touches the disk (until disposed).</summary>
     public void Add(LogType type, string message)
     {
-        if (_disposed || _enabled == 0 || string.IsNullOrWhiteSpace(message))
+        if (_enabled == 0 || string.IsNullOrWhiteSpace(message))
             return;
 
         string text = message.TrimEnd();
-        string time = DateTime.Now.ToString("HH:mm:ss");
+        DateTime now = DateTime.Now;
+        // Lines from CoreBots already start with [HH:mm:ss]: keep that time, and compare repeats without it.
+        Match time = StartsWithTime().Match(text);
+        string key = time.Success ? text[time.Length..].TrimStart() : text;
+        string stamp = time.Success ? time.Value : $"[{now:HH:mm:ss}]";
+        DateOnly day = DateOnly.FromDateTime(now);
+        bool disposed;
         lock (_lock)
         {
-            string key = type == LogType.Debug ? "[debug] " + text : text;
-            if (key == _lastLine)
+            disposed = _disposed;
+            if (!disposed && type == _lastType && key == _lastKey)
             {
-                _lastLineTime = time;
+                _lastStamp = stamp;
+                _lastDay = day;
                 if (++_repeats >= RepeatSummaryEvery)
                     AppendRepeatSummary();
                 return;
             }
 
             AppendRepeatSummary();
-            _lastLine = key;
-            // Lines from CoreBots already start with [HH:mm:ss]; the rest get the time added.
-            _pending.Append(StartsWithTime().IsMatch(text) ? key : $"[{time}] {key}").Append('\n');
-            if (_pending.Length > MaxPendingChars && _enabled != 1)
-                _pending.Clear(); // the setting can't be read yet: don't let the waiting lines grow without limit
+            _lastType = type;
+            _lastKey = key;
+            Enqueue(new(_account, day, $"{stamp} {(type == LogType.Debug ? "[debug] " : string.Empty)}{key}"));
         }
+
+        // After the final flush there is no timer left: write it now (the process is shutting down).
+        if (disposed)
+            Flush();
     }
 
     public void Flush()
     {
         // Read the setting on every tick, even with nothing pending, so turning it back on takes effect.
+        // Outside _writeLock: the settings service takes its own lock and a cross-process mutex.
         bool enabled = IsEnabled();
-        string account;
-        string text;
-        lock (_lock)
+        lock (_writeLock)
         {
-            if (_pending.Length == 0)
-                return;
-
-            if (!enabled)
+            Line[] lines;
+            lock (_lock)
             {
-                if (_enabled == 0)
-                    _pending.Clear();
-                return;
+                if (!enabled)
+                {
+                    // Off: drop what waits. Unknown (settings not up yet): keep it, bounded by MaxPendingChars.
+                    if (_enabled == 0)
+                    {
+                        _pending.Clear();
+                        _pendingChars = 0;
+                        _lastKey = null;
+                        _repeats = 0;
+                    }
+                    return;
+                }
+
+                if (_pending.Count == 0)
+                    return;
+
+                lines = _pending.ToArray();
+                _pending.Clear();
+                _pendingChars = 0;
             }
 
-            account = _account;
-            text = TakePending();
+            int written = Write(lines);
+            if (written < lines.Length)
+                Requeue(lines.AsSpan(written));
         }
-
-        Write(account, text);
     }
 
     public void Dispose()
     {
-        if (_disposed)
-            return;
-
-        _disposed = true;
-        _timer.Dispose();
         lock (_lock)
+        {
+            if (_disposed)
+                return;
+
+            // From here on Add writes its line itself, so nothing can be queued after the final flush below.
+            _disposed = true;
             AppendRepeatSummary();
+        }
+
+        _timer.Dispose();
         Flush();
     }
 
-    private string TakePending()
+    private void Enqueue(Line line)
     {
-        string text = _pending.ToString();
-        _pending.Clear();
-        return text;
+        _pending.Enqueue(line);
+        _pendingChars += line.Text.Length;
+        // Settings not readable yet, or the disk keeps failing: keep the newest lines and drop the oldest.
+        while (_pendingChars > MaxPendingChars && _pending.Count > 1)
+            _pendingChars -= _pending.Dequeue().Text.Length;
+    }
+
+    // A failed batch goes back in front of what was queued meanwhile, so the next tick retries it in order.
+    private void Requeue(ReadOnlySpan<Line> failed)
+    {
+        lock (_lock)
+        {
+            Line[] queued = _pending.ToArray();
+            _pending.Clear();
+            _pendingChars = 0;
+            foreach (Line line in failed)
+                Enqueue(line);
+            foreach (Line line in queued)
+                Enqueue(line);
+        }
     }
 
     private void AppendRepeatSummary()
@@ -150,80 +196,113 @@ internal sealed partial class LogFileWriter : IDisposable
         if (_repeats == 0)
             return;
 
-        _pending.Append($"[{_lastLineTime}] (previous line repeated {_repeats} more time{(_repeats == 1 ? string.Empty : "s")})\n");
+        Enqueue(new(_account, _lastDay, $"{_lastStamp} (previous line repeated {_repeats} more time{(_repeats == 1 ? string.Empty : "s")})"));
         _repeats = 0;
     }
 
-    private void Write(string account, string text)
+    /// <summary>Writes the lines grouped by file; returns how many were written before a failure.</summary>
+    private int Write(Line[] lines)
     {
-        byte[] bytes = Encoding.UTF8.GetBytes(text);
-        lock (_writeLock)
+        DeleteOldFiles();
+        int written = 0;
+        while (written < lines.Length)
         {
-            for (int attempt = 0; attempt < 2; attempt++)
-            {
-                try
-                {
-                    Directory.CreateDirectory(_directory);
-                    if (!_cleanedUp)
-                    {
-                        _cleanedUp = true;
-                        DeleteOldFiles();
-                    }
+            Line first = lines[written];
+            StringBuilder text = new();
+            int end = written;
+            for (; end < lines.Length && lines[end].Account == first.Account && lines[end].Day == first.Day; end++)
+                text.Append(lines[end].Text).Append('\n');
 
-                    // Shared, so another client (or the Manager) appending to the same file doesn't make this one fail.
-                    using FileStream stream = new(CurrentFile(account), FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
-                    stream.Write(bytes);
-                    return;
-                }
-                catch (IOException) when (attempt == 0)
-                {
-                    Thread.Sleep(100);
-                }
-                catch (IOException)
-                {
-                    // Disk full or still locked: drop this batch rather than fail the logger (no Trace here, it would loop back).
-                }
-                catch (UnauthorizedAccessException)
-                {
-                    return;
-                }
-            }
+            if (!Append(first.Account, first.Day, Encoding.UTF8.GetBytes(text.ToString())))
+                break;
+            written = end;
         }
+        return written;
     }
 
-    private string CurrentFile(string account)
+    private bool Append(string account, DateOnly day, byte[] bytes)
     {
-        string name = $"{account}_{DateTime.Now:yyyy-MM-dd}";
-        string path = Path.Combine(_directory, name + ".log");
-        for (int part = 2; File.Exists(path) && new FileInfo(path).Length >= MaxFileBytes; part++)
-            path = Path.Combine(_directory, $"{name}_{part}.log");
-        return path;
-    }
-
-    private void DeleteOldFiles()
-    {
-        DateTime cutoff = DateTime.Now.AddDays(-KeepDays);
-        foreach (string file in Directory.EnumerateFiles(_directory, "*.log"))
+        for (int attempt = 0; ; attempt++)
         {
             try
             {
-                if (File.GetLastWriteTime(file) < cutoff)
-                    File.Delete(file);
+                Directory.CreateDirectory(_directory);
+                // Shared, so another client (or the Manager) appending to the same file doesn't make this one fail.
+                using FileStream stream = new(CurrentFile(account, day, bytes.Length), FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                stream.Write(bytes);
+                _writeFailing = false;
+                return true;
             }
-            catch (IOException)
+            catch (IOException) when (attempt == 0)
             {
+                Thread.Sleep(100);
             }
-            catch (UnauthorizedAccessException)
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                // Disk full, still locked or no permission: the lines stay queued for the next tick.
+                // Report once per failure streak, on stderr (Trace would loop back into this logger).
+                if (!_writeFailing)
+                    Console.Error.WriteLine($"Bonxie: can't write the log file ({ex.Message}); will keep retrying.");
+                _writeFailing = true;
+                return false;
             }
         }
     }
 
-    // Called outside _lock: the settings service takes its own lock and a cross-process mutex.
+    // The last part of the day, or a new one when this batch would take it past MaxFileBytes.
+    private string CurrentFile(string account, DateOnly day, int byteCount)
+    {
+        string name = $"{account}_{day:yyyy-MM-dd}";
+        int part = 1;
+        while (File.Exists(PartPath(name, part + 1)))
+            part++;
+
+        string path = PartPath(name, part);
+        FileInfo file = new(path);
+        if (file.Exists && file.Length > 0 && file.Length + byteCount > MaxFileBytes)
+            path = PartPath(name, part + 1);
+        return path;
+    }
+
+    private string PartPath(string name, int part) => Path.Combine(_directory, part == 1 ? $"{name}.log" : $"{name}_{part}.log");
+
+    // At most once an hour. If the folder can't be listed the pass is retried on the next write;
+    // a single file that can't be deleted is left for the next pass.
+    private void DeleteOldFiles()
+    {
+        DateTime now = DateTime.Now;
+        if (now < _nextCleanup)
+            return;
+
+        try
+        {
+            if (Directory.Exists(_directory))
+            {
+                DateTime cutoff = now.AddDays(-KeepDays);
+                foreach (string file in Directory.EnumerateFiles(_directory, "*.log"))
+                {
+                    try
+                    {
+                        if (File.GetLastWriteTime(file) < cutoff)
+                            File.Delete(file);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                    }
+                }
+            }
+            _nextCleanup = now + CleanupInterval;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+        }
+    }
+
     // It may not exist yet when the first lines arrive; until it does, lines wait in memory.
+    // After Dispose the last value read is kept: the settings service may already be gone.
     private bool IsEnabled()
     {
-        if (_enabled != -1 && DateTime.Now - _enabledReadAt < SettingRefreshInterval)
+        if (_enabled != -1 && (_disposed || DateTime.Now - _enabledReadAt < SettingRefreshInterval))
             return _enabled == 1;
 
         try

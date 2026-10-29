@@ -44,8 +44,9 @@ public class LogService : ObservableRecipient, ILogService, IDisposable
             if (_debugLogs.Count >= MaxLogEntries)
                 _debugLogs.RemoveAt(0);
             _debugLogs.Add(message);
+            // In the same lock, so the file keeps the Logs window's order (Add only queues the line).
+            _fileWriter.Add(LogType.Debug, message);
         }
-        _fileWriter.Add(LogType.Debug, message);
         Messenger.Send(new LogsChangedMessage(LogType.Debug));
         Messenger.Send(new AddLogMessage(LogType.Debug, message));
     }
@@ -73,8 +74,9 @@ public class LogService : ObservableRecipient, ILogService, IDisposable
             if (_scriptLogs.Count >= MaxLogEntries)
                 _scriptLogs.RemoveAt(0);
             _scriptLogs.Add(message);
+            // In the same lock, so the file keeps the Logs window's order (Add only queues the line).
+            _fileWriter.Add(LogType.Script, message);
         }
-        _fileWriter.Add(LogType.Script, message);
         Messenger.Send(new LogsChangedMessage(LogType.Script));
         Messenger.Send(new AddLogMessage(LogType.Script, message));
     }
