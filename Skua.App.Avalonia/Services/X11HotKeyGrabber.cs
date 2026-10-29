@@ -38,12 +38,12 @@ internal sealed class X11HotKeyGrabber : IDisposable
             _window = window;
             _gestures = gestures.ToArray();
             _changed = true;
-        }
 
-        if (_thread is null && !_disposed)
-        {
-            _thread = new Thread(Run) { IsBackground = true, Name = "X11 hotkeys" };
-            _thread.Start();
+            if (_thread is null && !_disposed)
+            {
+                _thread = new Thread(Run) { IsBackground = true, Name = "X11 hotkeys" };
+                _thread.Start();
+            }
         }
     }
 
@@ -52,21 +52,40 @@ internal sealed class X11HotKeyGrabber : IDisposable
         _disposed = true;
     }
 
-    // Every X11 call happens on this thread, on a connection of its own (Avalonia's isn't shared).
+    // Every X11 call happens on this thread, on a connection of its own (Avalonia's isn't shared). When the display
+    // can't be opened or the connection fails, it tries again after a pause that grows up to half a minute.
     private void Run()
     {
-        IntPtr display;
         try
         {
             InstallErrorHandler();
-            display = XOpenDisplay(IntPtr.Zero);
+            int retryDelay = 1000;
+            while (!_disposed)
+            {
+                RunConnection();
+                if (_disposed)
+                    break;
+
+                Thread.Sleep(retryDelay);
+                retryDelay = Math.Min(retryDelay * 2, 30_000);
+            }
         }
         catch (Exception ex)
         {
+            // No libX11.
             System.Diagnostics.Trace.WriteLine($"X11 hotkeys unavailable: {ex.Message}");
-            return;
         }
+        finally
+        {
+            // The next Update starts a new worker.
+            lock (_lock)
+                _thread = null;
+        }
+    }
 
+    private void RunConnection()
+    {
+        IntPtr display = XOpenDisplay(IntPtr.Zero);
         if (display == IntPtr.Zero)
         {
             System.Diagnostics.Trace.WriteLine("X11 hotkeys unavailable: can't open the display.");
@@ -76,11 +95,24 @@ internal sealed class X11HotKeyGrabber : IDisposable
         lock (s_ownDisplays)
             s_ownDisplays.Add(display);
 
+        // A new connection has no grabs yet.
+        lock (_lock)
+            _changed = true;
+
         List<(int Keycode, uint Modifiers, Gesture Gesture)> grabs = [];
+        HashSet<int> heldKeycodes = [];
         IntPtr grabWindow = IntPtr.Zero;
+        uint altMask = Mod1Mask;
+        uint[] lockCombinations = [];
         IntPtr xevent = Marshal.AllocHGlobal(XEventSize);
         try
         {
+            // A held key repeats as KeyPress events alone, without the KeyRelease X11 normally sends before each
+            // one, so the repeats can be told apart from a new press.
+            XkbSetDetectableAutoRepeat(display, true, out bool detectableAutoRepeat);
+            if (!detectableAutoRepeat)
+                System.Diagnostics.Trace.WriteLine("X11 hotkeys: no detectable autorepeat, a held hotkey will repeat.");
+
             while (!_disposed)
             {
                 bool changed;
@@ -96,7 +128,14 @@ internal sealed class X11HotKeyGrabber : IDisposable
 
                 if (changed)
                 {
-                    Ungrab(display, grabWindow, grabs);
+                    Ungrab(display, grabWindow, grabs, lockCombinations);
+                    heldKeycodes.Clear();
+
+                    // Which of Mod1-Mod5 are Alt and Num Lock is up to the X server's modifier map.
+                    altMask = FindModifierMask(display, XK_Alt_L, XK_Alt_R) ?? FindModifierMask(display, XK_Meta_L, XK_Meta_R) ?? Mod1Mask;
+                    uint numLockMask = FindModifierMask(display, XK_Num_Lock) ?? Mod2Mask;
+                    lockCombinations = [0, LockMask, numLockMask, LockMask | numLockMask];
+
                     grabWindow = window;
                     if (window != IntPtr.Zero)
                     {
@@ -110,9 +149,9 @@ internal sealed class X11HotKeyGrabber : IDisposable
                             if (keycode == 0)
                                 continue;
 
-                            uint modifiers = ToX11Modifiers(gesture.Modifiers);
+                            uint modifiers = ToX11Modifiers(gesture.Modifiers, altMask);
                             // Caps Lock and Num Lock change the state too; grab every combination so they don't matter.
-                            foreach (uint locks in LockCombinations)
+                            foreach (uint locks in lockCombinations)
                                 XGrabKey(display, keycode, modifiers | locks, window, true, GrabModeAsync, GrabModeAsync);
                             grabs.Add((keycode, modifiers, gesture));
                         }
@@ -133,11 +172,21 @@ internal sealed class X11HotKeyGrabber : IDisposable
                         continue;
                     }
 
+                    if (type == KeyRelease)
+                    {
+                        heldKeycodes.Remove(Marshal.ReadInt32(xevent, XKeyEventKeycodeOffset));
+                        continue;
+                    }
+
                     if (type != KeyPress)
                         continue;
 
-                    uint state = (uint)Marshal.ReadInt32(xevent, XKeyEventStateOffset) & (ShiftMask | ControlMask | Mod1Mask);
                     int keycode = Marshal.ReadInt32(xevent, XKeyEventKeycodeOffset);
+                    // Still held since its last press: an autorepeat, which would flip a toggle straight back.
+                    if (!heldKeycodes.Add(keycode))
+                        continue;
+
+                    uint state = (uint)Marshal.ReadInt32(xevent, XKeyEventStateOffset) & (ShiftMask | ControlMask | altMask);
                     foreach ((int Keycode, uint Modifiers, Gesture Gesture) grab in grabs)
                     {
                         if (grab.Keycode == keycode && grab.Modifiers == state)
@@ -151,12 +200,12 @@ internal sealed class X11HotKeyGrabber : IDisposable
                 Thread.Sleep(20);
             }
 
-            Ungrab(display, grabWindow, grabs);
+            Ungrab(display, grabWindow, grabs, lockCombinations);
             XFlush(display);
         }
         catch (Exception ex)
         {
-            // An exception on this thread would end the process; lose the hotkeys instead.
+            // An exception on this thread would end the process; lose the hotkeys until Run reconnects instead.
             System.Diagnostics.Trace.WriteLine($"X11 hotkeys stopped: {ex}");
         }
         finally
@@ -170,20 +219,51 @@ internal sealed class X11HotKeyGrabber : IDisposable
         }
     }
 
-    private static void Ungrab(IntPtr display, IntPtr window, List<(int Keycode, uint Modifiers, Gesture Gesture)> grabs)
+    private static void Ungrab(IntPtr display, IntPtr window, List<(int Keycode, uint Modifiers, Gesture Gesture)> grabs, uint[] lockCombinations)
     {
         if (window != IntPtr.Zero)
         {
             foreach ((int Keycode, uint Modifiers, Gesture Gesture) grab in grabs)
             {
-                foreach (uint locks in LockCombinations)
+                foreach (uint locks in lockCombinations)
                     XUngrabKey(display, grab.Keycode, grab.Modifiers | locks, window);
             }
         }
         grabs.Clear();
     }
 
-    private static uint ToX11Modifiers(KeyModifiers modifiers)
+    // The mask of the first of Mod1-Mod5 a key with one of the keysyms is mapped to, or null if none is.
+    private static uint? FindModifierMask(IntPtr display, params nuint[] keysyms)
+    {
+        byte[] keycodes = keysyms.Select(keysym => XKeysymToKeycode(display, keysym)).Where(keycode => keycode != 0).ToArray();
+        if (keycodes.Length == 0)
+            return null;
+
+        IntPtr mapPointer = XGetModifierMapping(display);
+        if (mapPointer == IntPtr.Zero)
+            return null;
+
+        try
+        {
+            // modifiermap is 8 rows (Shift, Lock, Control, Mod1-Mod5) of max_keypermod keycodes, 0 where unused.
+            XModifierKeymap map = Marshal.PtrToStructure<XModifierKeymap>(mapPointer);
+            for (int modifier = 3; modifier < 8; modifier++)
+            {
+                for (int i = 0; i < map.MaxKeyPerMod; i++)
+                {
+                    if (keycodes.Contains(Marshal.ReadByte(map.ModifierMap, modifier * map.MaxKeyPerMod + i)))
+                        return 1u << modifier;
+                }
+            }
+            return null;
+        }
+        finally
+        {
+            XFreeModifiermap(mapPointer);
+        }
+    }
+
+    private static uint ToX11Modifiers(KeyModifiers modifiers, uint altMask)
     {
         uint result = 0;
         if (modifiers.HasFlag(KeyModifiers.Shift))
@@ -191,7 +271,7 @@ internal sealed class X11HotKeyGrabber : IDisposable
         if (modifiers.HasFlag(KeyModifiers.Control))
             result |= ControlMask;
         if (modifiers.HasFlag(KeyModifiers.Alt))
-            result |= Mod1Mask;
+            result |= altMask;
         return result;
     }
 
@@ -207,6 +287,8 @@ internal sealed class X11HotKeyGrabber : IDisposable
         if (key is >= Key.F1 and <= Key.F24)
             return (nuint)(0xFFBE + (key - Key.F1));
 
+        // Missing on purpose: Shift, Ctrl and Alt alone (the hotkey dialog takes them as modifiers), and the IME,
+        // DBE and other OEM-specific keys, which have no keysym of their own.
         return key switch
         {
             Key.Enter => 0xFF0D,
@@ -224,11 +306,47 @@ internal sealed class X11HotKeyGrabber : IDisposable
             Key.Up => 0xFF52,
             Key.Right => 0xFF53,
             Key.Down => 0xFF54,
+            Key.Cancel => 0xFF69,
+            Key.LineFeed => 0xFF0A,
+            Key.Clear => 0xFF0B,
+            Key.Pause => 0xFF13,
+            Key.CapsLock => 0xFFE5,
+            Key.Select => 0xFF60,
+            Key.Print => 0xFF61,
+            Key.Snapshot => 0xFF61,
+            Key.Execute => 0xFF62,
+            Key.Help => 0xFF6A,
+            Key.LWin => 0xFFEB,
+            Key.RWin => 0xFFEC,
+            Key.Apps => 0xFF67,
+            Key.NumLock => 0xFF7F,
+            Key.Scroll => 0xFF14,
             Key.Multiply => 0xFFAA,
             Key.Add => 0xFFAB,
+            Key.Separator => 0xFFAC,
             Key.Subtract => 0xFFAD,
             Key.Decimal => 0xFFAE,
             Key.Divide => 0xFFAF,
+
+            // X11/XF86keysym.h
+            Key.Sleep => 0x1008FF2F,
+            Key.VolumeDown => 0x1008FF11,
+            Key.VolumeMute => 0x1008FF12,
+            Key.VolumeUp => 0x1008FF13,
+            Key.MediaPlayPause => 0x1008FF14,
+            Key.MediaStop => 0x1008FF15,
+            Key.MediaPreviousTrack => 0x1008FF16,
+            Key.MediaNextTrack => 0x1008FF17,
+            Key.BrowserHome => 0x1008FF18,
+            Key.LaunchMail => 0x1008FF19,
+            Key.BrowserSearch => 0x1008FF1B,
+            Key.BrowserBack => 0x1008FF26,
+            Key.BrowserForward => 0x1008FF27,
+            Key.BrowserStop => 0x1008FF28,
+            Key.BrowserRefresh => 0x1008FF29,
+            Key.BrowserFavorites => 0x1008FF30,
+            Key.SelectMedia => 0x1008FF32,
+
             Key.OemTilde => 0x60,
             Key.OemMinus => 0x2D,
             Key.OemPlus => 0x3D,
@@ -240,6 +358,7 @@ internal sealed class X11HotKeyGrabber : IDisposable
             Key.OemPeriod => 0x2E,
             Key.OemQuestion => 0x2F,
             Key.OemPipe => 0x5C,
+            Key.OemBackslash => 0x3C,
             _ => 0
         };
     }
@@ -276,6 +395,7 @@ internal sealed class X11HotKeyGrabber : IDisposable
     }
 
     private const int KeyPress = 2;
+    private const int KeyRelease = 3;
     private const int MappingNotify = 34;
     private const int GrabModeAsync = 1;
     private const uint ShiftMask = 1 << 0;
@@ -283,12 +403,24 @@ internal sealed class X11HotKeyGrabber : IDisposable
     private const uint ControlMask = 1 << 2;
     private const uint Mod1Mask = 1 << 3;
     private const uint Mod2Mask = 1 << 4;
-    private static readonly uint[] LockCombinations = [0, LockMask, Mod2Mask, LockMask | Mod2Mask];
+    private const nuint XK_Alt_L = 0xFFE9;
+    private const nuint XK_Alt_R = 0xFFEA;
+    private const nuint XK_Meta_L = 0xFFE7;
+    private const nuint XK_Meta_R = 0xFFE8;
+    private const nuint XK_Num_Lock = 0xFF7F;
 
     // XEvent is a union of 24 longs; in XKeyEvent (LP64) state and keycode sit at bytes 80 and 84.
     private const int XEventSize = 24 * 8;
     private const int XKeyEventStateOffset = 80;
     private const int XKeyEventKeycodeOffset = 84;
+
+    // XModifierKeymap: int max_keypermod; KeyCode *modifiermap (the pointer at byte 8 on LP64).
+    [StructLayout(LayoutKind.Sequential)]
+    private struct XModifierKeymap
+    {
+        public int MaxKeyPerMod;
+        public IntPtr ModifierMap;
+    }
 
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     private delegate int XErrorHandler(IntPtr display, IntPtr errorEvent);
@@ -324,4 +456,14 @@ internal sealed class X11HotKeyGrabber : IDisposable
 
     [DllImport(LibX11)]
     private static extern int XRefreshKeyboardMapping(IntPtr mappingEvent);
+
+    [DllImport(LibX11)]
+    private static extern IntPtr XGetModifierMapping(IntPtr display);
+
+    [DllImport(LibX11)]
+    private static extern int XFreeModifiermap(IntPtr modmap);
+
+    // Bool is an int; bool marshals as a 4-byte BOOL.
+    [DllImport(LibX11)]
+    private static extern bool XkbSetDetectableAutoRepeat(IntPtr display, bool detectable, out bool supported);
 }
