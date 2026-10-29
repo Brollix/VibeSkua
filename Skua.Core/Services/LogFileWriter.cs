@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.DependencyInjection;
 using Skua.Core.Interfaces;
 using Skua.Core.Models;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -17,26 +18,35 @@ internal sealed partial class LogFileWriter : IDisposable
     private const long MaxFileBytes = 5 * 1024 * 1024;
     private const int KeepDays = 14;
     private const int RepeatSummaryEvery = 1000;
+    private const int MaxPendingChars = 1_000_000;
     private static readonly TimeSpan FlushInterval = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan SettingRefreshInterval = TimeSpan.FromSeconds(30);
 
     private readonly string _directory = Path.Combine(ClientFileSources.SkuaDIR, "logs");
+    // _lock guards the pending lines; _writeLock serializes disk writes, which happen outside _lock.
     private readonly object _lock = new();
+    private readonly object _writeLock = new();
     private readonly StringBuilder _pending = new();
     private readonly Timer _timer;
-    private string _account = "unknown";
+    private string _account;
     private string? _lastLine;
     private string? _lastLineTime;
     private int _repeats;
-    private bool? _enabled;
+    private volatile int _enabled = -1; // -1 unknown, 0 off, 1 on
     private DateTime _enabledReadAt;
     private bool _cleanedUp;
     private bool _disposed;
 
     public LogFileWriter()
     {
+        // The Manager never logs in; its lines get their own file instead of mixing with a client's.
+        string? entry = Assembly.GetEntryAssembly()?.GetName().Name;
+        _account = entry?.Contains("Manager", StringComparison.OrdinalIgnoreCase) == true ? "manager" : "unknown";
+
         _timer = new Timer(_ => Flush(), null, FlushInterval, FlushInterval);
         AppDomain.CurrentDomain.ProcessExit += (_, _) => Dispose();
+        // ProcessExit doesn't run when the process dies of an unhandled exception, and those last lines matter most.
+        AppDomain.CurrentDomain.UnhandledException += (_, _) => Dispose();
     }
 
     /// <summary>The logged-in account; lines from then on go to its file.</summary>
@@ -46,19 +56,27 @@ internal sealed partial class LogFileWriter : IDisposable
             return;
 
         string account = InvalidFileNameChars().Replace(username.Trim().ToLowerInvariant(), "_");
+        string previousAccount;
+        string text;
         lock (_lock)
         {
             if (account == _account)
                 return;
 
-            FlushLocked();
+            AppendRepeatSummary();
+            _lastLine = null;
+            previousAccount = _account;
+            text = TakePending();
             _account = account;
         }
+
+        if (text.Length > 0 && IsEnabled())
+            Write(previousAccount, text);
     }
 
     public void Add(LogType type, string message)
     {
-        if (_disposed || _enabled == false || string.IsNullOrWhiteSpace(message))
+        if (_disposed || _enabled == 0 || string.IsNullOrWhiteSpace(message))
             return;
 
         string text = message.TrimEnd();
@@ -78,13 +96,34 @@ internal sealed partial class LogFileWriter : IDisposable
             _lastLine = key;
             // Lines from CoreBots already start with [HH:mm:ss]; the rest get the time added.
             _pending.Append(StartsWithTime().IsMatch(text) ? key : $"[{time}] {key}").Append('\n');
+            if (_pending.Length > MaxPendingChars && _enabled != 1)
+                _pending.Clear(); // the setting can't be read yet: don't let the waiting lines grow without limit
         }
     }
 
     public void Flush()
     {
+        // Read the setting on every tick, even with nothing pending, so turning it back on takes effect.
+        bool enabled = IsEnabled();
+        string account;
+        string text;
         lock (_lock)
-            FlushLocked();
+        {
+            if (_pending.Length == 0)
+                return;
+
+            if (!enabled)
+            {
+                if (_enabled == 0)
+                    _pending.Clear();
+                return;
+            }
+
+            account = _account;
+            text = TakePending();
+        }
+
+        Write(account, text);
     }
 
     public void Dispose()
@@ -95,10 +134,15 @@ internal sealed partial class LogFileWriter : IDisposable
         _disposed = true;
         _timer.Dispose();
         lock (_lock)
-        {
             AppendRepeatSummary();
-            FlushLocked();
-        }
+        Flush();
+    }
+
+    private string TakePending()
+    {
+        string text = _pending.ToString();
+        _pending.Clear();
+        return text;
     }
 
     private void AppendRepeatSummary()
@@ -110,44 +154,46 @@ internal sealed partial class LogFileWriter : IDisposable
         _repeats = 0;
     }
 
-    private void FlushLocked()
+    private void Write(string account, string text)
     {
-        if (_pending.Length == 0)
-            return;
-
-        if (!IsEnabled())
+        byte[] bytes = Encoding.UTF8.GetBytes(text);
+        lock (_writeLock)
         {
-            // Off, or the setting can't be read yet: don't let the waiting lines grow without limit.
-            if (_enabled == false || _pending.Length > 1_000_000)
-                _pending.Clear();
-            return;
-        }
-
-        string text = _pending.ToString();
-        _pending.Clear();
-        try
-        {
-            Directory.CreateDirectory(_directory);
-            if (!_cleanedUp)
+            for (int attempt = 0; attempt < 2; attempt++)
             {
-                _cleanedUp = true;
-                DeleteOldFiles();
-            }
+                try
+                {
+                    Directory.CreateDirectory(_directory);
+                    if (!_cleanedUp)
+                    {
+                        _cleanedUp = true;
+                        DeleteOldFiles();
+                    }
 
-            File.AppendAllText(CurrentFile(), text, Encoding.UTF8);
-        }
-        catch (IOException)
-        {
-            // Disk full or the file is locked: drop this batch rather than fail the logger (no Trace here, it would loop back).
-        }
-        catch (UnauthorizedAccessException)
-        {
+                    // Shared, so another client (or the Manager) appending to the same file doesn't make this one fail.
+                    using FileStream stream = new(CurrentFile(account), FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete);
+                    stream.Write(bytes);
+                    return;
+                }
+                catch (IOException) when (attempt == 0)
+                {
+                    Thread.Sleep(100);
+                }
+                catch (IOException)
+                {
+                    // Disk full or still locked: drop this batch rather than fail the logger (no Trace here, it would loop back).
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    return;
+                }
+            }
         }
     }
 
-    private string CurrentFile()
+    private string CurrentFile(string account)
     {
-        string name = $"{_account}_{DateTime.Now:yyyy-MM-dd}";
+        string name = $"{account}_{DateTime.Now:yyyy-MM-dd}";
         string path = Path.Combine(_directory, name + ".log");
         for (int part = 2; File.Exists(path) && new FileInfo(path).Length >= MaxFileBytes; part++)
             path = Path.Combine(_directory, $"{name}_{part}.log");
@@ -173,11 +219,12 @@ internal sealed partial class LogFileWriter : IDisposable
         }
     }
 
-    // The settings service may not exist yet when the first lines arrive; until it does, lines wait in memory.
+    // Called outside _lock: the settings service takes its own lock and a cross-process mutex.
+    // It may not exist yet when the first lines arrive; until it does, lines wait in memory.
     private bool IsEnabled()
     {
-        if (_enabled is not null && DateTime.Now - _enabledReadAt < SettingRefreshInterval)
-            return _enabled.Value;
+        if (_enabled != -1 && DateTime.Now - _enabledReadAt < SettingRefreshInterval)
+            return _enabled == 1;
 
         try
         {
@@ -185,9 +232,9 @@ internal sealed partial class LogFileWriter : IDisposable
             if (settings is null)
                 return false;
 
-            _enabled = settings.Get<bool>("LogToFile");
+            _enabled = settings.Get<bool>("LogToFile") ? 1 : 0;
             _enabledReadAt = DateTime.Now;
-            return _enabled.Value;
+            return _enabled == 1;
         }
         catch (InvalidOperationException)
         {
