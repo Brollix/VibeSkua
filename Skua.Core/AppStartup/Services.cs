@@ -192,7 +192,7 @@ public static class Services
             "CommunityToolkit.Mvvm.DependencyInjection",
             "Newtonsoft.Json",
             "Newtonsoft.Json.Linq",
-        });
+        }.Where(ns => OperatingSystem.IsWindows() || ns != "System.Windows.Forms").ToArray()); // WinForms doesn't exist outside Windows
         compiler.SaveGeneratedCode = true;
         return compiler;
     }
