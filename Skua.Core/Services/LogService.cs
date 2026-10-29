@@ -10,6 +10,7 @@ namespace Skua.Core.Services;
 public class LogService : ObservableRecipient, ILogService, IDisposable
 {
     private readonly DebugListener _debugListener;
+    private readonly LogFileWriter _fileWriter = new();
     private const int MaxLogEntries = 10000;
     private readonly object _debugLock = new();
     private readonly object _scriptLock = new();
@@ -20,6 +21,8 @@ public class LogService : ObservableRecipient, ILogService, IDisposable
         _debugListener = new DebugListener(this);
         Trace.Listeners.Add(_debugListener);
         Messenger.Register<LogService, FlashErrorMessage>(this, LogFlashError);
+        // Game events go through the strong messenger (see ScriptInterface).
+        StrongReferenceMessenger.Default.Register<LogService, LoginMessage, int>(this, (int)MessageChannels.GameEvents, (r, m) => r._fileWriter.SetAccount(m.Username));
     }
 
     private void LogFlashError(LogService recipient, FlashErrorMessage message)
@@ -42,6 +45,7 @@ public class LogService : ObservableRecipient, ILogService, IDisposable
                 _debugLogs.RemoveAt(0);
             _debugLogs.Add(message);
         }
+        _fileWriter.Add(LogType.Debug, message);
         Messenger.Send(new LogsChangedMessage(LogType.Debug));
         Messenger.Send(new AddLogMessage(LogType.Debug, message));
     }
@@ -70,6 +74,7 @@ public class LogService : ObservableRecipient, ILogService, IDisposable
                 _scriptLogs.RemoveAt(0);
             _scriptLogs.Add(message);
         }
+        _fileWriter.Add(LogType.Script, message);
         Messenger.Send(new LogsChangedMessage(LogType.Script));
         Messenger.Send(new AddLogMessage(LogType.Script, message));
     }
@@ -132,6 +137,9 @@ public class LogService : ObservableRecipient, ILogService, IDisposable
 
             // Unregister from messenger
             Messenger.UnregisterAll(this);
+            StrongReferenceMessenger.Default.UnregisterAll(this);
+
+            _fileWriter.Dispose();
 
             // Clear log collections
             _debugLogs.Clear();
