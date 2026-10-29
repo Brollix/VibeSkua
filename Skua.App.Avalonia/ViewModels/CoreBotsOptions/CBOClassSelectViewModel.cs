@@ -385,11 +385,6 @@ public partial class CBOClassSelectViewModel : ObservableObject, IManageCBOption
 
     private void SortPlayerClasses()
     {
-        if (PlayerClasses.Count <= 1)
-        {
-            return;
-        }
-
         List<string> sortedClasses = PlayerClasses
             .Where(name => name != CurrentClassOption)
             .OrderBy(name => name, System.StringComparer.OrdinalIgnoreCase)
@@ -422,33 +417,32 @@ public partial class CBOClassSelectViewModel : ObservableObject, IManageCBOption
     [RelayCommand]
     private void ReloadClasses()
     {
+        // Runs every time the view is shown, so it must refresh the list without clearing the user's picks.
+        string? solo = SelectedSoloClass, farm = SelectedFarmClass, dodge = SelectedDodgeClass, boss = SelectedBossClass;
+
         PlayerClasses = new List<string> { CurrentClassOption };
         if (_inventory.Items is not null)
         {
             foreach (InventoryItem item in _inventory.Items)
             {
-                if (item.Category == ItemCategory.Class && item.EnhancementLevel > 0)
+                if (item.Category == ItemCategory.Class)
                     PlayerClasses.Add(item.Name);
             }
         }
 
+        foreach (string? picked in new[] { solo, farm, dodge, boss })
+        {
+            if (!string.IsNullOrEmpty(picked) && !PlayerClasses.Contains(picked))
+                PlayerClasses.Add(picked);
+        }
+
         SortPlayerClasses();
 
-        SoloUseModes = new();
-        SelectedSoloClass = null;
-        SelectedSoloUseMode = null;
-
-        FarmUseModes = new();
-        SelectedFarmClass = null;
-        SelectedFarmUseMode = null;
-
-        DodgeUseModes = new();
-        SelectedDodgeClass = null;
-        SelectedDodgeUseMode = null;
-
-        BossUseModes = new();
-        SelectedBossClass = null;
-        SelectedBossUseMode = null;
+        // The ComboBoxes may push null back while their ItemsSource is swapped; restore the picks.
+        SelectedSoloClass = solo;
+        SelectedFarmClass = farm;
+        SelectedDodgeClass = dodge;
+        SelectedBossClass = boss;
     }
 
     public StringBuilder Save(StringBuilder builder)
