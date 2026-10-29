@@ -15,6 +15,7 @@ using Skua.Core.Utils;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -182,8 +183,19 @@ public partial class GrabberListViewModel : ObservableRecipient
         }
 
         string text = BuildDetailedExportText(targetItems);
-        _fileDialogService.SaveText(text);
-        ShowTemporaryMessage($"Exported {targetItems.Count} item(s) to file.");
+        string? path = _fileDialogService.Save();
+        if (string.IsNullOrWhiteSpace(path))
+            return;
+
+        try
+        {
+            File.WriteAllText(path, text);
+            ShowTemporaryMessage($"Exported {targetItems.Count} item(s) to file.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ShowTemporaryMessage($"Export failed: {ex.Message}");
+        }
     }
 
     private void ShowTemporaryMessage(string message)

@@ -297,6 +297,13 @@ public partial class ScriptSchedulerViewModel : BotControlViewModelBase
         }
 
         string? path = _fileDialog.OpenFile("JSON Files (*.json)|*.json|All files (*.*)|*.*");
+        // The queue can be started while the file dialog is open.
+        if (path != null && IsRunningQueue)
+        {
+            _dialogService.ShowMessageBox("Cannot load a playlist while the queue is running.", "Scheduler Running");
+            return;
+        }
+
         if (path != null && File.Exists(path))
         {
             try
