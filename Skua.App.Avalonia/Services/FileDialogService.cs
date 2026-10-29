@@ -105,6 +105,7 @@ public class FileDialogService : IFileDialogService
     }
 }
 #else
+using CommunityToolkit.Mvvm.DependencyInjection;
 using Skua.Core.Models;
 using System;
 using System.IO;
@@ -186,14 +187,31 @@ public class FileDialogService : IFileDialogService
     {
         string? path = Save();
         if (!string.IsNullOrWhiteSpace(path))
-            File.WriteAllText(path, contents);
+            WriteFile(path, tmp => File.WriteAllText(tmp, contents));
     }
 
     public void SaveText(IEnumerable<string> contents)
     {
         string? path = Save();
         if (!string.IsNullOrWhiteSpace(path))
-            File.WriteAllLines(path, contents);
+            WriteFile(path, tmp => File.WriteAllLines(tmp, contents));
+    }
+
+    // Writes next to the file first and replaces it only once that worked, so a full disk or a
+    // folder without write access leaves the old file as it was; the error is shown, not thrown.
+    private static void WriteFile(string path, Action<string> write)
+    {
+        string tmp = path + ".tmp";
+        try
+        {
+            write(tmp);
+            File.Move(tmp, path, true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            try { File.Delete(tmp); } catch (Exception) { }
+            Ioc.Default.GetService<IDialogService>()?.ShowMessageBox($"Could not save {path}: {ex.Message}", "Save Error");
+        }
     }
 
     private static async Task<string?> PickFolder(IStorageProvider provider, string initialDirectory)
