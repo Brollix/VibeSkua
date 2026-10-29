@@ -196,7 +196,8 @@ internal sealed partial class LogFileWriter : IDisposable
         if (_repeats == 0)
             return;
 
-        Enqueue(new(_account, _lastDay, $"{_lastStamp} (previous line repeated {_repeats} more time{(_repeats == 1 ? string.Empty : "s")})"));
+        // Same [debug] tag as the line it summarizes, so it isn't read as a Script line.
+        Enqueue(new(_account, _lastDay, $"{_lastStamp} {(_lastType == LogType.Debug ? "[debug] " : string.Empty)}(previous line repeated {_repeats} more time{(_repeats == 1 ? string.Empty : "s")})"));
         _repeats = 0;
     }
 
